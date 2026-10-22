@@ -26,6 +26,16 @@ const api: KinotekaApi = {
     listShows: () => ipcRenderer.invoke(IpcChannel.CatalogListShows),
     getFileDetails: (fileId) => ipcRenderer.invoke(IpcChannel.CatalogFileDetails, fileId)
   },
+  metadata: {
+    keyStatus: () => ipcRenderer.invoke(IpcChannel.MetadataKeyStatus),
+    saveKey: (key) => ipcRenderer.invoke(IpcChannel.MetadataSaveKey, key),
+    removeKey: () => ipcRenderer.invoke(IpcChannel.MetadataRemoveKey),
+    search: (kind, query, year) =>
+      ipcRenderer.invoke(IpcChannel.MetadataSearch, { kind, query, year }),
+    applyMatch: (titleId, tmdbId) =>
+      ipcRenderer.invoke(IpcChannel.MetadataApplyMatch, titleId, tmdbId),
+    refresh: (titleId) => ipcRenderer.invoke(IpcChannel.MetadataRefresh, titleId)
+  },
   library: {
     listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),
     listFiles: () => ipcRenderer.invoke(IpcChannel.LibraryListFiles),

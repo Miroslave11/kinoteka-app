@@ -1,16 +1,24 @@
 import { useState } from 'react'
-import { ArrowLeft, Info, Play } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
-import type { EpisodeItem } from '../../../shared/catalog'
+import { Info, Play } from 'lucide-react'
+import { useParams } from 'react-router'
 import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
-import { playableFile, showFiles } from '../app/catalogData'
+import {
+  mergeSeasons,
+  playableFile,
+  showFiles,
+  type EpisodeView,
+  type TitleItem
+} from '../app/catalogData'
 import { paletteFor, placeholderStyle, useAmbientPalette } from '../app/palette'
+import Artwork from '../components/Artwork'
+import DetailHeader from '../components/DetailHeader'
 import MediaBadges from '../components/MediaBadges'
+
+const pad = (n: number): string => String(n).padStart(2, '0')
 
 export default function ShowDetailPage(): React.JSX.Element {
   const { id } = useParams()
-  const navigate = useNavigate()
   const { shows, loading, play } = useApp()
   const show = shows.find((s) => s.id === Number(id))
   const [seasonNumber, setSeasonNumber] = useState<number | null>(null)
@@ -24,105 +32,116 @@ export default function ShowDetailPage(): React.JSX.Element {
     )
   }
 
-  const season = show.seasons.find((s) => s.number === seasonNumber) ?? show.seasons[0]
-  const firstEpisode = show.seasons[0]?.episodes.find((e) => playableFile(e.files))
-  const files = showFiles(show)
-  const tags = [...new Set(files.flatMap((f) => f.tags))]
+  const title: TitleItem = { kind: 'show', ...show }
+  const seasons = mergeSeasons(show)
+  // Výchozí série = první, ve které je něco na disku.
+  const season =
+    seasons.find((s) => s.number === seasonNumber) ??
+    seasons.find((s) => s.episodes.some((e) => e.disk)) ??
+    seasons[0]
+  const firstEpisode = seasons
+    .flatMap((s) => s.episodes)
+    .find((e) => e.disk && playableFile(e.disk.files))
+  const tags = [...new Set(showFiles(show).flatMap((f) => f.tags))]
+  const total = seasons.reduce((sum, s) => sum + s.episodes.length, 0)
 
   return (
     <div className="detail-page">
-      <div className="d-back">
-        <div className="clip" />
-        <div className="shade" />
-      </div>
-      <button className="icon-btn back" onClick={() => navigate(-1)} title="Zpět">
-        <ArrowLeft size={20} />
-      </button>
-      <div className="detail">
-        <div className="poster detail-poster" style={placeholderStyle(show.name)}>
-          <span className="poster-title">
-            {show.name}
-            <small>{show.year}</small>
-          </span>
-        </div>
-        <div className="d-info">
-          <div className="logo-title">{show.name}</div>
-          {show.alternativeNames.length > 0 && (
-            <div className="orig">také jako {show.alternativeNames.join(', ')}</div>
-          )}
-          <div className="meta">
-            {[
-              show.year ?? 'rok neznámý',
-              `${show.seasons.length} ${show.seasons.length >= 5 ? 'sérií' : 'série'}`,
-              `${show.episodeCount} ${show.episodeCount >= 5 ? 'dílů' : 'díly'} na disku`
-            ].join(' · ')}
-          </div>
-          <MediaBadges file={undefined} tags={tags} />
-          {show.alternativeNames.length > 0 && (
-            <div className="info-chip">
-              Seskupeno ze souborů s různými názvy:{' '}
-              {[show.name, ...show.alternativeNames].join(' / ')}
-            </div>
-          )}
-          <div className="actions">
-            {firstEpisode && (
-              <button
-                className="btn primary"
-                onClick={() => void play(playableFile(firstEpisode.files)!.id)}
-              >
-                <Play size={18} fill="currentColor" /> Přehrát S
-                {String(firstEpisode.season).padStart(2, '0')}E
-                {String(firstEpisode.episode).padStart(2, '0')}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      <DetailHeader
+        title={title}
+        meta={[
+          `${seasons.length} ${seasons.length >= 5 ? 'sérií' : 'série'}`,
+          show.metadata
+            ? `${show.episodeCount} z ${total} dílů na disku`
+            : `${show.episodeCount} ${show.episodeCount >= 5 ? 'dílů' : 'díly'} na disku`
+        ]}
+        badges={<MediaBadges file={undefined} tags={tags} />}
+      >
+        {firstEpisode?.disk && (
+          <button
+            className="btn primary"
+            onClick={() => void play(playableFile(firstEpisode.disk!.files)!.id)}
+          >
+            <Play size={18} fill="currentColor" /> Přehrát S{pad(firstEpisode.season)}E
+            {pad(firstEpisode.episode)}
+          </button>
+        )}
+      </DetailHeader>
+
+      {show.alternativeNames.length > 0 && (
+        <p className="d-section info-chip">
+          Soubory seskupené z různých názvů: {[show.name, ...show.alternativeNames].join(' / ')}
+        </p>
+      )}
 
       <section className="d-section">
         <div className="seasons">
-          {show.seasons.map((s) => (
+          {seasons.map((s) => (
             <button
               key={s.number}
               className={`chip ${s.number === season?.number ? 'on' : ''}`}
               onClick={() => setSeasonNumber(s.number)}
             >
-              Série {s.number}
+              {s.name}
+              <span className="chip-count">
+                {s.episodes.filter((e) => e.disk).length}/{s.episodes.length}
+              </span>
             </button>
           ))}
         </div>
         {season?.episodes.map((episode) => (
-          <EpisodeRow key={episode.id} name={show.name} episode={episode} />
+          <EpisodeRow
+            key={`${episode.season}x${episode.episode}`}
+            showName={show.name}
+            episode={episode}
+          />
         ))}
       </section>
     </div>
   )
 }
 
-function EpisodeRow({ name, episode }: { name: string; episode: EpisodeItem }): React.JSX.Element {
+function EpisodeRow({
+  showName,
+  episode
+}: {
+  showName: string
+  episode: EpisodeView
+}): React.JSX.Element {
   const { play, showDetails } = useApp()
-  const file = playableFile(episode.files)
-  const first = file ?? episode.files[0]
+  const files = episode.disk?.files ?? []
+  const file = playableFile(files)
+  const first = file ?? files[0]
 
   return (
-    <div className={`ep ${file ? '' : 'is-unavailable'}`}>
+    <div className={`ep ${episode.disk ? (file ? '' : 'is-unavailable') : 'is-missing'}`}>
       <button
         className="ep-still"
-        style={placeholderStyle(`${name} ${episode.season}x${episode.episode}`)}
+        style={placeholderStyle(`${showName} ${episode.season}x${episode.episode}`)}
         disabled={!file}
         onClick={() => file && void play(file.id)}
-        title="Přehrát"
+        title={file ? 'Přehrát' : episode.disk ? 'Soubor není dostupný' : 'Díl není na disku'}
       >
-        <span className="ep-play">
-          <Play size={20} fill="currentColor" />
-        </span>
+        <Artwork src={episode.stillUrl} />
+        {file && (
+          <span className="ep-play">
+            <Play size={20} fill="currentColor" />
+          </span>
+        )}
       </button>
       <div className="ep-info">
         <h5>
           {episode.episode}. {episode.name ?? 'díl'}
         </h5>
-        <MediaBadges file={first} tags={first?.tags ?? []} />
-        <small className="mono">{episode.files.map((f) => f.fileName).join(' · ')}</small>
+        {episode.overview && <p className="ep-overview">{episode.overview}</p>}
+        {episode.disk ? (
+          <>
+            <MediaBadges file={first} tags={first?.tags ?? []} />
+            <small className="mono">{files.map((f) => f.fileName).join(' · ')}</small>
+          </>
+        ) : (
+          <small>Tento díl na disku není.</small>
+        )}
       </div>
       <div className="ep-side">
         {first?.summary && <span>{formatTime(first.summary.durationSec)}</span>}

@@ -17,5 +17,12 @@ export const IpcChannel = {
 
   CatalogListMovies: 'catalog:list-movies',
   CatalogListShows: 'catalog:list-shows',
-  CatalogFileDetails: 'catalog:file-details'
+  CatalogFileDetails: 'catalog:file-details',
+
+  MetadataKeyStatus: 'metadata:key-status',
+  MetadataSaveKey: 'metadata:save-key',
+  MetadataRemoveKey: 'metadata:remove-key',
+  MetadataSearch: 'metadata:search',
+  MetadataApplyMatch: 'metadata:apply-match',
+  MetadataRefresh: 'metadata:refresh'
 } as const

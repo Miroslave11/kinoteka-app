@@ -19,13 +19,23 @@ const file = (id: number, tags: string[]): CatalogFile => ({
 })
 
 const MOVIES: MovieItem[] = [
-  { id: 1, name: 'Prázdnota', year: 2020, tags: ['CZ dabing'], files: [file(1, ['CZ dabing'])] },
+  {
+    id: 1,
+    name: 'Prázdnota',
+    year: 2020,
+    tags: ['CZ dabing'],
+    files: [file(1, ['CZ dabing'])],
+    metadata: null,
+    matchStatus: 'pending'
+  },
   {
     id: 2,
     name: 'Predátor - Nebezpečné Území',
     year: 2025,
     tags: ['CZ titulky'],
-    files: [file(2, ['CZ titulky'])]
+    files: [file(2, ['CZ titulky'])],
+    metadata: null,
+    matchStatus: 'pending'
   }
 ]
 
