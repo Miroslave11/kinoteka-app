@@ -9,6 +9,8 @@ export interface CatalogFile {
   size: number
   available: boolean
   tags: string[]
+  /** ISO čas, kdy soubor přibyl do knihovny. */
+  addedAt: string
   /** Shrnutí z ffprobe; null, dokud analýza neproběhla. */
   summary: MediaSummary | null
 }

@@ -39,6 +39,7 @@ const toFile = (row: Row): CatalogFile => {
     size: Number(row['size']),
     available: row['available'] === 1,
     tags: parseTags(row['tags']),
+    addedAt: String(row['added_at']),
     summary: info ? summarize(info) : null
   }
 }

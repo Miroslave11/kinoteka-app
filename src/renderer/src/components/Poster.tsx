@@ -1,0 +1,56 @@
+import { Play } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import { applyPalette, paletteFor, placeholderStyle } from '../app/palette'
+import { filesOf, playableFile, type TitleItem } from '../app/catalogData'
+
+interface PosterProps {
+  title: TitleItem
+  /** Najetí myší přebarví prostředí podle titulu (Domů). */
+  tintOnHover?: boolean
+  onHoverEnd?: () => void
+}
+
+export const titlePath = (title: TitleItem): string =>
+  title.kind === 'movie' ? `/filmy/${title.id}` : `/serialy/${title.id}`
+
+/** Plakát s názvem; klik otevře detail. Obrázky z TMDB nahradí zástupný přechod v přírůstku 6. */
+export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps): React.JSX.Element {
+  const navigate = useNavigate()
+  const files = filesOf(title)
+  const summary = (playableFile(files) ?? files[0])?.summary
+  const subtitle =
+    title.kind === 'movie'
+      ? (title.year ?? '')
+      : `${title.episodeCount} ${title.episodeCount >= 5 ? 'dílů' : title.episodeCount === 1 ? 'díl' : 'díly'}`
+
+  return (
+    <button
+      className={`poster-card ${playableFile(files) ? '' : 'is-unavailable'}`}
+      onClick={() => navigate(titlePath(title))}
+      onMouseEnter={tintOnHover ? () => applyPalette(paletteFor(title.name)) : undefined}
+      onMouseLeave={onHoverEnd}
+    >
+      <span className="poster" style={placeholderStyle(title.name)}>
+        {summary && (
+          <span className="poster-badges">
+            <span className="badge glass">{summary.resolution}</span>
+          </span>
+        )}
+        <span className="poster-title">
+          {title.name}
+          <small>{subtitle}</small>
+        </span>
+        <span className="poster-play">
+          <Play size={22} fill="currentColor" />
+        </span>
+      </span>
+      <span className="cap">
+        <b>{title.name}</b>
+        <span>
+          {title.year ?? 'rok neznámý'}
+          {title.kind === 'show' && ` · seriál`}
+        </span>
+      </span>
+    </button>
+  )
+}
