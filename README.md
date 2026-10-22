@@ -13,16 +13,18 @@ Požadavky: Node.js 24, npm.
 
 ```bash
 npm install
+npm run fetch:mpv
 npm run dev
 ```
 
-| Příkaz              | Co dělá                                 |
-| ------------------- | --------------------------------------- |
-| `npm run dev`       | spustí aplikaci s automatickým reloadem |
-| `npm run build`     | sestaví aplikaci do `out/`              |
-| `npm run lint`      | ESLint                                  |
-| `npm run typecheck` | kontrola typů TypeScriptu               |
-| `npm test`          | automatické testy (Vitest)              |
-| `npm run format`    | naformátuje kód Prettierem              |
+| Příkaz              | Co dělá                                                                                |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `npm run dev`       | spustí aplikaci s automatickým reloadem                                                |
+| `npm run build`     | sestaví aplikaci do `out/`                                                             |
+| `npm run lint`      | ESLint                                                                                 |
+| `npm run typecheck` | kontrola typů TypeScriptu                                                              |
+| `npm test`          | automatické testy (Vitest)                                                             |
+| `npm run format`    | naformátuje kód Prettierem                                                             |
+| `npm run fetch:mpv` | jednou stáhne přehrávač mpv (pevná verze, ověřený kontrolní součet) do `resources/bin` |
 
 CI (GitHub Actions, Windows) při každém pushi spustí lint, kontrolu formátu, typů, testy a build.
