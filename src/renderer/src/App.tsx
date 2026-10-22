@@ -1,51 +1,64 @@
-import { useEffect, useState } from 'react'
-import MoviesPage from './catalog/MoviesPage'
-import ShowsPage from './catalog/ShowsPage'
-import LibraryPage from './library/LibraryPage'
-import PlayerTestPage from './PlayerTestPage'
+import { AnimatePresence, motion } from 'motion/react'
+import { HashRouter, Route, Routes, useLocation } from 'react-router'
+import { AppProvider, useApp } from './app/AppContext'
+import FileDetailsDialog from './components/FileDetailsDialog'
+import Sidebar from './components/Sidebar'
+import TopBar from './components/TopBar'
+import BrowsePage from './pages/BrowsePage'
+import HomePage from './pages/HomePage'
+import MovieDetailPage from './pages/MovieDetailPage'
+import SearchPage from './pages/SearchPage'
+import SettingsPage from './pages/SettingsPage'
+import ShowDetailPage from './pages/ShowDetailPage'
 
-type Tab = 'movies' | 'shows' | 'library' | 'player'
-
-const TABS: [Tab, string][] = [
-  ['movies', 'Filmy'],
-  ['shows', 'Seriály'],
-  ['library', 'Knihovna'],
-  ['player', 'Přehrávač (test)']
-]
-
-/** Dočasná kostra UI; skutečný vzhled podle mockupů přijde v přírůstku 5. */
 export default function App(): React.JSX.Element {
-  const [tab, setTab] = useState<Tab>('movies')
-  const [error, setError] = useState<string | null>(null)
+  return (
+    <HashRouter>
+      <AppProvider>
+        <Shell />
+      </AppProvider>
+    </HashRouter>
+  )
+}
 
-  useEffect(() => window.kinoteka.player.onClosed((info) => setError(info.error ?? null)), [])
+function Shell(): React.JSX.Element {
+  const location = useLocation()
+  const { error, setError, detailsFileId, showDetails } = useApp()
 
   return (
-    <div className="shell">
-      <header className="topnav">
-        <div className="brand">
-          <span className="brand-mark" />
-          Kinotéka
-        </div>
-        <nav>
-          {TABS.map(([id, label]) => (
-            <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
-              {label}
-            </button>
-          ))}
-        </nav>
-      </header>
+    <div className="app">
+      <div className="ambient" />
+      <Sidebar />
+      <main className="content">
+        <TopBar />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <Routes location={location}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/filmy" element={<BrowsePage kind="movie" />} />
+              <Route path="/filmy/:id" element={<MovieDetailPage />} />
+              <Route path="/serialy" element={<BrowsePage kind="show" />} />
+              <Route path="/serialy/:id" element={<ShowDetailPage />} />
+              <Route path="/hledat" element={<SearchPage />} />
+              <Route path="/nastaveni" element={<SettingsPage />} />
+            </Routes>
+          </motion.div>
+        </AnimatePresence>
+      </main>
+      {detailsFileId !== null && (
+        <FileDetailsDialog fileId={detailsFileId} onClose={() => showDetails(null)} />
+      )}
       {error && (
         <p className="notice is-error floating" onClick={() => setError(null)}>
           {error}
         </p>
       )}
-      <main>
-        {tab === 'movies' && <MoviesPage onError={setError} />}
-        {tab === 'shows' && <ShowsPage onError={setError} />}
-        {tab === 'library' && <LibraryPage />}
-        {tab === 'player' && <PlayerTestPage />}
-      </main>
     </div>
   )
 }

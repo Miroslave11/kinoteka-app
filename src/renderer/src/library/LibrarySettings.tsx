@@ -22,7 +22,7 @@ function describeScan(results: ScanResult[]): string {
   return `Sken dokončen: ${parts.join(', ')}${offline ? ` · nedostupné složky: ${offline}` : ''}.`
 }
 
-export default function LibraryPage(): React.JSX.Element {
+export default function LibrarySettings(): React.JSX.Element {
   const { library, player } = window.kinoteka
   const { folders, files, progress, loading } = useLibrary()
   const [busy, setBusy] = useState(false)
@@ -65,10 +65,7 @@ export default function LibraryPage(): React.JSX.Element {
   const folderById = new Map(folders.map((folder) => [folder.id, folder]))
 
   return (
-    <div className="page">
-      <h1>Knihovna</h1>
-      <p className="subtitle">Složky, ve kterých Kinotéka hledá filmy a seriály.</p>
-
+    <div className="s-stack">
       <section className="card">
         <h2>Složky s filmy a seriály</h2>
         {!loading && folders.length === 0 && (

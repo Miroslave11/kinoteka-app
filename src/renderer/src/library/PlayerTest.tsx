@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 
 /** Ruční otevření libovolného souboru – zůstává pro testování přehrávače. */
-export default function PlayerTestPage(): React.JSX.Element {
+export default function PlayerTest(): React.JSX.Element {
   const { versions, player } = window.kinoteka
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -16,16 +16,19 @@ export default function PlayerTestPage(): React.JSX.Element {
   }
 
   return (
-    <div className="welcome">
-      <p className="lead">Technický test přehrávače – vyber libovolný soubor z disku.</p>
-      <button className="btn primary" onClick={openFile} disabled={busy}>
-        <FolderOpen size={18} />
-        {busy ? 'Spouštím…' : 'Otevřít soubor…'}
-      </button>
+    <section className="card">
+      <h2>Test přehrávače</h2>
+      <p className="muted">Přehraje libovolný soubor z disku, i mimo knihovnu.</p>
+      <div className="actions">
+        <button className="btn primary" onClick={openFile} disabled={busy}>
+          <FolderOpen size={18} />
+          {busy ? 'Spouštím…' : 'Otevřít soubor…'}
+        </button>
+      </div>
       {error && <p className="notice is-error">{error}</p>}
       <p className="versions">
-        Electron {versions.electron} · Chromium {versions.chrome} · Node {versions.node}
+        Kinotéka · Electron {versions.electron} · Chromium {versions.chrome} · Node {versions.node}
       </p>
-    </div>
+    </section>
   )
 }
