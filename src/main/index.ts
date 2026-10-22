@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
 import { VIDEO_EXTENSIONS } from '../shared/library'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
+import { CatalogRepository } from './catalog/CatalogRepository'
 import { openDatabase } from './db/database'
 import { registerLibraryIpc } from './library/libraryIpc'
 import { LibraryRepository } from './library/LibraryRepository'
@@ -86,6 +87,12 @@ void app.whenReady().then(() => {
   const db = openDatabase(join(app.getPath('userData'), 'kinoteka.db'))
   const repository = new LibraryRepository(db)
   const library = new LibraryService(repository)
+  const catalog = new CatalogRepository(db)
+  // Katalog se přestaví dřív, než se změna knihovny ohlásí oknům (posluchači běží v pořadí registrace).
+  library.on('changed', () => catalog.rebuild())
+  catalog.rebuild()
+  ipcMain.handle(IpcChannel.CatalogListMovies, () => catalog.listMovies())
+  ipcMain.handle(IpcChannel.CatalogListShows, () => catalog.listShows())
   registerLibraryIpc(library, repository)
   registerPlayerIpc(repository)
 

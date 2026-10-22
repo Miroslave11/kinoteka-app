@@ -13,5 +13,8 @@ export const IpcChannel = {
   LibraryRemoveFolder: 'library:remove-folder',
   LibraryScan: 'library:scan',
   LibraryChanged: 'library:changed',
-  LibraryScanProgress: 'library:scan-progress'
+  LibraryScanProgress: 'library:scan-progress',
+
+  CatalogListMovies: 'catalog:list-movies',
+  CatalogListShows: 'catalog:list-shows'
 } as const

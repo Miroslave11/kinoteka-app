@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react'
+import MoviesPage from './catalog/MoviesPage'
+import ShowsPage from './catalog/ShowsPage'
 import LibraryPage from './library/LibraryPage'
 import PlayerTestPage from './PlayerTestPage'
 
-type Tab = 'library' | 'player'
+type Tab = 'movies' | 'shows' | 'library' | 'player'
+
+const TABS: [Tab, string][] = [
+  ['movies', 'Filmy'],
+  ['shows', 'Seriály'],
+  ['library', 'Knihovna'],
+  ['player', 'Přehrávač (test)']
+]
 
 /** Dočasná kostra UI; skutečný vzhled podle mockupů přijde v přírůstku 5. */
 export default function App(): React.JSX.Element {
-  const [tab, setTab] = useState<Tab>('library')
-  const [playerError, setPlayerError] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('movies')
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => window.kinoteka.player.onClosed((info) => setPlayerError(info.error ?? null)), [])
+  useEffect(() => window.kinoteka.player.onClosed((info) => setError(info.error ?? null)), [])
 
   return (
     <div className="shell">
@@ -19,20 +28,24 @@ export default function App(): React.JSX.Element {
           Kinotéka
         </div>
         <nav>
-          <button className={tab === 'library' ? 'on' : ''} onClick={() => setTab('library')}>
-            Knihovna
-          </button>
-          <button className={tab === 'player' ? 'on' : ''} onClick={() => setTab('player')}>
-            Přehrávač (test)
-          </button>
+          {TABS.map(([id, label]) => (
+            <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
         </nav>
       </header>
-      {playerError && (
-        <p className="notice is-error floating" onClick={() => setPlayerError(null)}>
-          {playerError}
+      {error && (
+        <p className="notice is-error floating" onClick={() => setError(null)}>
+          {error}
         </p>
       )}
-      <main>{tab === 'library' ? <LibraryPage /> : <PlayerTestPage />}</main>
+      <main>
+        {tab === 'movies' && <MoviesPage onError={setError} />}
+        {tab === 'shows' && <ShowsPage onError={setError} />}
+        {tab === 'library' && <LibraryPage />}
+        {tab === 'player' && <PlayerTestPage />}
+      </main>
     </div>
   )
 }

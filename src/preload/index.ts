@@ -21,6 +21,10 @@ const api: KinotekaApi = {
     onState: (listener) => subscribe(IpcChannel.PlayerState, listener),
     onClosed: (listener) => subscribe(IpcChannel.PlayerClosed, listener)
   },
+  catalog: {
+    listMovies: () => ipcRenderer.invoke(IpcChannel.CatalogListMovies),
+    listShows: () => ipcRenderer.invoke(IpcChannel.CatalogListShows)
+  },
   library: {
     listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),
     listFiles: () => ipcRenderer.invoke(IpcChannel.LibraryListFiles),

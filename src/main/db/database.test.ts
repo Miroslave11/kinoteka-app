@@ -9,7 +9,7 @@ describe('openDatabase', () => {
       .all()
       .map((row) => row['name'])
     expect(tables).toEqual(expect.arrayContaining(['library_folder', 'media_file']))
-    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 1 })
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 })
   })
 
   it('zapne cizí klíče', () => {
