@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { migrate, openDatabase, transaction } from './database'
+import { MIGRATIONS } from './migrations'
 
 describe('openDatabase', () => {
   it('vytvoří schéma a nastaví verzi', () => {
@@ -9,7 +10,7 @@ describe('openDatabase', () => {
       .all()
       .map((row) => row['name'])
     expect(tables).toEqual(expect.arrayContaining(['library_folder', 'media_file']))
-    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 })
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: MIGRATIONS.length })
   })
 
   it('zapne cizí klíče', () => {

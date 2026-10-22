@@ -1,6 +1,10 @@
-import { Play } from 'lucide-react'
+import { useState } from 'react'
+import { Info, Play } from 'lucide-react'
 import type { MovieItem } from '../../../shared/catalog'
 import { formatSize } from '../../../shared/library'
+import { formatTime } from '../../../shared/player'
+import FileDetailsDialog from './FileDetailsDialog'
+import MediaBadges from './MediaBadges'
 import { placeholderStyle, useCatalog } from './useCatalog'
 
 export default function MoviesPage({
@@ -9,6 +13,7 @@ export default function MoviesPage({
   onError: (message: string) => void
 }): React.JSX.Element {
   const { movies, loading } = useCatalog()
+  const [detailsFor, setDetailsFor] = useState<number | null>(null)
 
   return (
     <div className="page">
@@ -21,21 +26,25 @@ export default function MoviesPage({
       )}
       <div className="poster-grid">
         {movies.map((movie) => (
-          <MovieCard key={movie.id} movie={movie} onError={onError} />
+          <MovieCard key={movie.id} movie={movie} onError={onError} onDetails={setDetailsFor} />
         ))}
       </div>
+      {detailsFor !== null && (
+        <FileDetailsDialog fileId={detailsFor} onClose={() => setDetailsFor(null)} />
+      )}
     </div>
   )
 }
 
-function MovieCard({
-  movie,
-  onError
-}: {
+interface MovieCardProps {
   movie: MovieItem
   onError: (message: string) => void
-}): React.JSX.Element {
+  onDetails: (fileId: number) => void
+}
+
+function MovieCard({ movie, onError, onDetails }: MovieCardProps): React.JSX.Element {
   const playable = movie.files.find((file) => file.available)
+  const first = playable ?? movie.files[0]
 
   const play = async (): Promise<void> => {
     if (!playable) return
@@ -62,20 +71,26 @@ function MovieCard({
         )}
       </button>
       <div className="poster-caption">
-        <b>{movie.name}</b>
+        <div className="caption-head">
+          <b>{movie.name}</b>
+          {first && (
+            <button
+              className="icon-btn xs"
+              title="Vlastnosti souboru"
+              onClick={() => onDetails(first.id)}
+            >
+              <Info size={14} />
+            </button>
+          )}
+        </div>
         <span>
           {movie.year ?? 'rok neznámý'}
+          {first?.summary && ` · ${formatTime(first.summary.durationSec)}`}
           {movie.files.length > 1 && ` · ${movie.files.length} soubory`}
         </span>
-        <div className="tags">
-          {movie.tags.map((tag) => (
-            <span key={tag} className="badge">
-              {tag}
-            </span>
-          ))}
-        </div>
+        <MediaBadges file={first} tags={movie.tags} />
         <small className="file-hint" title={movie.files.map((f) => f.relativePath).join('\n')}>
-          {movie.files[0]?.fileName} · {formatSize(movie.files.reduce((sum, f) => sum + f.size, 0))}
+          {first?.fileName} · {formatSize(movie.files.reduce((sum, f) => sum + f.size, 0))}
         </small>
       </div>
     </article>

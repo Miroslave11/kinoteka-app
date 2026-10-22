@@ -16,7 +16,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "fetch:mpv": "node scripts/fetch-mpv.mjs"
+    "fetch:mpv": "node scripts/fetch-mpv.mjs",
+    "fetch:ffmpeg": "node scripts/fetch-ffmpeg.mjs",
+    "fetch:bin": "node scripts/fetch-mpv.mjs && node scripts/fetch-ffmpeg.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.61.0",

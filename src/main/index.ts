@@ -1,10 +1,15 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
 import { VIDEO_EXTENSIONS } from '../shared/library'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
+import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
 import { openDatabase } from './db/database'
+import { runFfprobe } from './media/ffprobe'
+import { ProbeService } from './media/ProbeService'
+import { ffprobeExecutablePath } from './mpv/binary'
 import { registerLibraryIpc } from './library/libraryIpc'
 import { LibraryRepository } from './library/LibraryRepository'
 import { LibraryService } from './library/LibraryService'
@@ -88,11 +93,26 @@ void app.whenReady().then(() => {
   const repository = new LibraryRepository(db)
   const library = new LibraryService(repository)
   const catalog = new CatalogRepository(db)
+  const ffprobe = ffprobeExecutablePath()
+  const probe = existsSync(ffprobe)
+    ? new ProbeService(db, (path) => runFfprobe(ffprobe, path))
+    : null
+  if (!probe)
+    console.warn(`Chybí ${ffprobe} – vlastnosti souborů se nezjistí (npm run fetch:ffmpeg).`)
+  probe?.on('changed', () => broadcast(IpcChannel.LibraryChanged))
+
   // Katalog se přestaví dřív, než se změna knihovny ohlásí oknům (posluchači běží v pořadí registrace).
-  library.on('changed', () => catalog.rebuild())
+  library.on('changed', () => {
+    catalog.rebuild()
+    void probe?.run()
+  })
   catalog.rebuild()
+  void probe?.run()
   ipcMain.handle(IpcChannel.CatalogListMovies, () => catalog.listMovies())
   ipcMain.handle(IpcChannel.CatalogListShows, () => catalog.listShows())
+  ipcMain.handle(IpcChannel.CatalogFileDetails, (_event, id: unknown) =>
+    Number.isInteger(id) ? catalog.fileDetails(id as number) : null
+  )
   registerLibraryIpc(library, repository)
   registerPlayerIpc(repository)
 

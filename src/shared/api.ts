@@ -1,4 +1,4 @@
-import type { MovieItem, ShowItem } from './catalog'
+import type { FileDetails, MovieItem, ShowItem } from './catalog'
 import type {
   AddFolderResult,
   LibraryFolder,
@@ -32,6 +32,8 @@ export interface KinotekaApi {
     listMovies(): Promise<MovieItem[]>
     /** Seriály se sériemi a díly. */
     listShows(): Promise<ShowItem[]>
+    /** Technické vlastnosti souboru (panel „Vlastnosti souboru“). */
+    getFileDetails(fileId: number): Promise<FileDetails | null>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>

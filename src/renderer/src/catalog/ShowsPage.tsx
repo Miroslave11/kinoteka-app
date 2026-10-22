@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { ChevronDown, Play } from 'lucide-react'
+import { ChevronDown, Info, Play } from 'lucide-react'
 import type { EpisodeItem, ShowItem } from '../../../shared/catalog'
+import { formatTime } from '../../../shared/player'
+import FileDetailsDialog from './FileDetailsDialog'
+import MediaBadges from './MediaBadges'
 import { placeholderStyle, useCatalog } from './useCatalog'
 
 export default function ShowsPage({
@@ -10,6 +13,7 @@ export default function ShowsPage({
 }): React.JSX.Element {
   const { shows, loading } = useCatalog()
   const [open, setOpen] = useState<number | null>(null)
+  const [detailsFor, setDetailsFor] = useState<number | null>(null)
 
   return (
     <div className="page">
@@ -26,9 +30,13 @@ export default function ShowsPage({
             open={open === show.id}
             onToggle={() => setOpen(open === show.id ? null : show.id)}
             onError={onError}
+            onDetails={setDetailsFor}
           />
         ))}
       </div>
+      {detailsFor !== null && (
+        <FileDetailsDialog fileId={detailsFor} onClose={() => setDetailsFor(null)} />
+      )}
     </div>
   )
 }
@@ -38,9 +46,10 @@ interface ShowRowProps {
   open: boolean
   onToggle: () => void
   onError: (message: string) => void
+  onDetails: (fileId: number) => void
 }
 
-function ShowRow({ show, open, onToggle, onError }: ShowRowProps): React.JSX.Element {
+function ShowRow({ show, open, onToggle, onError, onDetails }: ShowRowProps): React.JSX.Element {
   return (
     <section className={`card show ${open ? 'is-open' : ''}`}>
       <button className="show-head" onClick={onToggle} aria-expanded={open}>
@@ -68,7 +77,12 @@ function ShowRow({ show, open, onToggle, onError }: ShowRowProps): React.JSX.Ele
           <div key={season.number} className="season">
             <h3>Série {season.number}</h3>
             {season.episodes.map((episode) => (
-              <EpisodeRow key={episode.id} episode={episode} onError={onError} />
+              <EpisodeRow
+                key={episode.id}
+                episode={episode}
+                onError={onError}
+                onDetails={onDetails}
+              />
             ))}
           </div>
         ))}
@@ -76,14 +90,15 @@ function ShowRow({ show, open, onToggle, onError }: ShowRowProps): React.JSX.Ele
   )
 }
 
-function EpisodeRow({
-  episode,
-  onError
-}: {
+interface EpisodeRowProps {
   episode: EpisodeItem
   onError: (message: string) => void
-}): React.JSX.Element {
+  onDetails: (fileId: number) => void
+}
+
+function EpisodeRow({ episode, onError, onDetails }: EpisodeRowProps): React.JSX.Element {
   const playable = episode.files.find((file) => file.available)
+  const first = playable ?? episode.files[0]
   const play = async (): Promise<void> => {
     if (!playable) return
     const result = await window.kinoteka.player.playFile(playable.id)
@@ -100,12 +115,25 @@ function EpisodeRow({
       >
         <Play size={14} fill="currentColor" />
       </button>
-      <div>
+      <div className="episode-info">
         <b>
           {episode.episode}. díl{episode.name && ` – ${episode.name}`}
+          {first?.summary && (
+            <span className="muted"> · {formatTime(first.summary.durationSec)}</span>
+          )}
         </b>
         <small>{episode.files.map((file) => file.fileName).join(' · ')}</small>
       </div>
+      <MediaBadges file={first} tags={first?.tags ?? []} />
+      {first && (
+        <button
+          className="icon-btn xs"
+          title="Vlastnosti souboru"
+          onClick={() => onDetails(first.id)}
+        >
+          <Info size={14} />
+        </button>
+      )}
     </div>
   )
 }
