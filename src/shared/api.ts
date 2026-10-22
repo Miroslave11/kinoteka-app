@@ -1,3 +1,4 @@
+import type { MovieItem, ShowItem } from './catalog'
 import type {
   AddFolderResult,
   LibraryFolder,
@@ -25,6 +26,12 @@ export interface KinotekaApi {
     onState(listener: (state: PlayerState) => void): () => void
     /** Přehrávání skončilo (zavřením nebo chybou). */
     onClosed(listener: (info: PlayerClosedInfo) => void): () => void
+  }
+  catalog: {
+    /** Filmy rozpoznané z názvů souborů. Změny hlásí `library.onChanged`. */
+    listMovies(): Promise<MovieItem[]>
+    /** Seriály se sériemi a díly. */
+    listShows(): Promise<ShowItem[]>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>
