@@ -6,6 +6,10 @@ import { PlayerSession } from './player/PlayerSession'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
 import { createMainWindowOptions } from './windowOptions'
 
+// S DirectComposition kreslí Chromium obsah oken nad všechna vnořená nativní okna,
+// takže by zakryl obraz, který mpv kreslí do okna aplikace (--wid).
+app.commandLine.appendSwitch('disable-direct-composition')
+
 const VIDEO_EXTENSIONS = ['mkv', 'mp4', 'm4v', 'avi', 'ts', 'm2ts', 'mov', 'wmv', 'webm']
 
 let session: PlayerSession | null = null

@@ -1,4 +1,4 @@
-import { BaseWindow, BrowserWindow } from 'electron'
+import { app, BaseWindow, BrowserWindow } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
@@ -116,7 +116,10 @@ export class PlayerSession {
       windowId: windowHandleToId(videoWindow.getNativeWindowHandle()),
       ipcPath,
       passthroughCodecs: DEFAULT_PASSTHROUGH_CODECS,
-      logFile: options.logFile
+      logFile: options.logFile,
+      extraArgs: app.isPackaged
+        ? undefined
+        : process.env['KINOTEKA_DEV_MPV_ARGS']?.split(' ').filter(Boolean)
     })
     const mpv = spawn(executable, args, { windowsHide: true, stdio: 'ignore' })
 

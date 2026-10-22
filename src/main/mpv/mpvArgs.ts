@@ -8,6 +8,8 @@ export interface MpvLaunchOptions {
   ipcPath: string
   passthroughCodecs: readonly string[]
   logFile?: string
+  /** Další volby pro ladění (jen ve vývoji, proměnná KINOTEKA_DEV_MPV_ARGS). */
+  extraArgs?: readonly string[]
 }
 
 export function buildMpvArgs(options: MpvLaunchOptions): string[] {
@@ -40,6 +42,7 @@ export function buildMpvArgs(options: MpvLaunchOptions): string[] {
     '--sub-auto=fuzzy'
   ]
   if (options.logFile) args.push(`--log-file=${options.logFile}`)
+  if (options.extraArgs) args.push(...options.extraArgs)
   // „--“ zajistí, že název souboru začínající pomlčkou mpv nevezme jako volbu.
   args.push('--', options.file)
   return args
