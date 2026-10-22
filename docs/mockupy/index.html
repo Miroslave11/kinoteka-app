@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kinotéka – mockupy V1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+@property --c1 { syntax: '<color>'; inherits: true; initial-value: #8a2a12; }
+@property --c2 { syntax: '<color>'; inherits: true; initial-value: #2a0d1c; }
+@property --accent { syntax: '<color>'; inherits: true; initial-value: #ff8a3d; }
+
+:root {
+  --bg: #07080c;
+  --glass: rgba(255,255,255,.055);
+  --glass-2: rgba(255,255,255,.09);
+  --line: rgba(255,255,255,.09);
+  --text: #f4f5f7;
+  --muted: #9aa0ab;
+  --dim: #6b717c;
+  --danger: #ff5a5f;
+  --ok: #45d483;
+  --csfd: #ba0305;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #020203; color: var(--text); font-family: Inter, system-ui, sans-serif; padding: 16px; font-size: 14px; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ---------- navigace mockupu (není součást aplikace) ---------- */
+.mock-nav { max-width: 1440px; margin: 0 auto 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mock-nav h1 { font-size: 13px; font-weight: 600; color: var(--muted); margin-right: 10px; }
+.mock-nav button { padding: 7px 12px; border-radius: 8px; background: #111318; border: 1px solid #1e2129; color: #c9ccd3; font-size: 13px; }
+.mock-nav button.on { background: #f4f5f7; color: #000; border-color: #f4f5f7; }
+.mock-note { max-width: 1440px; margin: 10px auto 0; color: var(--dim); font-size: 12px; line-height: 1.5; }
+
+/* ---------- rám aplikace ---------- */
+.app {
+  --c1: #8a2a12; --c2: #2a0d1c; --accent: #ff8a3d;
+  transition: --c1 1.4s ease, --c2 1.4s ease, --accent 1.4s ease;
+  position: relative; max-width: 1440px; height: 860px; margin: 0 auto;
+  display: flex; overflow: hidden; border-radius: 14px; border: 1px solid #16181f;
+  background: var(--bg); box-shadow: 0 30px 80px rgba(0,0,0,.6);
+}
+.ambient {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(1100px 650px at 80% -10%, color-mix(in oklab, var(--c1) 75%, transparent), transparent 62%),
+    radial-gradient(900px 600px at -5% 105%, color-mix(in oklab, var(--c2) 95%, transparent), transparent 65%),
+    var(--bg);
+}
+
+/* ---------- postranní menu ---------- */
+.sidebar {
+  position: relative; z-index: 3; width: 228px; flex: none; padding: 22px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+  background: rgba(6,7,10,.55); backdrop-filter: blur(24px); border-right: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -.02em; padding: 0 10px 22px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 8px; background: conic-gradient(from 200deg, var(--accent), color-mix(in oklab, var(--accent) 40%, #fff), var(--accent)); box-shadow: 0 0 24px color-mix(in oklab, var(--accent) 60%, transparent); }
+.sidebar a { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; color: #c3c7cf; cursor: pointer; font-weight: 500; }
+.sidebar a:hover { background: var(--glass); color: #fff; }
+.sidebar a.on { background: var(--glass-2); color: #fff; box-shadow: inset 3px 0 0 var(--accent); }
+.sidebar a.on svg { color: var(--accent); }
+.count { margin-left: auto; font-size: 12px; color: var(--dim); }
+.side-sep { margin: 22px 12px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim); font-weight: 600; }
+.lib { display: flex; align-items: center; gap: 10px; padding: 7px 12px; color: var(--muted); font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.dot.off { background: #555b66; box-shadow: none; }
+.side-bottom { margin-top: auto; }
+
+/* ---------- hlavní plocha ---------- */
+main { position: relative; z-index: 1; flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #2a2d36 transparent; }
+.topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 5; display: flex; align-items: center; gap: 14px; padding: 18px 36px; }
+.search { display: flex; align-items: center; gap: 10px; width: 380px; padding: 10px 16px; border-radius: 999px; background: rgba(0,0,0,.35); border: 1px solid var(--line); backdrop-filter: blur(16px); color: var(--muted); }
+.spacer { flex: 1; }
+.status { white-space: nowrap; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); padding: 8px 12px; border-radius: 999px; background: rgba(0,0,0,.3); border: 1px solid var(--line); backdrop-filter: blur(16px); }
+.screen { display: none; }
+.screen.active { display: block; }
+.page { padding: 96px 36px 48px; }
+.page h2 { font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+.page .sub { color: var(--muted); margin-top: 4px; }
+
+/* ---------- tlačítka, štítky ---------- */
+.btn { display: inline-flex; align-items: center; gap: 9px; padding: 12px 22px; border-radius: 12px; font-weight: 700; background: var(--glass-2); border: 1px solid var(--line); backdrop-filter: blur(12px); transition: transform .15s, background .2s; }
+.btn:hover { transform: translateY(-1px); background: rgba(255,255,255,.14); }
+.btn.primary { background: var(--accent); color: #0b0b0b; border-color: transparent; box-shadow: 0 10px 30px color-mix(in oklab, var(--accent) 45%, transparent); }
+.btn.primary svg { fill: currentColor; stroke: none; }
+.btn.danger { background: var(--danger); color: #fff; border-color: transparent; }
+.btn.sm { padding: 8px 14px; font-size: 13px; border-radius: 10px; }
+.icon-btn { width: 44px; height: 44px; display: inline-grid; place-items: center; border-radius: 12px; background: var(--glass-2); border: 1px solid var(--line); }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: .03em; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12); color: #e6e8ec; }
+.badge.hl { background: color-mix(in oklab, var(--accent) 22%, transparent); border-color: color-mix(in oklab, var(--accent) 50%, transparent); color: color-mix(in oklab, var(--accent) 60%, #fff); }
+.csfd { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; background: var(--csfd); font-weight: 800; font-size: 12px; }
+.tmdb { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 6px; background: linear-gradient(90deg, #0d253f, #01b4e4); font-weight: 800; font-size: 12px; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: #cfd3da; font-size: 14px; }
+.meta .sep { width: 4px; height: 4px; border-radius: 50%; background: #666; }
+.stars { display: inline-flex; gap: 2px; font-size: 18px; color: #3b3f48; cursor: pointer; }
+.stars .f { color: var(--accent); }
+.chip { padding: 8px 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); font-size: 13px; color: #cfd3da; display: inline-flex; align-items: center; gap: 6px; }
+.chip.on { background: #f4f5f7; color: #000; border-color: #f4f5f7; font-weight: 600; }
+
+/* ---------- hero (Domů) ---------- */
+.hero { position: relative; height: 480px; overflow: hidden; }
+.clip {
+  position: absolute; inset: -8%;
+  background:
+    radial-gradient(28% 40% at 72% 38%, color-mix(in oklab, var(--accent) 60%, transparent), transparent 70%),
+    radial-gradient(30% 45% at 88% 72%, color-mix(in oklab, var(--c1) 85%, #fff 15%), transparent 70%),
+    radial-gradient(55% 75% at 58% 18%, var(--c1), transparent 72%),
+    linear-gradient(118deg, var(--c2), var(--c1));
+  animation: kenburns 14s ease-in-out infinite alternate;
+}
+.clip::after { /* světelný přejezd = simulace pohybu v klipu */
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.10) 45%, transparent 60%);
+  animation: sweep 7s ease-in-out infinite;
+}
+@keyframes kenburns { from { transform: scale(1) translate(0,0); } to { transform: scale(1.12) translate(-3%, 2%); } }
+@keyframes sweep { 0% { transform: translateX(-60%); } 100% { transform: translateX(60%); } }
+.hero-shade { position: absolute; inset: 0; background:
+  linear-gradient(90deg, rgba(7,8,12,.96) 0%, rgba(7,8,12,.72) 34%, rgba(7,8,12,0) 68%),
+  linear-gradient(0deg, rgba(7,8,12,1) 0%, rgba(7,8,12,0) 38%); }
+.hero-body { position: absolute; left: 36px; bottom: 56px; width: 560px; display: flex; flex-direction: column; gap: 16px; }
+.logo-title { font-size: 58px; line-height: .95; font-weight: 900; letter-spacing: -.035em; text-transform: uppercase;
+  background: linear-gradient(180deg, #fff 30%, color-mix(in oklab, var(--accent) 55%, #fff)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 6px 24px rgba(0,0,0,.5)); }
+.plot { color: #c9cdd4; line-height: 1.6; max-width: 520px; }
+.clip-tag { position: absolute; right: 36px; top: 86px; white-space: nowrap; display: flex; align-items: center; gap: 10px; font-size: 12px; color: #d6d9df; padding: 8px 12px; border-radius: 999px; background: rgba(0,0,0,.35); border: 1px solid var(--line); backdrop-filter: blur(10px); }
+.hero-dots { display: flex; gap: 6px; }
+.hero-dots i { width: 22px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.25); }
+.hero-dots i.on { background: var(--accent); }
+
+/* ---------- řady a karty ---------- */
+.row { padding: 8px 36px 24px; }
+.row h3 { font-size: 18px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: baseline; gap: 10px; }
+.row h3 small { font-size: 12px; color: var(--dim); font-weight: 500; }
+.strip { display: flex; gap: 18px; overflow-x: auto; padding: 6px 2px 14px; scrollbar-width: none; }
+.land { flex: none; width: 300px; cursor: pointer; }
+.land .img { position: relative; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: linear-gradient(130deg, var(--p2), var(--p1)); transition: transform .25s, box-shadow .25s; }
+.land .img::before { content: ''; position: absolute; inset: 0; background: radial-gradient(50% 70% at 70% 30%, color-mix(in oklab, var(--pa) 65%, transparent), transparent 70%); }
+.land:hover .img { transform: translateY(-4px); box-shadow: 0 18px 40px color-mix(in oklab, var(--pa) 35%, transparent); }
+.land .play { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transition: opacity .2s; background: rgba(0,0,0,.25); }
+.land:hover .play { opacity: 1; }
+.land .play span { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.92); color: #000; }
+.land .play svg { fill: currentColor; stroke: none; width: 20px; height: 20px; margin-left: 3px; }
+.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.2); }
+.progress i { display: block; height: 100%; background: var(--pa); }
+.cap { margin-top: 10px; }
+.cap b { display: block; font-weight: 600; }
+.cap span { color: var(--muted); font-size: 12px; }
+
+.poster-card { flex: none; width: 168px; cursor: pointer; }
+.poster { position: relative; aspect-ratio: 2/3; border-radius: 12px; overflow: hidden; background: linear-gradient(165deg, var(--p1), var(--p2)); transition: transform .25s, box-shadow .25s; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.poster::before { content: ''; position: absolute; width: 150%; aspect-ratio: 1; left: -25%; top: -35%; background: radial-gradient(circle, color-mix(in oklab, var(--pa) 70%, transparent), transparent 58%); }
+.poster::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(0,0,0,.75), transparent 55%); }
+.poster-card:hover .poster { transform: translateY(-6px) scale(1.03); box-shadow: 0 20px 44px color-mix(in oklab, var(--pa) 40%, transparent); }
+.poster .pt { position: absolute; z-index: 1; left: 12px; right: 12px; bottom: 14px; font-weight: 900; font-size: 16px; line-height: 1.05; text-transform: uppercase; letter-spacing: -.01em; }
+.poster .pt small { display: block; font-size: 11px; font-weight: 600; color: rgba(255,255,255,.7); margin-top: 5px; letter-spacing: .05em; }
+.poster .tl { position: absolute; z-index: 1; top: 8px; left: 8px; display: flex; gap: 4px; }
+.poster .tl .badge { background: rgba(0,0,0,.55); backdrop-filter: blur(6px); }
+.poster .tr { position: absolute; z-index: 1; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--ok); color: #000; }
+.poster .tr svg { width: 14px; height: 14px; stroke-width: 3; }
+.poster.unmatched { background: repeating-linear-gradient(135deg, #1a1c22 0 12px, #15171c 12px 24px); }
+.poster.unmatched::before { display: none; }
+.poster.unmatched .pt { font-size: 12px; font-weight: 600; text-transform: none; font-family: ui-monospace, Consolas, monospace; color: #c7cad1; }
+.unm-flag { position: absolute; z-index: 1; top: 40%; left: 50%; transform: translate(-50%,-50%); text-align: center; font-size: 12px; color: #ffcf6b; font-weight: 600; }
+.poster-card .cap b { font-size: 13px; }
+.poster-card .cap .stars { font-size: 12px; }
+
+/* ---------- Filmy ---------- */
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 22px 0 26px; }
+.toolbar .divider { width: 1px; height: 22px; background: var(--line); margin: 0 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 26px 20px; }
+.grid .poster-card { width: auto; }
+
+/* ---------- Detail ---------- */
+.d-back { position: absolute; inset: 0 0 auto 0; height: 640px; overflow: hidden; }
+.d-back .clip { animation-duration: 18s; }
+.d-back .shade { position: absolute; inset: 0; background:
+  linear-gradient(90deg, rgba(7,8,12,.92) 0%, rgba(7,8,12,.55) 45%, rgba(7,8,12,.15) 100%),
+  linear-gradient(0deg, var(--bg) 0%, rgba(7,8,12,0) 55%); }
+.detail { position: relative; padding: 110px 36px 40px; display: grid; grid-template-columns: 250px 1fr; gap: 40px; }
+.detail .poster { width: 250px; box-shadow: 0 30px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08); }
+.d-info { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; }
+.d-info .logo-title { font-size: 52px; }
+.orig { color: var(--muted); font-size: 14px; margin-top: -8px; }
+.ratings { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.my-rating { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 10px; background: var(--glass); border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.actions { display: flex; gap: 10px; align-items: center; position: relative; flex-wrap: wrap; }
+.menu { position: absolute; top: 54px; left: 486px; width: 230px; padding: 6px; border-radius: 12px; background: rgba(22,24,31,.92); border: 1px solid var(--line); backdrop-filter: blur(20px); box-shadow: 0 20px 50px rgba(0,0,0,.6); z-index: 4; }
+.menu div { padding: 9px 12px; border-radius: 8px; display: flex; gap: 10px; align-items: center; color: #d6d9df; }
+.menu div:hover { background: var(--glass-2); }
+.menu .del { color: var(--danger); }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.tabs { display: flex; gap: 26px; border-bottom: 1px solid var(--line); margin-top: 8px; }
+.tabs span { padding: 12px 0; color: var(--muted); font-weight: 600; cursor: pointer; }
+.tabs span.on { color: #fff; box-shadow: inset 0 -2px 0 var(--accent); }
+.d-cols { position: relative; padding: 0 36px 48px; display: grid; grid-template-columns: 1fr 470px; gap: 28px; }
+.card { background: var(--glass); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; backdrop-filter: blur(16px); }
+.card h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 14px; font-weight: 700; }
+.kv { display: grid; grid-template-columns: 96px 1fr; gap: 9px 14px; font-size: 13px; }
+.kv dt { color: var(--dim); }
+.kv dd { color: #e2e5ea; }
+.track { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cast { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+.person { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 50%, #333), #222); }
+.person b { display: block; font-size: 13px; }
+.person span { font-size: 12px; color: var(--muted); }
+
+/* ---------- Seriál ---------- */
+.seasons { display: flex; gap: 8px; margin: 6px 0 18px; }
+.ep { display: grid; grid-template-columns: 240px 1fr auto; gap: 22px; align-items: center; padding: 14px; border-radius: 14px; transition: background .2s; }
+.ep:hover { background: var(--glass); }
+.ep .img { position: relative; aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; background: linear-gradient(130deg, var(--p2), var(--p1)); }
+.ep .img::before { content: ''; position: absolute; inset: 0; background: radial-gradient(50% 70% at 30% 40%, color-mix(in oklab, var(--pa) 55%, transparent), transparent 70%); }
+.ep h5 { font-size: 16px; margin-bottom: 6px; }
+.ep p { color: var(--muted); line-height: 1.55; font-size: 13px; max-width: 640px; }
+.ep .side { text-align: right; color: var(--muted); font-size: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.ep.missing { opacity: .45; }
+.ep.missing .img { background: repeating-linear-gradient(135deg, #1a1c22 0 10px, #15171c 10px 20px); }
+.ok-dot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--ok); color: #000; }
+.ok-dot svg { width: 14px; height: 14px; stroke-width: 3; }
+.info-chip { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #cfe7ff; background: rgba(80,160,255,.12); border: 1px solid rgba(80,160,255,.3); }
+
+/* ---------- Přehrávač ---------- */
+.player { position: absolute; inset: 0; z-index: 20; background: #000; }
+.player.active { display: block; }
+.scene { position: absolute; inset: -6%;
+  background:
+    radial-gradient(18% 30% at 30% 45%, rgba(255,210,150,.35), transparent 70%),
+    radial-gradient(40% 50% at 75% 30%, color-mix(in oklab, var(--c1) 80%, #000), transparent 70%),
+    linear-gradient(180deg, #0b1a1d 0%, #10282c 55%, #050a0b 100%);
+  animation: kenburns 20s ease-in-out infinite alternate; }
+.subtitle { position: absolute; left: 0; right: 0; bottom: 150px; text-align: center; font-size: 34px; font-weight: 600; color: #fff; line-height: 1.3;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 2px 2px 2px #000; transition: all .2s; }
+.p-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 16px; padding: 22px 28px 60px; background: linear-gradient(180deg, rgba(0,0,0,.8), transparent); }
+.p-title { font-size: 18px; font-weight: 700; }
+.p-sub { color: var(--muted); font-size: 13px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,.1); border: 1px solid var(--line); backdrop-filter: blur(10px); }
+.pill.ok { color: #8ff0b8; border-color: rgba(69,212,131,.35); background: rgba(69,212,131,.12); }
+.p-bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 70px 28px 22px; background: linear-gradient(0deg, rgba(0,0,0,.85), transparent); }
+.seek { position: relative; height: 5px; border-radius: 5px; background: rgba(255,255,255,.2); margin-bottom: 16px; }
+.seek-buf { position: absolute; left: 0; top: 0; bottom: 0; width: 82%; border-radius: 5px; background: rgba(255,255,255,.25); }
+.seek-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 72.5%; border-radius: 5px; background: var(--accent); }
+.seek-knob { position: absolute; left: 72.5%; top: 50%; width: 15px; height: 15px; border-radius: 50%; transform: translate(-50%,-50%); background: #fff; box-shadow: 0 0 0 5px color-mix(in oklab, var(--accent) 35%, transparent); }
+.seek-thumb { position: absolute; left: 22%; bottom: 20px; transform: translateX(-50%); text-align: center; font-size: 12px; font-weight: 700; }
+.seek-thumb .ti { width: 180px; aspect-ratio: 16/9; border-radius: 8px; margin-bottom: 6px; border: 2px solid rgba(255,255,255,.8); background: linear-gradient(180deg, #10282c, #050a0b); }
+.chapters { position: absolute; inset: 0; }
+.chapters i { position: absolute; top: -1px; width: 3px; height: 7px; background: rgba(0,0,0,.7); }
+.p-controls { display: flex; align-items: center; gap: 10px; }
+.p-controls .time { font-variant-numeric: tabular-nums; color: #d6d9df; font-size: 13px; width: 200px; }
+.p-controls .center { flex: 1; display: flex; justify-content: center; gap: 10px; align-items: center; }
+.p-controls .big { width: 60px; height: 60px; border-radius: 50%; background: #fff; color: #000; display: grid; place-items: center; }
+.p-controls .big svg { width: 24px; height: 24px; fill: currentColor; stroke: none; }
+.p-controls .right { display: flex; gap: 8px; align-items: center; width: 360px; justify-content: flex-end; }
+.p-controls .icon-btn { background: rgba(255,255,255,.08); }
+.p-controls .icon-btn.on { background: color-mix(in oklab, var(--accent) 30%, transparent); border-color: color-mix(in oklab, var(--accent) 60%, transparent); }
+.vol { display: flex; align-items: center; gap: 8px; }
+.vol .bar { width: 80px; height: 4px; border-radius: 4px; background: linear-gradient(90deg, #fff 70%, rgba(255,255,255,.25) 70%); }
+.p-panel { position: absolute; top: 80px; right: 24px; bottom: 140px; width: 370px; padding: 18px; border-radius: 18px; overflow-y: auto; scrollbar-width: thin;
+  background: rgba(14,16,21,.78); border: 1px solid var(--line); backdrop-filter: blur(26px); box-shadow: 0 30px 60px rgba(0,0,0,.5); }
+.p-panel h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 18px 0 8px; font-weight: 700; }
+.p-panel h4:first-child { margin-top: 0; }
+.opt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; }
+.opt:hover { background: var(--glass); }
+.opt.on { background: var(--glass-2); }
+.opt .r { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #555; flex: none; }
+.opt.on .r { border-color: var(--accent); box-shadow: inset 0 0 0 3px #15171c; background: var(--accent); }
+.opt b { font-weight: 600; font-size: 13px; display: block; }
+.opt span { font-size: 11px; color: var(--muted); }
+.opt .badge { margin-left: auto; }
+.ctl { display: grid; grid-template-columns: 90px 1fr auto; align-items: center; gap: 12px; padding: 8px 12px; font-size: 13px; color: #cfd3da; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.swatches { display: flex; gap: 8px; }
+.swatches i { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+.swatches i.on { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.stepper { display: inline-flex; align-items: center; gap: 4px; }
+.stepper button { width: 28px; height: 28px; border-radius: 8px; background: var(--glass-2); }
+.stepper b { width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+.link-row { display: flex; gap: 8px; padding: 6px 12px; }
+
+/* ---------- Deník ---------- */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 24px 0; }
+.stat { padding: 18px 20px; border-radius: 16px; background: var(--glass); border: 1px solid var(--line); }
+.stat b { font-size: 28px; font-weight: 800; letter-spacing: -.02em; display: block; }
+.stat span { color: var(--muted); font-size: 12px; }
+.month { margin: 26px 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; }
+.h-row { display: grid; grid-template-columns: 56px 1fr 170px 130px 40px; gap: 18px; align-items: center; padding: 10px 14px; border-radius: 12px; }
+.h-row:hover { background: var(--glass); }
+.h-row .poster { width: 56px; border-radius: 6px; box-shadow: none; }
+.h-row .poster .pt { display: none; }
+.h-row b { display: block; font-size: 15px; }
+.h-row .note { color: var(--muted); font-size: 12px; margin-top: 3px; font-style: italic; }
+.h-row .when { color: #cfd3da; font-size: 13px; }
+.h-row .when span { display: block; color: var(--dim); font-size: 12px; }
+
+/* ---------- Nastavení ---------- */
+.settings { display: grid; grid-template-columns: 210px 1fr; gap: 30px; margin-top: 24px; }
+.s-nav { display: flex; flex-direction: column; gap: 2px; }
+.s-nav span { padding: 9px 12px; border-radius: 9px; color: var(--muted); font-weight: 500; cursor: pointer; }
+.s-nav span.on { background: var(--glass-2); color: #fff; }
+.s-body { display: flex; flex-direction: column; gap: 18px; max-width: 820px; }
+.folder { display: grid; grid-template-columns: 38px 1fr auto; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.folder:first-of-type { border-top: 0; }
+.folder .ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--glass-2); }
+.folder code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: #e2e5ea; }
+.folder small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+.folder .warn { color: #ffcf6b; }
+.radio { display: flex; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); margin-bottom: 8px; cursor: pointer; }
+.radio.on { border-color: color-mix(in oklab, var(--accent) 70%, transparent); background: color-mix(in oklab, var(--accent) 8%, transparent); }
+.radio .r { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #555; flex: none; margin-top: 2px; }
+.radio.on .r { border-color: var(--accent); box-shadow: inset 0 0 0 3px #111; background: var(--accent); }
+.radio b { display: block; font-size: 14px; }
+.radio span { color: var(--muted); font-size: 12px; }
+.checks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.check { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 9px; background: var(--glass); border: 1px solid var(--line); font-size: 13px; }
+.check i { width: 16px; height: 16px; border-radius: 4px; background: var(--accent); display: grid; place-items: center; color: #000; }
+.check i svg { width: 12px; height: 12px; stroke-width: 3.2; }
+.field { display: grid; grid-template-columns: 170px 1fr; gap: 14px; align-items: center; padding: 8px 0; }
+.field label { color: var(--muted); font-size: 13px; }
+.input { padding: 10px 14px; border-radius: 10px; background: rgba(0,0,0,.35); border: 1px solid var(--line); color: #e2e5ea; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.input .okt { margin-left: auto; color: var(--ok); font-size: 12px; font-weight: 600; }
+.toggle { width: 40px; height: 22px; border-radius: 999px; background: var(--accent); position: relative; flex: none; }
+.toggle::after { content: ''; position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+
+/* ---------- Dialogy ---------- */
+.dialogs { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 22px; align-items: start; margin-top: 26px; }
+.dlg { border-radius: 20px; padding: 24px; background: rgba(18,20,26,.9); border: 1px solid var(--line); backdrop-filter: blur(30px); box-shadow: 0 40px 80px rgba(0,0,0,.6); }
+.dlg h3 { font-size: 20px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 6px; }
+.dlg p { color: var(--muted); line-height: 1.55; font-size: 13px; }
+.dlg .foot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+.dlg .thumb { position: relative; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; margin: 14px 0; background: linear-gradient(130deg, var(--p2), var(--p1)); }
+.dlg .thumb::before { content: ''; position: absolute; inset: 0; background: radial-gradient(50% 70% at 70% 30%, color-mix(in oklab, var(--pa) 60%, transparent), transparent 70%); }
+.warnbox { display: flex; gap: 10px; padding: 12px 14px; margin: 14px 0; border-radius: 12px; background: rgba(255,90,95,.1); border: 1px solid rgba(255,90,95,.35); color: #ffb3b5; font-size: 13px; line-height: 1.45; }
+.path { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #c7cad1; background: rgba(0,0,0,.35); padding: 10px 12px; border-radius: 10px; margin-top: 12px; word-break: break-all; }
+.result { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; padding: 8px; border-radius: 10px; margin-top: 4px; }
+.result.on { background: var(--glass-2); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 60%, transparent); }
+.result .poster { width: 44px; border-radius: 5px; box-shadow: none; }
+.result .poster .pt { display: none; }
+.result b { font-size: 13px; display: block; }
+.result span { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="mock-nav">
+  <h1>Kinotéka · mockupy V1</h1>
+  <button data-go="home" class="on">1 · Domů</button>
+  <button data-go="movies">2 · Filmy</button>
+  <button data-go="detail">3 · Detail filmu</button>
+  <button data-go="show">4 · Seriál</button>
+  <button data-go="player">5 · Přehrávač</button>
+  <button data-go="history">6 · Deník</button>
+  <button data-go="settings">7 · Nastavení</button>
+  <button data-go="dialogs">8 · Dialogy</button>
+</div>
+
+<div class="app" id="app">
+  <div class="ambient"></div>
+
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark"></span>Kinotéka</div>
+    <a data-go="home" class="on"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>Domů</a>
+    <a data-go="movies"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>Filmy<span class="count">5</span></a>
+    <a data-go="show"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 21h8M9 2l3 4 3-4"/></svg>Seriály<span class="count">2</span></a>
+    <a data-go="history"><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>Deník</a>
+    <div class="side-sep">Knihovny</div>
+    <div class="lib"><i class="dot"></i>Filmy – lokální disk</div>
+    <div class="lib"><i class="dot off"></i>Synology – offline</div>
+    <div class="side-bottom">
+      <a data-go="settings"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Nastavení</a>
+    </div>
+  </aside>
+
+  <main id="main">
+    <div class="topbar">
+      <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Hledat filmy, seriály, herce…<span class="spacer"></span><span class="badge">Ctrl K</span></div>
+      <span class="spacer"></span>
+      <div class="status"><i class="dot"></i>Knihovna aktuální · 10 souborů · 19 GB</div>
+    </div>
+
+    <!-- 1 · DOMŮ -->
+    <section class="screen active" data-screen="home">
+      <div class="hero">
+        <div class="clip"></div>
+        <div class="hero-shade"></div>
+        <div class="hero-body">
+          <div class="logo-title" id="heroTitle">Den odhalení</div>
+          <div class="meta" id="heroMeta"></div>
+          <div class="meta" id="heroBadges"></div>
+          <p class="plot">Ilustrační popis filmu z ČSFD. Dva až tři řádky, aby bylo jasné, o čem film je, ale hero zůstal vzdušný a dominoval mu obraz.</p>
+          <div class="actions">
+            <button class="btn primary"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>Pokračovat od 1:12:34</button>
+            <button class="btn" data-go="detail">Více informací</button>
+          </div>
+        </div>
+        <div class="clip-tag"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>Ukázka z vlastního souboru · bez zvuku<div class="hero-dots" id="heroDots"></div></div>
+      </div>
+      <div class="row"><h3>Pokračovat ve sledování</h3><div class="strip" id="rowContinue"></div></div>
+      <div class="row"><h3>Nově přidané <small>najetím na plakát se změní barvy aplikace</small></h3><div class="strip" id="rowNew"></div></div>
+      <div class="row"><h3>Seriály</h3><div class="strip" id="rowShows"></div></div>
+    </section>
+
+    <!-- 2 · FILMY -->
+    <section class="screen" data-screen="movies">
+      <div class="page">
+        <h2>Filmy</h2>
+        <div class="sub">5 filmů · 1 bez dohledaných informací</div>
+        <div class="toolbar">
+          <span class="chip on">Vše</span><span class="chip">Nezhlédnuté</span><span class="chip">Zhlédnuté</span>
+          <span class="divider"></span>
+          <span class="chip">Žánr ▾</span><span class="chip">Rok ▾</span><span class="chip">Rozlišení ▾</span><span class="chip">Jazyk ▾</span>
+          <span class="spacer"></span>
+          <span class="chip">Řadit: Naposledy přidané ▾</span>
+        </div>
+        <div class="grid" id="gridMovies"></div>
+      </div>
+    </section>
+
+    <!-- 3 · DETAIL FILMU -->
+    <section class="screen" data-screen="detail">
+      <div class="d-back"><div class="clip"></div><div class="shade"></div></div>
+      <div class="detail">
+        <div id="detailPoster"></div>
+        <div class="d-info">
+          <div class="logo-title">Den odhalení</div>
+          <div class="orig">Původní název z TMDB · 2026</div>
+          <div class="meta">2026<i class="sep"></i>2 h 4 min<i class="sep"></i>Thriller, Drama<i class="sep"></i>USA</div>
+          <div class="ratings">
+            <span class="csfd">ČSFD 78 %</span><span class="tmdb">TMDB 7,4</span>
+            <div class="my-rating">Moje hodnocení <span class="stars rate" data-v="4"></span></div>
+          </div>
+          <div class="meta"><span class="badge hl">4K</span><span class="badge hl">HDR10</span><span class="badge hl">TrueHD Atmos 7.1</span><span class="badge">CZ dabing</span><span class="badge">CZ titulky</span></div>
+          <div class="actions">
+            <button class="btn primary"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>Pokračovat od 1:12:34</button>
+            <button class="btn">Od začátku</button>
+            <button class="btn"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Viděl jsem</button>
+            <button class="icon-btn">⋯</button>
+            <div class="menu">
+              <div>🔎 Opravit shodu (ČSFD / TMDB)</div>
+              <div>📂 Otevřít složku</div>
+              <div>🔄 Znovu načíst informace</div>
+              <hr>
+              <div class="del">🗑 Smazat film…</div>
+            </div>
+          </div>
+          <div class="tabs"><span class="on">Přehled</span><span>Vlastnosti souboru</span><span>Historie sledování (2)</span></div>
+        </div>
+      </div>
+      <div class="d-cols">
+        <div class="card">
+          <h4>Děj (ČSFD)</h4>
+          <p class="plot" style="max-width:none">Ilustrační popis z ČSFD. Delší text s dějem filmu, který se v hero sekci zkrátí, ale tady je celý. Když ČSFD popis nemá, použije se česká verze z TMDB.</p>
+          <h4 style="margin-top:22px">Režie a hrají</h4>
+          <div class="cast">
+            <div class="person"><i class="avatar"></i><div><b>Jméno Režiséra</b><span>Režie</span></div></div>
+            <div class="person"><i class="avatar"></i><div><b>Herec Jedna</b><span>Hlavní role</span></div></div>
+            <div class="person"><i class="avatar"></i><div><b>Herečka Dvě</b><span>Hlavní role</span></div></div>
+            <div class="person"><i class="avatar"></i><div><b>Herec Tři</b><span>Vedlejší role</span></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>Vlastnosti souboru (ffprobe)</h4>
+          <dl class="kv">
+            <dt>Soubor</dt><dd>Den odhalení (2026) CZ DABING.mkv</dd>
+            <dt>Velikost</dt><dd>14,8 GB · MKV · 2:04:12</dd>
+            <dt>Video</dt><dd class="track"><span class="badge hl">HEVC</span>3840×2160 · HDR10 · 23,976 fps · 15,9 Mb/s</dd>
+            <dt>Zvuk 1</dt><dd class="track"><span class="badge">CZ</span>E-AC3 5.1 · 640 kb/s · výchozí</dd>
+            <dt>Zvuk 2</dt><dd class="track"><span class="badge">EN</span>TrueHD Atmos 7.1 · 4,2 Mb/s</dd>
+            <dt>Titulky</dt><dd class="track"><span class="badge">CZ</span>SRT externí <span class="badge">EN</span>PGS vložené</dd>
+            <dt>Umístění</dt><dd>Filmy – lokální disk</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 · SERIÁL -->
+    <section class="screen" data-screen="show">
+      <div class="d-back"><div class="clip"></div><div class="shade"></div></div>
+      <div class="detail">
+        <div id="showPoster"></div>
+        <div class="d-info">
+          <div class="logo-title">Vidím vás</div>
+          <div class="orig">The Watcher · 2022</div>
+          <div class="meta">Seriál<i class="sep"></i>1 série<i class="sep"></i>2 ze 7 dílů na disku<i class="sep"></i>Thriller, Mysteriózní</div>
+          <div class="ratings"><span class="csfd">ČSFD 64 %</span><span class="tmdb">TMDB 6,8</span><div class="my-rating">Moje hodnocení <span class="stars rate" data-v="3"></span></div></div>
+          <div><span class="info-chip">ⓘ Seskupeno ze 2 různých názvů souborů: „Vidím Vás (2022) S01E01…“ a „Vidim vas - The.Watcher.S01E03…“</span></div>
+          <div class="actions">
+            <button class="btn primary"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>Další díl: S01E03</button>
+            <button class="btn"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Označit sérii jako viděnou</button>
+            <button class="icon-btn">⋯</button>
+          </div>
+        </div>
+      </div>
+      <div class="row" style="position:relative">
+        <div class="seasons"><span class="chip on">Série 1</span></div>
+        <div id="episodes"></div>
+      </div>
+    </section>
+
+    <!-- 6 · DENÍK -->
+    <section class="screen" data-screen="history">
+      <div class="page">
+        <h2>Deník zhlédnutých</h2>
+        <div class="sub">Co a kdy jsi viděl, s tvým hodnocením. Záznamy zůstávají i po smazání souboru.</div>
+        <div class="stats">
+          <div class="stat"><b>42</b><span>filmů zhlédnuto letos</span></div>
+          <div class="stat"><b>118</b><span>dílů seriálů letos</span></div>
+          <div class="stat"><b>★ 3,8</b><span>průměrné moje hodnocení</span></div>
+          <div class="stat"><b>164 h</b><span>celkový čas u filmů</span></div>
+        </div>
+        <div class="toolbar" style="margin:0">
+          <span class="chip on">Vše</span><span class="chip">Filmy</span><span class="chip">Seriály</span>
+          <span class="divider"></span>
+          <span class="chip">★★★★★</span><span class="chip">★★★★</span><span class="chip">Bez hodnocení</span>
+          <span class="spacer"></span><span class="chip">+ Přidat „viděl jsem“</span>
+        </div>
+        <div class="month">Říjen 2026</div>
+        <div id="historyList"></div>
+      </div>
+    </section>
+
+    <!-- 7 · NASTAVENÍ -->
+    <section class="screen" data-screen="settings">
+      <div class="page">
+        <h2>Nastavení</h2>
+        <div class="settings">
+          <div class="s-nav"><span class="on">Knihovna</span><span>Přehrávání a zvuk</span><span>Titulky</span><span>Jazyky</span><span>Metadata</span><span>O aplikaci</span></div>
+          <div class="s-body">
+            <div class="card">
+              <h4>Složky s filmy a seriály</h4>
+              <div class="folder"><span class="ico">💽</span><div><code>C:\Mirek_data\09_Videa\Filmy\Filmy</code><small>Lokální disk · 10 souborů · sken před 2 min</small></div><span class="dot"></span></div>
+              <div class="folder"><span class="ico">🗄</span><div><code>\\DS920\video\Filmy</code><small class="warn">Synology (SMB) · 1 284 souborů · nedostupné – položky jsou šedé, nic se nemaže</small></div><span class="dot off"></span></div>
+              <div class="actions" style="margin-top:14px"><button class="btn sm">+ Přidat složku</button><button class="btn sm">+ Přidat síťovou složku (\\NAS\…)</button><span class="spacer"></span><button class="btn sm">⟳ Skenovat nyní</button></div>
+              <div class="field" style="margin-top:12px"><label>Automatický sken</label><div class="actions"><span class="toggle"></span><span style="color:var(--muted);font-size:13px">každých 30 minut a při startu</span></div></div>
+            </div>
+            <div class="card">
+              <h4>Přehrávání a zvuk</h4>
+              <div class="radio on"><i class="r"></i><div><b>HDMI – bitstream do receiveru (passthrough)</b><span>Dolby a DTS se pošlou nedekódované, receiver ukáže Dolby Atmos / DTS-HD. Doporučeno pro tvoje zapojení.</span>
+                <div class="checks"><span class="check"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i>AC3</span><span class="check"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i>E-AC3</span><span class="check"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i>DTS</span><span class="check"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i>DTS-HD MA</span><span class="check"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i>TrueHD / Atmos</span></div></div></div>
+              <div class="radio"><i class="r"></i><div><b>Vícekanálové PCM (5.1 / 7.1)</b><span>Dekóduje počítač. Záloha, když receiver některý formát nepodporuje.</span></div></div>
+              <div class="field"><label>Zvukové zařízení</label><div class="input">NVIDIA High Definition Audio – AV receiver (HDMI) ▾</div></div>
+            </div>
+            <div class="card">
+              <h4>Jazyky a metadata</h4>
+              <div class="field"><label>Preferovaný zvuk</label><div class="input">Čeština → Angličtina → původní</div></div>
+              <div class="field"><label>Titulky</label><div class="input">Čeština, jen pokud zvuk není český</div></div>
+              <div class="field"><label>TMDB API klíč</label><div class="input">••••••••••••••••3f2a<span class="okt">✓ ověřeno</span></div></div>
+              <div class="field"><label>ČSFD</label><div class="input">Zapnuto · prodleva mezi dotazy 1,5 s · cache 30 dní</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8 · DIALOGY -->
+    <section class="screen" data-screen="dialogs">
+      <div class="page">
+        <h2>Dialogy</h2>
+        <div class="sub">Pokračování přehrávání, mazání a ruční oprava shody.</div>
+        <div class="dialogs">
+          <div class="dlg" id="dlgResume">
+            <h3>Pokračovat ve sledování?</h3>
+            <p>Země gangů · S01E01 – minule jsi skončil v <b style="color:#fff">31:05</b> ze 48:12.</p>
+            <div class="thumb"><div class="progress" style="height:5px"><i style="width:64%"></i></div></div>
+            <div class="foot"><button class="btn sm">Od začátku</button><button class="btn sm primary"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>Pokračovat od 31:05</button></div>
+          </div>
+          <div class="dlg">
+            <h3>Smazat film „Prázdnota“?</h3>
+            <p>Smaže se video a přidružené titulky. Záznam v deníku a tvé hodnocení zůstanou.</p>
+            <div class="path">\\DS920\video\Filmy\Prázdnota (2020) cz dabing.mkv · 4,1 GB</div>
+            <div class="warnbox"><span>⚠</span><span>Soubor je na síťovém disku – smazání je <b>trvalé</b>. Pokud máš na Synology zapnutý Koš, najdeš ho v #recycle.</span></div>
+            <div class="checks"><span class="check"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i>Smazat i externí titulky (1)</span></div>
+            <div class="foot"><button class="btn sm">Zrušit</button><button class="btn sm danger">Smazat trvale</button></div>
+          </div>
+          <div class="dlg">
+            <h3>Opravit shodu</h3>
+            <div class="path" style="margin-top:4px">Úkryt nebo past (2026) cz dabing.mkv</div>
+            <div class="input" style="margin-top:14px"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Úkryt nebo past</div>
+            <div id="matchResults" style="margin-top:8px"></div>
+            <div class="input" style="margin-top:12px;color:var(--dim)">…nebo vlož odkaz na ČSFD / TMDB</div>
+            <div class="foot"><button class="btn sm">Zrušit</button><button class="btn sm primary">Použít</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 5 · PŘEHRÁVAČ (přes celé okno) -->
+  <section class="screen player" data-screen="player">
+    <div class="scene"></div>
+    <div class="subtitle" id="sub">Někdo nás sleduje.<br>Celou dobu.</div>
+    <div class="p-top">
+      <button class="icon-btn" data-go="show">←</button>
+      <div><div class="p-title">Vidím vás</div><div class="p-sub">S01E03 · Díl 3</div></div>
+      <span class="spacer"></span>
+      <span class="pill ok">● Bitstream E-AC3 5.1 → HDMI receiver</span>
+      <span class="pill">HEVC 1080p</span>
+    </div>
+    <div class="p-bottom">
+      <div class="seek">
+        <div class="seek-buf"></div><div class="seek-fill"></div>
+        <div class="chapters"><i style="left:18%"></i><i style="left:41%"></i><i style="left:66%"></i></div>
+        <div class="seek-knob"></div>
+        <div class="seek-thumb"><div class="ti"></div>11:36</div>
+      </div>
+      <div class="p-controls">
+        <div class="time">38:12 / 52:40 · konec ve 22:31</div>
+        <div class="center">
+          <button class="icon-btn">⏮</button><button class="icon-btn">−10</button>
+          <button class="big"><svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+          <button class="icon-btn">+30</button><button class="icon-btn">⏭</button>
+        </div>
+        <div class="right">
+          <button class="icon-btn on" title="Zvuk a titulky">💬</button>
+          <div class="vol">🔊<span class="bar"></span></div>
+          <button class="icon-btn">⛶</button>
+        </div>
+      </div>
+    </div>
+    <aside class="p-panel">
+      <h4>Zvuková stopa</h4>
+      <div class="opt on"><i class="r"></i><div><b>Čeština</b><span>E-AC3 5.1 · 640 kb/s</span></div><span class="badge hl">passthrough</span></div>
+      <div class="opt"><i class="r"></i><div><b>Angličtina</b><span>E-AC3 5.1 · 640 kb/s</span></div></div>
+      <h4>Titulky</h4>
+      <div class="opt"><i class="r"></i><div><b>Vypnuto</b></div></div>
+      <div class="opt on"><i class="r"></i><div><b>Čeština</b><span>externí .srt · převedeno z CP1250</span></div></div>
+      <div class="opt"><i class="r"></i><div><b>Angličtina</b><span>vložené · SubRip</span></div></div>
+      <div class="link-row"><button class="btn sm">📂 Načíst ze souboru…</button></div>
+      <div class="ctl"><span>Časování</span><span></span><span class="stepper"><button>−</button><b>−0,5 s</b><button>+</button></span></div>
+      <h4>Vzhled titulků</h4>
+      <div class="ctl"><span>Velikost</span><input type="range" min="22" max="56" value="34" id="subSize"><span id="subSizeV">34</span></div>
+      <div class="ctl"><span>Barva</span><span class="swatches" id="subColor"><i class="on" style="background:#fff" data-c="#ffffff"></i><i style="background:#ffe14d" data-c="#ffe14d"></i><i style="background:#7fe3ff" data-c="#7fe3ff"></i><i style="background:#9dff9d" data-c="#9dff9d"></i></span><span></span></div>
+      <div class="ctl"><span>Obrys</span><input type="range" min="0" max="6" value="3" id="subOutline"><span></span></div>
+      <div class="ctl"><span>Pozadí</span><input type="range" min="0" max="80" value="0" id="subBg"><span></span></div>
+      <div class="ctl"><span>Pozice</span><input type="range" min="60" max="320" value="150" id="subPos"><span></span></div>
+    </aside>
+  </section>
+</div>
+
+<p class="mock-note">Mockup – ilustrační data. Plakáty, pozadí a ukázkové klipy jsou nahrazené barevnými přechody; ve skutečné aplikaci budou z TMDB/ČSFD a z tvých souborů.
+Na obrazovce Domů se každých 6 s střídá zvýrazněný film a celé prostředí plynule přebarví podle jeho plakátu. Najetím na plakát se barvy změní také. V přehrávači jdou vyzkoušet ovládací prvky vzhledu titulků.</p>
+
+<script>
+const T = {
+  den:    { name: 'Den odhalení', year: 2026, c1: '#8a2a12', c2: '#2a0d1c', a: '#ff8a3d', meta: ['2026', '2 h 4 min', 'Thriller, Drama'], csfd: 78, badges: ['4K', 'HDR10', 'Atmos', 'CZ dabing'], prog: .58, left: 'Zbývá 52 min' },
+  pred:   { name: 'Predátor: Nebezpečné území', year: 2025, c1: '#0f5a3f', c2: '#04201f', a: '#4fe0a0', meta: ['2025', '1 h 47 min', 'Sci-Fi, Akční'], csfd: 71, badges: ['1080p', '5.1', 'CZ titulky'], watched: true, stars: 4 },
+  praz:   { name: 'Prázdnota', year: 2020, c1: '#3d2470', c2: '#120a26', a: '#b38cff', meta: ['2020', '1 h 32 min', 'Horor'], csfd: 58, badges: ['1080p', '5.1', 'CZ dabing'], watched: true, stars: 3 },
+  vukrytu:{ name: 'V úkrytu', year: 2026, c1: '#123e6b', c2: '#06142a', a: '#5cb8ff', meta: ['2026', '2 h 11 min', 'Drama, Válečný'], csfd: 82, badges: ['4K', 'Dolby Vision', 'DTS-HD', 'CZ dabing'] },
+  ukryt:  { name: 'Úkryt nebo past', year: 2026, file: 'Úkryt nebo past (2026) cz dabing.mkv', unmatched: true, c1: '#3a3d45', c2: '#15171c', a: '#ffcf6b' },
+  zeme:   { name: 'Země gangů', year: 2025, c1: '#6a1538', c2: '#1a0610', a: '#ff5c8a', meta: ['2025', 'Seriál', 'Krimi'], csfd: 74, badges: ['1080p', 'CZ dabing'], show: true, prog: .64, ep: 'S01E01 · Zbývá 17 min' },
+  vidim:  { name: 'Vidím vás', year: 2022, c1: '#1d4d55', c2: '#071a1e', a: '#4fd6e0', meta: ['2022', 'Seriál', 'Thriller'], csfd: 64, badges: ['1080p', '5.1', 'CZ dabing'], show: true, prog: .72, ep: 'S01E03 · Zbývá 14 min' },
+};
+const ICON_CHECK = '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>';
+const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>';
+const app = document.getElementById('app');
+
+const pv = t => `--p1:${t.c1};--p2:${t.c2};--pa:${t.a}`;
+const stars = n => '<span class="stars">' + [1,2,3,4,5].map(i => `<span class="${i <= n ? 'f' : ''}">★</span>`).join('') + '</span>';
+
+function posterHtml(k, { caption = true, bare = false } = {}) {
+  const t = T[k];
+  if (t.unmatched) {
+    return `<div class="poster-card" data-k="${k}"><div class="poster unmatched"><div class="unm-flag">⚠ Nedohledáno<br><u>Opravit shodu</u></div><div class="pt">${t.file}</div></div>${caption ? `<div class="cap"><b>${t.name}</b><span>${t.year} · bez informací</span></div>` : ''}</div>`;
+  }
+  const tl = t.badges && !bare ? `<div class="tl"><span class="badge">${t.badges[0]}</span></div>` : '';
+  const tr = t.watched && !bare ? `<div class="tr">${ICON_CHECK}</div>` : '';
+  const cap = caption ? `<div class="cap"><b>${t.name}</b><span>${t.year}${t.stars ? ' · ' + stars(t.stars) : ''}</span></div>` : '';
+  return `<div class="poster-card" data-k="${k}"><div class="poster" style="${pv(t)}">${tl}${tr}<div class="pt">${t.name}<small>${t.year}</small></div></div>${cap}</div>`;
+}
+function landHtml(k) {
+  const t = T[k];
+  return `<div class="land" data-k="${k}"><div class="img" style="${pv(t)}"><div class="play"><span>${ICON_PLAY}</span></div><div class="progress"><i style="width:${t.prog * 100}%"></i></div></div><div class="cap"><b>${t.name}</b><span>${t.ep || t.left}</span></div></div>`;
+}
+
+function setPalette(k) {
+  const t = T[k];
+  app.style.setProperty('--c1', t.c1);
+  app.style.setProperty('--c2', t.c2);
+  app.style.setProperty('--accent', t.a);
+}
+
+document.getElementById('rowContinue').innerHTML = ['den', 'vidim', 'zeme'].map(landHtml).join('');
+document.getElementById('rowNew').innerHTML = ['vukrytu', 'den', 'ukryt', 'pred', 'praz'].map(k => posterHtml(k)).join('');
+document.getElementById('rowShows').innerHTML = ['zeme', 'vidim'].map(k => posterHtml(k)).join('');
+document.getElementById('gridMovies').innerHTML = ['vukrytu', 'den', 'ukryt', 'pred', 'praz'].map(k => posterHtml(k)).join('');
+document.getElementById('detailPoster').innerHTML = posterHtml('den', { caption: false });
+document.getElementById('showPoster').innerHTML = posterHtml('vidim', { caption: false });
+
+// epizody – díl 2 na disku chybí, zná ho jen TMDB
+const eps = [
+  { n: 1, name: 'Díl 1', len: '58 min', done: true, file: 'Vidím Vás (2022) S01E01 HD CZ Dabing!!!.mkv' },
+  { n: 2, name: 'Díl 2', len: '49 min', missing: true },
+  { n: 3, name: 'Díl 3', len: '52 min', prog: .72, file: 'Vidim vas - The.Watcher.S01E03.WEBRip.CZ.5.1.mp4' },
+];
+document.getElementById('episodes').innerHTML = eps.map(e => `
+  <div class="ep ${e.missing ? 'missing' : ''}">
+    <div class="img" style="${pv(T.vidim)}">${e.prog ? `<div class="progress"><i style="width:${e.prog * 100}%"></i></div>` : ''}</div>
+    <div><h5>${e.n}. ${e.name}</h5><p>${e.missing ? 'Tento díl na disku není – informace jsou jen z TMDB.' : 'Ilustrační popis dílu z TMDB (česky). Krátké shrnutí, o čem díl je, bez spoilerů.'}</p>
+    ${e.file ? `<p style="margin-top:6px;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--dim)">${e.file}</p>` : ''}</div>
+    <div class="side">${e.len}${e.done ? `<span class="ok-dot">${ICON_CHECK}</span>` : ''}${e.prog ? '<span style="color:var(--accent)">Zbývá 14 min</span>' : ''}</div>
+  </div>`).join('');
+
+// deník
+const hist = [
+  { k: 'vidim', t: 'Vidím vás · S01E01', when: '21. 10. 2026', time: '20:14', count: '', stars: 3 },
+  { k: 'pred', t: 'Predátor: Nebezpečné území', when: '18. 10. 2026', time: '21:02', count: 'viděno 2×', stars: 4, note: 'Lepší než minulý díl, akce v druhé půlce super.' },
+  { k: 'praz', t: 'Prázdnota', when: '12. 10. 2026', time: '22:40', count: '', stars: 3 },
+  { k: 'zeme', t: 'Země gangů · S01E01', when: '9. 10. 2026', time: '19:30', count: 'nedokončeno – 31:05', stars: 0 },
+];
+document.getElementById('historyList').innerHTML = hist.map(h => `
+  <div class="h-row">${posterHtml(h.k, { caption: false, bare: true })}
+    <div><b>${h.t}</b>${h.note ? `<div class="note">„${h.note}“</div>` : ''}</div>
+    <div class="when">${h.when} · ${h.time}<span>${h.count}</span></div>
+    <div>${h.stars ? stars(h.stars) : '<span style="color:var(--dim);font-size:12px">Ohodnotit ☆</span>'}</div>
+    <button class="icon-btn" style="width:36px;height:36px">⋯</button>
+  </div>`).join('');
+
+// opravit shodu – výsledky
+document.getElementById('matchResults').innerHTML = [
+  { k: 'ukryt', n: 'Úkryt nebo past', s: '2026 · Thriller · ČSFD + TMDB', on: true },
+  { k: 'vukrytu', n: 'V úkrytu', s: '2026 · Drama · ČSFD + TMDB' },
+  { k: 'praz', n: 'Past', s: '2019 · Horor · jen TMDB' },
+].map(r => `<div class="result ${r.on ? 'on' : ''}">${posterHtml(r.k === 'ukryt' ? 'den' : r.k, { caption: false, bare: true })}<div><b>${r.n}</b><span>${r.s}</span></div>${r.on ? `<span class="ok-dot">${ICON_CHECK}</span>` : ''}</div>`).join('');
+document.querySelectorAll('#dlgResume .thumb').forEach(el => el.setAttribute('style', pv(T.zeme)));
+
+// interaktivní hvězdičky
+document.querySelectorAll('.stars.rate').forEach(el => {
+  const paint = v => el.innerHTML = [1,2,3,4,5].map(i => `<span data-i="${i}" class="${i <= v ? 'f' : ''}">★</span>`).join('');
+  let v = +el.dataset.v; paint(v);
+  el.addEventListener('mouseover', e => e.target.dataset.i && paint(+e.target.dataset.i));
+  el.addEventListener('mouseleave', () => paint(v));
+  el.addEventListener('click', e => { if (e.target.dataset.i) { v = +e.target.dataset.i; paint(v); } });
+});
+
+// hero – rotace filmů a dynamické barvy
+const heroOrder = ['den', 'vukrytu', 'pred', 'praz'];
+let heroI = 0, heroTimer;
+function showHero(i) {
+  heroI = i;
+  const k = heroOrder[i], t = T[k];
+  setPalette(k);
+  document.getElementById('heroTitle').textContent = t.name;
+  document.getElementById('heroMeta').innerHTML = t.meta.join('<i class="sep"></i>') + `<i class="sep"></i><span class="csfd">ČSFD ${t.csfd} %</span>`;
+  document.getElementById('heroBadges').innerHTML = t.badges.map((b, j) => `<span class="badge ${j < 2 ? 'hl' : ''}">${b}</span>`).join('');
+  document.getElementById('heroDots').innerHTML = heroOrder.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('');
+}
+function startHero() { clearInterval(heroTimer); heroTimer = setInterval(() => showHero((heroI + 1) % heroOrder.length), 6000); }
+showHero(0); startHero();
+
+document.querySelectorAll('[data-screen="home"] .poster-card, [data-screen="home"] .land, [data-screen="movies"] .poster-card').forEach(el => {
+  el.addEventListener('mouseenter', () => { clearInterval(heroTimer); setPalette(el.dataset.k); });
+  el.addEventListener('mouseleave', () => { if (current === 'home') { showHero(heroI); startHero(); } });
+});
+
+// přepínání obrazovek
+const screenPalette = { detail: 'den', show: 'vidim', player: 'vidim', movies: 'den', history: 'pred', settings: 'vukrytu', dialogs: 'zeme' };
+const sideFor = { detail: 'movies', show: 'show', dialogs: 'movies' };
+let current = 'home';
+function go(name) {
+  current = name;
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === name));
+  document.querySelectorAll('.mock-nav button').forEach(b => b.classList.toggle('on', b.dataset.go === name));
+  document.querySelectorAll('.sidebar a').forEach(a => a.classList.toggle('on', a.dataset.go === (sideFor[name] || name)));
+  document.getElementById('main').scrollTop = 0;
+  if (name === 'home') { showHero(heroI); startHero(); } else { clearInterval(heroTimer); setPalette(screenPalette[name]); }
+}
+document.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => go(el.dataset.go)));
+document.querySelectorAll('.poster-card[data-k], .land[data-k]').forEach(el => el.addEventListener('click', () => go(T[el.dataset.k].show ? 'show' : 'detail')));
+
+// vzhled titulků v přehrávači
+const sub = document.getElementById('sub');
+const outline = w => Array.from({ length: 8 }, (_, i) => { const a = i * Math.PI / 4; return `${(Math.cos(a) * w).toFixed(1)}px ${(Math.sin(a) * w).toFixed(1)}px 0 #000`; }).join(',');
+document.getElementById('subSize').oninput = e => { sub.style.fontSize = e.target.value + 'px'; document.getElementById('subSizeV').textContent = e.target.value; };
+document.getElementById('subOutline').oninput = e => { sub.style.textShadow = +e.target.value ? outline(e.target.value / 2) : 'none'; };
+document.getElementById('subBg').oninput = e => { const v = +e.target.value; sub.style.background = v ? `rgba(0,0,0,${v / 100})` : 'none'; sub.style.padding = v ? '6px 0' : '0'; };
+document.getElementById('subPos').oninput = e => { sub.style.bottom = e.target.value + 'px'; };
+document.querySelectorAll('#subColor i').forEach(i => i.onclick = () => { document.querySelectorAll('#subColor i').forEach(x => x.classList.remove('on')); i.classList.add('on'); sub.style.color = i.dataset.c; });
+</script>
+</body>
+</html>

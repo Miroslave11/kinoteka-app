@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+*.log
+.vite/
+.DS_Store
+Thumbs.db
+
+# přibalené binárky (mpv, ffmpeg) se stahují skriptem, nejsou v gitu
+resources/bin/

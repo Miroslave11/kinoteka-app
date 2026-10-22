@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, testy a build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalace závislostí
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Formát
+        run: npm run format:check
+
+      - name: Kontrola typů
+        run: npm run typecheck
+
+      - name: Testy
+        run: npm test
+
+      - name: Build
+        run: npm run build
