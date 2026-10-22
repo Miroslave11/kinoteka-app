@@ -1,38 +1,38 @@
 import { useEffect, useState } from 'react'
-import { FolderOpen } from 'lucide-react'
+import LibraryPage from './library/LibraryPage'
+import PlayerTestPage from './PlayerTestPage'
 
+type Tab = 'library' | 'player'
+
+/** Dočasná kostra UI; skutečný vzhled podle mockupů přijde v přírůstku 5. */
 export default function App(): React.JSX.Element {
-  const { versions, player } = window.kinoteka
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('library')
+  const [playerError, setPlayerError] = useState<string | null>(null)
 
-  useEffect(() => player.onClosed((info) => setError(info.error ?? null)), [player])
-
-  const openFile = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    const result = await player.openFile()
-    setBusy(false)
-    if (!result.ok && result.reason === 'error') setError(result.message)
-  }
+  useEffect(() => window.kinoteka.player.onClosed((info) => setPlayerError(info.error ?? null)), [])
 
   return (
-    <main className="welcome">
-      <div className="brand">
-        <span className="brand-mark" />
-        Kinotéka
-      </div>
-      <p className="lead">
-        Technický test přehrávače – vyber film a vyzkoušej obraz, zvuk a ovládání.
-      </p>
-      <button className="btn primary" onClick={openFile} disabled={busy}>
-        <FolderOpen size={18} />
-        {busy ? 'Spouštím…' : 'Otevřít soubor…'}
-      </button>
-      {error && <p className="error">{error}</p>}
-      <p className="versions">
-        Electron {versions.electron} · Chromium {versions.chrome} · Node {versions.node}
-      </p>
-    </main>
+    <div className="shell">
+      <header className="topnav">
+        <div className="brand">
+          <span className="brand-mark" />
+          Kinotéka
+        </div>
+        <nav>
+          <button className={tab === 'library' ? 'on' : ''} onClick={() => setTab('library')}>
+            Knihovna
+          </button>
+          <button className={tab === 'player' ? 'on' : ''} onClick={() => setTab('player')}>
+            Přehrávač (test)
+          </button>
+        </nav>
+      </header>
+      {playerError && (
+        <p className="notice is-error floating" onClick={() => setPlayerError(null)}>
+          {playerError}
+        </p>
+      )}
+      <main>{tab === 'library' ? <LibraryPage /> : <PlayerTestPage />}</main>
+    </div>
   )
 }
