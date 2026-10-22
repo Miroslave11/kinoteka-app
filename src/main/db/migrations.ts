@@ -60,5 +60,11 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE media_file ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';
 
   CREATE INDEX media_file_title ON media_file (title_id);
+  `,
+
+  // 3 – technické vlastnosti souboru z ffprobe (JSON MediaInfo)
+  `
+  ALTER TABLE media_file ADD COLUMN media_info TEXT;
+  ALTER TABLE media_file ADD COLUMN probe_error TEXT;
   `
 ]

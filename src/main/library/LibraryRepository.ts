@@ -98,11 +98,16 @@ export class LibraryRepository {
          WHERE id = ?`
       )
       const remove = this.db.prepare('DELETE FROM media_file WHERE id = ?')
+      // Změněný obsah = znovu zjistit vlastnosti; přesunutý soubor si je ponechá.
+      const resetProbe = this.db.prepare(
+        'UPDATE media_file SET media_info = NULL, probe_error = NULL WHERE id = ?'
+      )
 
       for (const id of diff.removed) remove.run(id)
       for (const { id, file } of [...diff.updated, ...diff.moved]) {
         update.run(file.path, file.relativePath, file.size, file.mtimeMs, timestamp, id)
       }
+      for (const { id } of diff.updated) resetProbe.run(id)
       for (const file of diff.added) {
         insert.run(
           folderId,

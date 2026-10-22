@@ -1,3 +1,6 @@
+import type { FolderKind } from './library'
+import type { MediaInfo, MediaSummary } from './mediaInfo'
+
 /** Soubor patřící k filmu nebo dílu. */
 export interface CatalogFile {
   id: number
@@ -6,6 +9,21 @@ export interface CatalogFile {
   size: number
   available: boolean
   tags: string[]
+  /** Shrnutí z ffprobe; null, dokud analýza neproběhla. */
+  summary: MediaSummary | null
+}
+
+/** Vše pro panel „Vlastnosti souboru“. */
+export interface FileDetails {
+  file: CatalogFile
+  path: string
+  folderName: string
+  folderKind: FolderKind
+  info: MediaInfo | null
+  /** Proč se vlastnosti nepodařilo zjistit. */
+  error: string | null
+  /** Analýza ještě neproběhla. */
+  pending: boolean
 }
 
 export interface MovieItem {

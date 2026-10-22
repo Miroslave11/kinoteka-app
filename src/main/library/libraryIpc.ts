@@ -1,16 +1,11 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { IpcChannel } from '../../shared/ipc'
+import { broadcast } from '../broadcast'
 import type { AddFolderResult } from '../../shared/library'
 import type { LibraryRepository } from './LibraryRepository'
 import { LibraryError, type LibraryService } from './LibraryService'
 
 const isId = (value: unknown): value is number => Number.isInteger(value) && (value as number) > 0
-
-function broadcast(channel: string, payload?: unknown): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send(channel, payload)
-  }
-}
 
 /** IPC knihovny. Vstupy z UI se ověřují – okno posílá jen data, nikdy cesty ke spuštění. */
 export function registerLibraryIpc(service: LibraryService, repository: LibraryRepository): void {

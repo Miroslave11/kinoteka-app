@@ -1,5 +1,12 @@
 import { basename } from 'node:path'
-import type { CatalogFile, MovieItem, SeasonItem, ShowItem } from '../../shared/catalog'
+import type {
+  CatalogFile,
+  FileDetails,
+  MovieItem,
+  SeasonItem,
+  ShowItem
+} from '../../shared/catalog'
+import { summarize, type MediaInfo } from '../../shared/mediaInfo'
 import { transaction, type Database } from '../db/database'
 import { groupMediaFiles } from './grouping'
 
@@ -14,14 +21,27 @@ const parseTags = (value: unknown): string[] => {
   }
 }
 
-const toFile = (row: Row): CatalogFile => ({
-  id: Number(row['id']),
-  fileName: basename(String(row['path'])),
-  relativePath: String(row['relative_path']),
-  size: Number(row['size']),
-  available: row['available'] === 1,
-  tags: parseTags(row['tags'])
-})
+const parseMediaInfo = (value: unknown): MediaInfo | null => {
+  if (typeof value !== 'string') return null
+  try {
+    return JSON.parse(value) as MediaInfo
+  } catch {
+    return null
+  }
+}
+
+const toFile = (row: Row): CatalogFile => {
+  const info = parseMediaInfo(row['media_info'])
+  return {
+    id: Number(row['id']),
+    fileName: basename(String(row['path'])),
+    relativePath: String(row['relative_path']),
+    size: Number(row['size']),
+    available: row['available'] === 1,
+    tags: parseTags(row['tags']),
+    summary: info ? summarize(info) : null
+  }
+}
 
 const unionTags = (files: CatalogFile[]): string[] => [...new Set(files.flatMap((f) => f.tags))]
 
@@ -195,6 +215,27 @@ export class CatalogRepository {
         episodeCount: allSeasons.reduce((total, season) => total + season.episodes.length, 0)
       }
     })
+  }
+
+  fileDetails(fileId: number): FileDetails | null {
+    const row = this.db
+      .prepare(
+        `SELECT m.*, f.name AS folder_name, f.kind AS folder_kind
+         FROM media_file m JOIN library_folder f ON f.id = m.folder_id WHERE m.id = ?`
+      )
+      .get(fileId)
+    if (!row) return null
+    const info = parseMediaInfo(row['media_info'])
+    const error = (row['probe_error'] as string | null) ?? null
+    return {
+      file: toFile(row),
+      path: String(row['path']),
+      folderName: String(row['folder_name']),
+      folderKind: row['folder_kind'] === 'network' ? 'network' : 'local',
+      info,
+      error,
+      pending: !info && !error
+    }
   }
 
   private filesByTitle(): Map<number, CatalogFile[]> {
