@@ -16,9 +16,20 @@ const api: KinotekaApi = {
   },
   player: {
     openFile: () => ipcRenderer.invoke(IpcChannel.PlayerOpenFile),
+    playFile: (mediaFileId) => ipcRenderer.invoke(IpcChannel.PlayerPlayFile, mediaFileId),
     send: (command) => ipcRenderer.send(IpcChannel.PlayerCommand, command),
     onState: (listener) => subscribe(IpcChannel.PlayerState, listener),
     onClosed: (listener) => subscribe(IpcChannel.PlayerClosed, listener)
+  },
+  library: {
+    listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),
+    listFiles: () => ipcRenderer.invoke(IpcChannel.LibraryListFiles),
+    pickFolder: () => ipcRenderer.invoke(IpcChannel.LibraryPickFolder),
+    addFolder: (path) => ipcRenderer.invoke(IpcChannel.LibraryAddFolder, path),
+    removeFolder: (id) => ipcRenderer.invoke(IpcChannel.LibraryRemoveFolder, id),
+    scan: (folderId) => ipcRenderer.invoke(IpcChannel.LibraryScan, folderId),
+    onChanged: (listener) => subscribe(IpcChannel.LibraryChanged, () => listener()),
+    onScanProgress: (listener) => subscribe(IpcChannel.LibraryScanProgress, listener)
   }
 }
 
