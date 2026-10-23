@@ -11,6 +11,7 @@ import type { ImdbRating, MatchStatus, TitleMetadata } from '../../shared/metada
 import { EMPTY_WATCH_STATE } from '../../shared/playback'
 import type { Palette } from '../../shared/posterPalette'
 import { transaction, type Database } from '../db/database'
+import { JournalRepository } from '../journal/JournalRepository'
 import { PlaybackRepository, watchKey } from '../playback/PlaybackRepository'
 import { groupMediaFiles } from './grouping'
 
@@ -124,9 +125,11 @@ export interface MetadataRequest {
  */
 export class CatalogRepository {
   private readonly playback: PlaybackRepository
+  private readonly journal: JournalRepository
 
   constructor(private readonly db: Database) {
     this.playback = new PlaybackRepository(db)
+    this.journal = new JournalRepository(db)
   }
 
   rebuild(now = new Date()): void {
@@ -231,7 +234,7 @@ export class CatalogRepository {
         }
       }
 
-      // Tituly a díly bez souborů se mažou, kromě zhlédnutých – deník o ně nesmí přijít.
+      // Tituly a díly bez souborů se mažou, kromě zhlédnutých a ohodnocených – deník o ně nesmí přijít.
       // Když se soubor vrátí, připojí se k nim zase podle klíče názvu.
       this.db.exec(
         `DELETE FROM episode
@@ -241,7 +244,8 @@ export class CatalogRepository {
       this.db.exec(
         `DELETE FROM title
          WHERE id NOT IN (SELECT title_id FROM media_file WHERE title_id IS NOT NULL)
-           AND id NOT IN (SELECT title_id FROM watch_event)`
+           AND id NOT IN (SELECT title_id FROM watch_event)
+           AND id NOT IN (SELECT title_id FROM title_rating)`
       )
     })
   }
@@ -258,6 +262,7 @@ export class CatalogRepository {
     const files = this.filesByTitle()
     const clips = this.clipsByTitle()
     const watch = this.playback.watchStates()
+    const ratings = this.journal.ratings()
     return titles.map((row) => {
       const id = Number(row['id'])
       const movieFiles = files.get(id) ?? []
@@ -268,6 +273,7 @@ export class CatalogRepository {
         tags: unionTags(movieFiles),
         files: movieFiles,
         clips: clips.get(id) ?? [],
+        myRating: ratings.get(id) ?? null,
         watch: watch.get(watchKey(id, null)) ?? EMPTY_WATCH_STATE,
         ...metadataOf(row)
       }
@@ -284,6 +290,7 @@ export class CatalogRepository {
       .all()
     const clips = this.clipsByTitle()
     const watch = this.playback.watchStates()
+    const ratings = this.journal.ratings()
     const episodes = this.db
       .prepare(
         `SELECT * FROM episode
@@ -325,6 +332,7 @@ export class CatalogRepository {
         seasons: allSeasons,
         episodeCount: allSeasons.reduce((total, season) => total + season.episodes.length, 0),
         clips: clips.get(id) ?? [],
+        myRating: ratings.get(id) ?? null,
         ...metadataOf(row)
       }
     })

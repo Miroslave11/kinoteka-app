@@ -169,5 +169,17 @@ export const MIGRATIONS: readonly string[] = [
     media_file_id INTEGER PRIMARY KEY REFERENCES media_file (id) ON DELETE CASCADE,
     delay REAL NOT NULL
   );
+  `,
+
+  // 11 – deník: poznámka ke zhlédnutí, moje hodnocení titulu (1–5 hvězd)
+  `
+  ALTER TABLE watch_event ADD COLUMN note TEXT;
+  CREATE INDEX watch_event_time ON watch_event (watched_at);
+
+  CREATE TABLE title_rating (
+    title_id INTEGER PRIMARY KEY REFERENCES title (id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    updated_at TEXT NOT NULL
+  );
   `
 ]

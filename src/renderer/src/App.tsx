@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import BrowsePage from './pages/BrowsePage'
 import HomePage from './pages/HomePage'
+import JournalPage from './pages/JournalPage'
 import MovieDetailPage from './pages/MovieDetailPage'
 import SearchPage from './pages/SearchPage'
 import SettingsPage from './pages/SettingsPage'
@@ -45,6 +46,7 @@ function Shell(): React.JSX.Element {
               <Route path="/filmy/:id" element={<MovieDetailPage />} />
               <Route path="/serialy" element={<BrowsePage kind="show" />} />
               <Route path="/serialy/:id" element={<ShowDetailPage />} />
+              <Route path="/denik" element={<JournalPage />} />
               <Route path="/hledat" element={<SearchPage />} />
               <Route path="/nastaveni" element={<SettingsPage />} />
             </Routes>

@@ -106,6 +106,11 @@ export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps):
           {year ?? 'rok neznámý'}
           {title.kind === 'show' && ` · ${subtitle}`}
           {title.imdb && <ImdbBadge imdb={title.imdb} compact />}
+          {title.myRating && (
+            <span className="my-stars" title={`Moje hodnocení ${title.myRating} z 5`}>
+              ★ {title.myRating}
+            </span>
+          )}
         </span>
       </span>
     </button>

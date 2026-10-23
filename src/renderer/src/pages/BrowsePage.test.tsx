@@ -31,6 +31,7 @@ const MOVIES: MovieItem[] = [
     imdb: null,
     palette: null,
     clips: [],
+    myRating: null,
     watch: EMPTY_WATCH_STATE
   },
   {
@@ -44,6 +45,7 @@ const MOVIES: MovieItem[] = [
     imdb: null,
     palette: null,
     clips: [],
+    myRating: null,
     watch: EMPTY_WATCH_STATE
   }
 ]

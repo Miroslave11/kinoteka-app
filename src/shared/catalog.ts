@@ -47,6 +47,8 @@ export interface MovieItem {
   clips: string[]
   /** Rozkoukáno / zhlédnuto. */
   watch: WatchState
+  /** Moje hodnocení 1–5; null = bez hodnocení. */
+  myRating: number | null
 }
 
 export interface EpisodeItem {
@@ -79,4 +81,6 @@ export interface ShowItem {
   palette: Palette | null
   /** Tiché klipy z filmu pro pozadí (kinoteka-media://clips/…). */
   clips: string[]
+  /** Moje hodnocení 1–5; null = bez hodnocení. */
+  myRating: number | null
 }

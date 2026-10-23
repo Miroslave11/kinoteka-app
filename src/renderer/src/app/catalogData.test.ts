@@ -37,6 +37,7 @@ const movie = (id: number, name: string, year: number | null, files: CatalogFile
   imdb: null,
   palette: null,
   clips: [],
+  myRating: null,
   watch: EMPTY_WATCH_STATE
 })
 
@@ -69,7 +70,8 @@ const titles: TitleItem[] = [
     matchStatus: 'pending',
     imdb: null,
     palette: null,
-    clips: []
+    clips: [],
+    myRating: null
   }
 ]
 
@@ -145,6 +147,7 @@ describe('mergeSeasons', () => {
       imdb: null,
       palette: null,
       clips: [],
+      myRating: null,
       metadata: {
         seasons: [
           {
@@ -197,7 +200,8 @@ describe('sledování', () => {
     matchStatus: 'pending',
     imdb: null,
     palette: null,
-    clips: []
+    clips: [],
+    myRating: null
   })
   const progress = (position: number, updatedAt: string): WatchState['progress'] => ({
     position,
