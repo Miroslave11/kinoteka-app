@@ -1,13 +1,8 @@
-import { app, BaseWindow, BrowserWindow } from 'electron'
+import { app, BaseWindow, BrowserWindow, dialog } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
-import {
-  audioTracksFromMpv,
-  chooseAudioTrack,
-  type AudioTrack,
-  type TrackPreference
-} from '../../shared/audio'
+import { audioTracksFromMpv, type AudioTrack } from '../../shared/audio'
 import { IpcChannel } from '../../shared/ipc'
 import {
   describeAudioOutput,
@@ -16,10 +11,17 @@ import {
   type PlayerCommand,
   type PlayerState
 } from '../../shared/player'
+import {
+  subtitleTracksFromMpv,
+  SUBTITLE_EXTENSIONS,
+  type SubtitleTrack
+} from '../../shared/subtitles'
 import { mpvExecutablePath } from '../mpv/binary'
 import { connectToMpv, type MpvClient } from '../mpv/MpvClient'
 import { buildMpvArgs, windowHandleToId, type MpvLaunchOptions } from '../mpv/mpvArgs'
 import { hardenWebContents, loadRendererPage, preloadPath } from '../rendererPage'
+import type { ExternalSubtitle } from '../subtitles/externalSubtitles'
+import { TrackSelector, type TrackChoices } from './TrackSelector'
 import { createOverlayWindowOptions, createVideoWindowOptions } from '../windowOptions'
 
 /** Pozice se do overlaye posílá nejvýš 4× za sekundu, ostatní změny hned. */
@@ -42,7 +44,8 @@ const OBSERVED_PROPERTIES = [
   'video-format',
   'video-params',
   'path',
-  'track-list'
+  'track-list',
+  'sub-delay'
 ]
 
 const BOUNDS_EVENTS = [
@@ -70,8 +73,10 @@ export interface PlayerSessionOptions {
     MpvLaunchOptions,
     'passthroughCodecs' | 'audioDevice' | 'audioChannels' | 'audioLanguages'
   >
-  /** Jak vybrat zvukovou stopu po načtení souboru. */
-  audioChoice?: AudioChoice
+  /** Jak vybrat zvuk a titulky po načtení souboru. */
+  tracks: TrackChoices
+  /** Styl titulků (volby `--sub-…`). */
+  subtitleArgs?: readonly string[]
   logFile?: string
   /** Pozice a délka právě hraného souboru (několikrát za sekundu). */
   onProgress?: (position: number, duration: number) => void
@@ -79,6 +84,12 @@ export interface PlayerSessionOptions {
   onNext?: () => void
   /** Uživatel ručně vybral zvukovou stopu (zapamatuje se pro titul). */
   onAudioTrackChosen?: (track: AudioTrack) => void
+  /** Uživatel ručně vybral titulky (null = vypnul). */
+  onSubtitleChosen?: (track: SubtitleTrack | null) => void
+  /** Uživatel změnil posun titulků. */
+  onSubDelayChanged?: (seconds: number) => void
+  /** Připraví ručně vybraný soubor titulků (převod kódování). */
+  prepareSubtitle?: (path: string) => Promise<ExternalSubtitle>
   onEnd: (info: PlayerClosedInfo) => void
 }
 
@@ -87,13 +98,7 @@ export interface LoadOptions {
   title: string
   startSec?: number
   next: string | null
-  audioChoice?: AudioChoice
-}
-
-/** Zapamatovaná stopa pro titul a preferované jazyky (ISO 639-1). */
-export interface AudioChoice {
-  remembered: TrackPreference | null
-  languages: string[]
+  tracks: TrackChoices
 }
 
 const asNumber = (value: unknown): number =>
@@ -124,9 +129,7 @@ export class PlayerSession {
   /** Po `load()` až do změny `path` chodí ještě události předchozího souboru. */
   private switching = false
   private fixedTitle: string | undefined
-  private audioChoice: AudioChoice | undefined
-  /** Stopa pro aktuální soubor už je vybraná (podle preferencí nebo uživatelem). */
-  private audioChosen = false
+  private readonly selector: TrackSelector
   /** Hlídání zaseknutí po spuštění souboru (viz `checkStall`). */
   private stallTimer: NodeJS.Timeout | null = null
   private firstPosition: number | null = null
@@ -143,7 +146,8 @@ export class PlayerSession {
     private readonly options: PlayerSessionOptions
   ) {
     this.fixedTitle = options.title
-    this.audioChoice = options.audioChoice
+    this.selector = new TrackSelector(client)
+    this.selector.reset(options.tracks)
     this.state = {
       ...INITIAL_PLAYER_STATE,
       title: options.title ?? basename(options.file),
@@ -171,6 +175,7 @@ export class PlayerSession {
       windowId: windowHandleToId(videoWindow.getNativeWindowHandle()),
       ipcPath,
       ...options.audio,
+      subtitleArgs: options.subtitleArgs,
       logFile: options.logFile,
       startSec: options.startSec,
       extraArgs: app.isPackaged
@@ -241,10 +246,20 @@ export class PlayerSession {
       case 'set-audio-track': {
         const track = this.state.audioTracks.find((t) => t.id === command.id)
         if (!track) return
-        this.audioChosen = true
         run(this.client.setProperty('aid', command.id))
         return this.options.onAudioTrackChosen?.(track)
       }
+      case 'set-subtitle-track': {
+        const track = this.state.subtitleTracks.find((t) => t.id === command.id) ?? null
+        if (command.id !== null && !track) return
+        run(this.client.setProperty('sid', command.id ?? 'no'))
+        return this.options.onSubtitleChosen?.(track)
+      }
+      case 'set-sub-delay':
+        run(this.client.setProperty('sub-delay', command.seconds))
+        return this.options.onSubDelayChanged?.(command.seconds)
+      case 'load-subtitle':
+        return void this.loadSubtitleFromDialog()
     }
   }
 
@@ -253,19 +268,22 @@ export class PlayerSession {
     if (this.finished) return
     this.switching = true
     this.fixedTitle = options.title
-    this.audioChoice = options.audioChoice
-    this.audioChosen = false
+    this.selector.reset(options.tracks)
     this.update({
       title: options.title,
       next: options.next,
       position: 0,
       duration: 0,
       ended: false,
-      audioTracks: []
+      audioTracks: [],
+      subtitleTracks: []
     })
     // `start` platí pro další načtený soubor; na konci dílu je mpv pozastavené (keep-open).
     void this.client
       .setProperty('start', options.startSec ? options.startSec.toFixed(1) : 'none')
+      // Stopy předchozího dílu neplatí – vybere je znovu TrackSelector.
+      .then(() => this.client.setProperty('aid', 'auto'))
+      .then(() => this.client.setProperty('sid', 'no'))
       .then(() => this.client.command('loadfile', options.file, 'replace'))
       .then(() => this.client.setProperty('pause', false))
       .catch(() => undefined)
@@ -311,6 +329,9 @@ export class PlayerSession {
   private async attach(): Promise<void> {
     this.client.on('property', (name, value) => this.onProperty(name, value))
     this.client.on('close', () => this.finish())
+    this.client.on('event', (name) => {
+      if (name === 'file-loaded') void this.selector.onFileLoaded()
+    })
     this.mpv.on('exit', (code) => {
       const crashed = code !== 0 && code !== null
       this.finish(
@@ -332,6 +353,9 @@ export class PlayerSession {
 
     await Promise.all(OBSERVED_PROPERTIES.map((name) => this.client.observe(name)))
     this.armStallCheck()
+    // Soubor se mohl načíst dřív, než se aplikace k mpv připojila (událost by pak nepřišla).
+    const tracks = await this.client.command('get_property', 'track-list').catch(() => [])
+    if (Array.isArray(tracks) && tracks.length > 0) void this.selector.onFileLoaded()
   }
 
   private listenToVideoWindow(): void {
@@ -388,7 +412,12 @@ export class PlayerSession {
         return this.update({ ended: value === true })
       case 'track-list':
         if (this.switching) return
-        return this.onTracks(audioTracksFromMpv(value))
+        return this.update({
+          audioTracks: audioTracksFromMpv(value),
+          subtitleTracks: subtitleTracksFromMpv(value)
+        })
+      case 'sub-delay':
+        return this.update({ subDelay: Math.round(asNumber(value) * 10) / 10 })
       case 'media-title':
         if (!this.fixedTitle && typeof value === 'string' && value) this.update({ title: value })
         return
@@ -410,16 +439,22 @@ export class PlayerSession {
     }
   }
 
-  /** Po načtení souboru jednou vybere stopu podle zapamatované volby a jazyků. */
-  private onTracks(tracks: AudioTrack[]): void {
-    this.update({ audioTracks: tracks })
-    if (this.audioChosen || tracks.length === 0 || !this.audioChoice) return
-    this.audioChosen = true
-    const { remembered, languages } = this.audioChoice
-    const id = chooseAudioTrack(tracks, remembered, languages)
-    if (id !== null && !tracks.find((t) => t.id === id)?.selected) {
-      this.client.setProperty('aid', id).catch(() => undefined)
-    }
+  /** „Načíst titulky ze souboru…“ – vybraný soubor se převede do UTF-8 a hned zapne. */
+  private async loadSubtitleFromDialog(): Promise<void> {
+    if (this.videoWindow.isFullScreen()) this.videoWindow.setFullScreen(false)
+    const picked = await dialog.showOpenDialog(this.videoWindow, {
+      title: 'Načíst titulky',
+      properties: ['openFile'],
+      filters: [{ name: 'Titulky', extensions: [...SUBTITLE_EXTENSIONS] }]
+    })
+    const file = picked.filePaths[0]
+    if (picked.canceled || !file || this.finished) return
+    const subtitle = (await this.options.prepareSubtitle?.(file).catch(() => null)) ?? null
+    const args: unknown[] = ['sub-add', subtitle?.path ?? file, 'select', subtitle?.title ?? file]
+    if (subtitle?.language) args.push(subtitle.language)
+    await this.client
+      .command(...args)
+      .catch(() => this.update({ notice: 'Titulky se nepodařilo načíst.' }))
   }
 
   private describeVideo(): PlayerState['video'] {

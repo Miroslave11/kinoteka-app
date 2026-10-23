@@ -16,6 +16,7 @@ import type {
 import type { PreviewStatus } from './posterPalette'
 import type { AudioDevice, AudioSettings } from './audio'
 import type { PlayRequest } from './playback'
+import type { SubtitleSettings } from './subtitles'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
 /** API, které preload zpřístupní oknům jako `window.kinoteka`. */
@@ -43,6 +44,11 @@ export interface KinotekaApi {
     saveSettings(value: AudioSettings): Promise<AudioSettings>
     /** Zvuková zařízení, jak je vidí mpv. */
     listDevices(): Promise<AudioDevice[]>
+  }
+  subtitles: {
+    getSettings(): Promise<SubtitleSettings>
+    /** Uloží nastavení titulků (projeví se při dalším spuštění přehrávání). */
+    saveSettings(value: SubtitleSettings): Promise<SubtitleSettings>
   }
   catalog: {
     /** Filmy rozpoznané z názvů souborů. Změny hlásí `library.onChanged`. */

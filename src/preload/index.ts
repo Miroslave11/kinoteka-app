@@ -26,6 +26,10 @@ const api: KinotekaApi = {
     saveSettings: (value) => ipcRenderer.invoke(IpcChannel.AudioSaveSettings, value),
     listDevices: () => ipcRenderer.invoke(IpcChannel.AudioListDevices)
   },
+  subtitles: {
+    getSettings: () => ipcRenderer.invoke(IpcChannel.SubtitlesGetSettings),
+    saveSettings: (value) => ipcRenderer.invoke(IpcChannel.SubtitlesSaveSettings, value)
+  },
   catalog: {
     listMovies: () => ipcRenderer.invoke(IpcChannel.CatalogListMovies),
     listShows: () => ipcRenderer.invoke(IpcChannel.CatalogListShows),

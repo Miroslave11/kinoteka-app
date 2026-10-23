@@ -33,6 +33,8 @@ export const IpcChannel = {
   AudioGetSettings: 'audio:get-settings',
   AudioSaveSettings: 'audio:save-settings',
   AudioListDevices: 'audio:list-devices',
+  SubtitlesGetSettings: 'subtitles:get-settings',
+  SubtitlesSaveSettings: 'subtitles:save-settings',
 
   PreviewStatus: 'preview:status',
   PreviewSetClipsEnabled: 'preview:set-clips-enabled'

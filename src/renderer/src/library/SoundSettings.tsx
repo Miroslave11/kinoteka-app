@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, X } from 'lucide-react'
 import {
   PASSTHROUGH_FORMATS,
   PCM_CHANNELS,
@@ -8,12 +7,7 @@ import {
   type PassthroughFormat,
   type PcmChannels
 } from '../../../shared/audio'
-import { languageName } from '../../../shared/languages'
-
-/** Jazyky v nabídce „Přidat jazyk“. */
-const LANGUAGE_CHOICES = ['cs', 'sk', 'en', 'de', 'fr', 'es', 'it', 'pl', 'hu', 'ru', 'ja', 'ko']
-
-const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
+import LanguageList from './LanguageList'
 
 /** Nastavení → Zvuk: výstup, passthrough do receiveru a preferované jazyky. */
 export default function SoundSettings(): React.JSX.Element {
@@ -39,12 +33,6 @@ export default function SoundSettings(): React.JSX.Element {
         ? settings.passthrough.filter((f) => f !== id)
         : [...settings.passthrough, id]
     })
-  const moveLanguage = (index: number, by: number): void => {
-    const languages = [...settings.languages]
-    const [moved] = languages.splice(index, 1)
-    languages.splice(index + by, 0, moved!)
-    save({ languages })
-  }
   const knownDevice = devices?.some((d) => d.name === settings.device) ?? true
 
   return (
@@ -125,51 +113,10 @@ export default function SoundSettings(): React.JSX.Element {
           Přehrávač vybere první jazyk ze seznamu, který soubor má. Když stopu v přehrávači přepneš
           ručně, zapamatuje se pro daný film nebo celý seriál.
         </p>
-        <ol className="lang-list">
-          {settings.languages.map((code, index) => (
-            <li key={code}>
-              <span>{capitalize(languageName(code))}</span>
-              <button
-                className="icon-btn xs"
-                title="Výš"
-                disabled={index === 0}
-                onClick={() => moveLanguage(index, -1)}
-              >
-                <ArrowUp size={14} />
-              </button>
-              <button
-                className="icon-btn xs"
-                title="Níž"
-                disabled={index === settings.languages.length - 1}
-                onClick={() => moveLanguage(index, 1)}
-              >
-                <ArrowDown size={14} />
-              </button>
-              <button
-                className="icon-btn xs"
-                title="Odebrat"
-                onClick={() => save({ languages: settings.languages.filter((c) => c !== code) })}
-              >
-                <X size={14} />
-              </button>
-            </li>
-          ))}
-        </ol>
-        <select
-          className="field"
-          value=""
-          aria-label="Přidat jazyk"
-          onChange={(event) =>
-            event.target.value && save({ languages: [...settings.languages, event.target.value] })
-          }
-        >
-          <option value="">Přidat jazyk…</option>
-          {LANGUAGE_CHOICES.filter((code) => !settings.languages.includes(code)).map((code) => (
-            <option key={code} value={code}>
-              {capitalize(languageName(code))}
-            </option>
-          ))}
-        </select>
+        <LanguageList
+          languages={settings.languages}
+          onChange={(languages) => save({ languages })}
+        />
       </section>
     </div>
   )
