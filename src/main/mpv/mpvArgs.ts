@@ -8,6 +8,8 @@ export interface MpvLaunchOptions {
   ipcPath: string
   passthroughCodecs: readonly string[]
   logFile?: string
+  /** Začít od této pozice (s) – pokračování v rozkoukaném filmu. */
+  startSec?: number
   /** Další volby pro ladění (jen ve vývoji, proměnná KINOTEKA_DEV_MPV_ARGS). */
   extraArgs?: readonly string[]
 }
@@ -41,6 +43,7 @@ export function buildMpvArgs(options: MpvLaunchOptions): string[] {
     '--slang=cze,ces,cs,eng,en',
     '--sub-auto=fuzzy'
   ]
+  if (options.startSec && options.startSec > 0) args.push(`--start=${options.startSec.toFixed(1)}`)
   if (options.logFile) args.push(`--log-file=${options.logFile}`)
   if (options.extraArgs) args.push(...options.extraArgs)
   // „--“ zajistí, že název souboru začínající pomlčkou mpv nevezme jako volbu.

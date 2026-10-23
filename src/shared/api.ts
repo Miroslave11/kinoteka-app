@@ -14,6 +14,7 @@ import type {
   TmdbKeyStatus
 } from './metadata'
 import type { PreviewStatus } from './posterPalette'
+import type { PlayRequest } from './playback'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
 /** API, které preload zpřístupní oknům jako `window.kinoteka`. */
@@ -26,8 +27,8 @@ export interface KinotekaApi {
   player: {
     /** Otevře dialog pro výběr souboru a spustí přehrávání v tomto okně. */
     openFile(): Promise<OpenFileResult>
-    /** Přehraje soubor z knihovny. */
-    playFile(mediaFileId: number): Promise<OpenFileResult>
+    /** Přehraje soubor z knihovny – od začátku, nebo od uložené pozice. */
+    playFile(request: PlayRequest): Promise<OpenFileResult>
     /** Příkaz z ovládání přehrávače. */
     send(command: PlayerCommand): void
     /** Odebírá stav přehrávače; vrací funkci pro odhlášení. */

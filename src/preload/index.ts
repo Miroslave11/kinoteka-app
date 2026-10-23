@@ -16,7 +16,7 @@ const api: KinotekaApi = {
   },
   player: {
     openFile: () => ipcRenderer.invoke(IpcChannel.PlayerOpenFile),
-    playFile: (mediaFileId) => ipcRenderer.invoke(IpcChannel.PlayerPlayFile, mediaFileId),
+    playFile: (request) => ipcRenderer.invoke(IpcChannel.PlayerPlayFile, request),
     send: (command) => ipcRenderer.send(IpcChannel.PlayerCommand, command),
     onState: (listener) => subscribe(IpcChannel.PlayerState, listener),
     onClosed: (listener) => subscribe(IpcChannel.PlayerClosed, listener)

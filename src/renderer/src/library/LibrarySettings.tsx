@@ -58,7 +58,7 @@ export default function LibrarySettings(): React.JSX.Element {
     run(async () => setMessage({ text: describeScan(await library.scan(folderId)) }))
 
   const playFile = async (id: number): Promise<void> => {
-    const result = await player.playFile(id)
+    const result = await player.playFile({ fileId: id, from: 'beginning' })
     if (!result.ok && result.reason === 'error') setMessage({ text: result.message, error: true })
   }
 

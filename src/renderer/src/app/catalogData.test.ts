@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import type { CatalogFile } from '../../../shared/catalog'
+import type { CatalogFile, EpisodeItem, ShowItem } from '../../../shared/catalog'
 import type { TitleMetadata } from '../../../shared/metadata'
+import { EMPTY_WATCH_STATE, type WatchState } from '../../../shared/playback'
 import {
+  continueWatching,
   DEFAULT_FILTERS,
   filterOptions,
   filterTitles,
   mergeSeasons,
+  upNext,
+  watchForFile,
   type TitleItem
 } from './catalogData'
 
@@ -32,7 +36,8 @@ const movie = (id: number, name: string, year: number | null, files: CatalogFile
   matchStatus: 'pending',
   imdb: null,
   palette: null,
-  clips: []
+  clips: [],
+  watch: EMPTY_WATCH_STATE
 })
 
 const titles: TitleItem[] = [
@@ -123,7 +128,8 @@ describe('mergeSeasons', () => {
     season: 1,
     episode: n,
     name: n === 2 ? 'Puzzle' : null,
-    files: [file({ id: n })]
+    files: [file({ id: n })],
+    watch: EMPTY_WATCH_STATE
   })
 
   it('spojí díly z disku s díly z TMDB a chybějící označí', () => {
@@ -164,5 +170,100 @@ describe('mergeSeasons', () => {
       // díl na disku, který TMDB nezná, zůstane
       [9, null, true]
     ])
+  })
+})
+
+describe('sledování', () => {
+  const ep = (season: number, n: number, watch: Partial<WatchState> = {}): EpisodeItem => ({
+    id: season * 100 + n,
+    season,
+    episode: n,
+    name: null,
+    files: [file({ id: season * 100 + n })],
+    watch: { ...EMPTY_WATCH_STATE, ...watch }
+  })
+  const show = (episodes: EpisodeItem[]): ShowItem & { kind: 'show' } => ({
+    kind: 'show',
+    id: 9,
+    name: 'Země gangů',
+    year: 2025,
+    alternativeNames: [],
+    tags: [],
+    seasons: [1, 2]
+      .map((number) => ({ number, episodes: episodes.filter((e) => e.season === number) }))
+      .filter((season) => season.episodes.length > 0),
+    episodeCount: episodes.length,
+    metadata: null,
+    matchStatus: 'pending',
+    imdb: null,
+    palette: null,
+    clips: []
+  })
+  const progress = (position: number, updatedAt: string): WatchState['progress'] => ({
+    position,
+    duration: 3000,
+    updatedAt
+  })
+
+  it('nezačatý seriál začne prvním dílem', () => {
+    expect(upNext(show([ep(1, 1), ep(1, 2)]))).toMatchObject({
+      mode: 'start',
+      episode: { id: 101 }
+    })
+  })
+
+  it('po zhlédnutém dílu nabídne další, i v další sérii', () => {
+    const next = upNext(
+      show([ep(1, 1), ep(1, 2, { watchCount: 1, lastWatchedAt: '2026-10-20' }), ep(2, 1)])
+    )
+    expect(next).toMatchObject({ mode: 'next', episode: { id: 201 } })
+  })
+
+  it('rozkoukaný díl má přednost, pokud je novější než poslední zhlédnutí', () => {
+    const episodes = [
+      ep(1, 1, { progress: progress(600, '2026-10-21') }),
+      ep(1, 2, { watchCount: 1, lastWatchedAt: '2026-10-20' }),
+      ep(1, 3)
+    ]
+    expect(upNext(show(episodes))).toMatchObject({ mode: 'resume', episode: { id: 101 } })
+    episodes[1]!.watch.lastWatchedAt = '2026-10-22'
+    expect(upNext(show(episodes))).toMatchObject({ mode: 'next', episode: { id: 103 } })
+  })
+
+  it('dokoukaný seriál nic nenabízí', () => {
+    expect(upNext(show([ep(1, 1, { watchCount: 1, lastWatchedAt: '2026-10-20' })]))).toBeNull()
+  })
+
+  it('řada Pokračovat: rozkoukané filmy a díly i další díly, nejnovější první', () => {
+    const film = {
+      ...movie(1, 'Prázdnota', 2020, [file({ id: 5 })]),
+      watch: { ...EMPTY_WATCH_STATE, progress: progress(900, '2026-10-19') }
+    } as TitleItem
+    const finished = {
+      ...movie(2, 'Den odhalení', 2026, [file({ id: 6 })]),
+      watch: { ...EMPTY_WATCH_STATE, watchCount: 1, lastWatchedAt: '2026-10-22' }
+    } as TitleItem
+    const series = show([ep(1, 1, { watchCount: 1, lastWatchedAt: '2026-10-21' }), ep(1, 2)])
+
+    expect(
+      continueWatching([film, finished, series]).map((item) => [
+        item.title.name,
+        item.fileId,
+        item.episode,
+        item.progress?.position ?? null
+      ])
+    ).toEqual([
+      ['Země gangů', 102, 'S01E02', null],
+      ['Prázdnota', 5, null, 900]
+    ])
+  })
+
+  it('k souboru najde název a stav pro dialog pokračování', () => {
+    const series = show([ep(1, 2, { progress: progress(600, '2026-10-21') })])
+    expect(watchForFile([series], 102)).toMatchObject({
+      label: 'Země gangů · S01E02',
+      watch: { progress: { position: 600 } }
+    })
+    expect(watchForFile([series], 999)).toBeNull()
   })
 })

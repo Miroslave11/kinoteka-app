@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
 import { VIDEO_EXTENSIONS } from '../shared/library'
+import { canResume, parsePlayRequest } from '../shared/playback'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
 import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
@@ -22,6 +23,8 @@ import { binaryPath, ffprobeExecutablePath } from './mpv/binary'
 import { registerLibraryIpc } from './library/libraryIpc'
 import { LibraryRepository } from './library/LibraryRepository'
 import { LibraryService } from './library/LibraryService'
+import { PlaybackRepository, type PlaybackItem } from './playback/PlaybackRepository'
+import { PlaybackTracker } from './playback/PlaybackTracker'
 import { PlayerSession } from './player/PlayerSession'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
 import { SettingsRepository } from './settings/SettingsRepository'
@@ -33,6 +36,8 @@ app.commandLine.appendSwitch('disable-direct-composition')
 registerMediaScheme()
 
 let session: PlayerSession | null = null
+let playback: PlaybackRepository
+let tracker: PlaybackTracker
 
 /** fetch přes síť Chromia (net.fetch), který neumí objekt URL – převede ho na text. */
 const chromiumFetch: typeof fetch = (input, init) =>
@@ -46,31 +51,82 @@ function createMainWindow(): BrowserWindow {
   return win
 }
 
-async function startPlayback(host: BrowserWindow, file: string): Promise<void> {
+/** Uložená pozice, od které má pokračovat přehrávání; undefined = od začátku. */
+function resumePosition(item: PlaybackItem): number | undefined {
+  const progress = playback.progress(item.titleId, item.episodeId)
+  return canResume(progress) ? progress.position : undefined
+}
+
+const nextLabel = (item: PlaybackItem): string | null =>
+  playback.nextEpisode(item)?.shortLabel ?? null
+
+/**
+ * Spustí přehrávání. Soubor z knihovny (`item`) si pamatuje pozici a zhlédnutí;
+ * soubor z dialogu „Otevřít soubor…“ (test přehrávače) ne.
+ */
+async function startPlayback(
+  host: BrowserWindow,
+  file: string,
+  item?: PlaybackItem,
+  startSec?: number
+): Promise<void> {
   session?.close()
-  const started = await PlayerSession.start({
+  const started: PlayerSession = await PlayerSession.start({
     mainWindow: host,
     file,
+    title: item?.label,
+    startSec,
+    next: item ? nextLabel(item) : null,
     logFile: join(app.getPath('logs'), 'mpv.log'),
+    onProgress: (position, duration) => {
+      if (session === started) tracker.update(position, duration)
+    },
+    onNext: () => {
+      if (session === started) playNext(started)
+    },
     onEnd: (info) => {
-      if (session === started) session = null
+      if (session === started) {
+        session = null
+        tracker.finish()
+      }
       if (!host.isDestroyed()) host.webContents.send(IpcChannel.PlayerClosed, info)
     }
   })
   session = started
+  if (item) tracker.start(item)
+  else tracker.finish()
 }
 
-async function play(host: BrowserWindow | null, file: string): Promise<OpenFileResult> {
+/** „Další díl“ – načte se do běžícího přehrávače, okno se nezavře. */
+function playNext(current: PlayerSession): void {
+  const item = tracker.current
+  const next = item && playback.nextEpisode(item)
+  if (!next) return
+  tracker.start(next)
+  current.load({
+    file: next.path,
+    title: next.label,
+    startSec: resumePosition(next),
+    next: nextLabel(next)
+  })
+}
+
+async function play(
+  host: BrowserWindow | null,
+  file: string,
+  item?: PlaybackItem,
+  startSec?: number
+): Promise<OpenFileResult> {
   if (!host) return { ok: false, reason: 'error', message: 'Okno aplikace nebylo nalezeno.' }
   try {
-    await startPlayback(host, file)
+    await startPlayback(host, file, item, startSec)
     return { ok: true }
   } catch (error) {
     return { ok: false, reason: 'error', message: (error as Error).message }
   }
 }
 
-function registerPlayerIpc(repository: LibraryRepository): void {
+function registerPlayerIpc(): void {
   ipcMain.handle(IpcChannel.PlayerOpenFile, async (event): Promise<OpenFileResult> => {
     const host = BrowserWindow.fromWebContents(event.sender)
     if (!host) return { ok: false, reason: 'error', message: 'Okno aplikace nebylo nalezeno.' }
@@ -85,14 +141,17 @@ function registerPlayerIpc(repository: LibraryRepository): void {
   })
 
   // Z knihovny se přehrává podle id – okno nikdy neposílá cestu k souboru.
-  ipcMain.handle(IpcChannel.PlayerPlayFile, (event, id: unknown): Promise<OpenFileResult> => {
-    const file = Number.isInteger(id) ? repository.getFile(id as number) : undefined
-    if (!file)
+  ipcMain.handle(IpcChannel.PlayerPlayFile, (event, payload: unknown): Promise<OpenFileResult> => {
+    const request = parsePlayRequest(payload)
+    const item = request ? playback.itemForFile(request.fileId) : undefined
+    if (!request || !item) {
       return Promise.resolve({ ok: false, reason: 'error', message: 'Soubor není v knihovně.' })
-    if (!file.available) {
+    }
+    if (!item.available) {
       return Promise.resolve({ ok: false, reason: 'error', message: 'Soubor teď není dostupný.' })
     }
-    return play(BrowserWindow.fromWebContents(event.sender), file.path)
+    const startSec = request.from === 'resume' ? resumePosition(item) : undefined
+    return play(BrowserWindow.fromWebContents(event.sender), item.path, item, startSec)
   })
 
   ipcMain.on(IpcChannel.PlayerCommand, (event, payload: unknown) => {
@@ -108,6 +167,8 @@ void app.whenReady().then(() => {
   const repository = new LibraryRepository(db)
   const library = new LibraryService(repository)
   const catalog = new CatalogRepository(db)
+  playback = new PlaybackRepository(db)
+  tracker = new PlaybackTracker(playback, () => broadcast(IpcChannel.LibraryChanged))
   const ffprobe = ffprobeExecutablePath()
   const probe = existsSync(ffprobe)
     ? new ProbeService(db, (path) => runFfprobe(ffprobe, path))
@@ -195,7 +256,7 @@ void app.whenReady().then(() => {
     Number.isInteger(id) ? catalog.fileDetails(id as number) : null
   )
   registerLibraryIpc(library, repository)
-  registerPlayerIpc(repository)
+  registerPlayerIpc()
 
   const win = createMainWindow()
 

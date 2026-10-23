@@ -32,7 +32,8 @@ const OBSERVED_PROPERTIES = [
   'audio-params',
   'audio-out-params',
   'video-format',
-  'video-params'
+  'video-params',
+  'path'
 ]
 
 const BOUNDS_EVENTS = [
@@ -49,8 +50,25 @@ export interface PlayerSessionOptions {
   /** Hlavní okno aplikace – po dobu přehrávání se schová a video zaujme jeho místo. */
   mainWindow: BrowserWindow
   file: string
+  /** Název z knihovny („Země gangů · S01E02 · Puzzle“); jinak název z mpv nebo souboru. */
+  title?: string
+  /** Začít od pozice (s) – pokračování. */
+  startSec?: number
+  /** Popis dalšího dílu pro tlačítko „Další díl“. */
+  next?: string | null
   logFile?: string
+  /** Pozice a délka právě hraného souboru (několikrát za sekundu). */
+  onProgress?: (position: number, duration: number) => void
+  /** Uživatel chce další díl – volající pak zavolá `load()`. */
+  onNext?: () => void
   onEnd: (info: PlayerClosedInfo) => void
+}
+
+export interface LoadOptions {
+  file: string
+  title: string
+  startSec?: number
+  next: string | null
 }
 
 const asNumber = (value: unknown): number =>
@@ -78,6 +96,9 @@ export class PlayerSession {
   private sendTimer: NodeJS.Timeout | null = null
   private quitTimer: NodeJS.Timeout | null = null
   private finished = false
+  /** Po `load()` až do změny `path` chodí ještě události předchozího souboru. */
+  private switching = false
+  private fixedTitle: string | undefined
   private readonly cleanups: (() => void)[] = []
 
   private constructor(
@@ -86,13 +107,13 @@ export class PlayerSession {
     readonly overlay: BrowserWindow,
     private readonly mpv: ChildProcess,
     private readonly client: MpvClient,
-    file: string,
-    private readonly logFile: string | undefined,
-    private readonly onEnd: (info: PlayerClosedInfo) => void
+    private readonly options: PlayerSessionOptions
   ) {
+    this.fixedTitle = options.title
     this.state = {
       ...INITIAL_PLAYER_STATE,
-      title: basename(file),
+      title: options.title ?? basename(options.file),
+      next: options.next ?? null,
       fullscreen: videoWindow.isFullScreen()
     }
   }
@@ -117,6 +138,7 @@ export class PlayerSession {
       ipcPath,
       passthroughCodecs: DEFAULT_PASSTHROUGH_CODECS,
       logFile: options.logFile,
+      startSec: options.startSec,
       extraArgs: app.isPackaged
         ? undefined
         : process.env['KINOTEKA_DEV_MPV_ARGS']?.split(' ').filter(Boolean)
@@ -150,16 +172,7 @@ export class PlayerSession {
       ...createOverlayWindowOptions(preloadPath()),
       parent: videoWindow
     })
-    const session = new PlayerSession(
-      mainWindow,
-      videoWindow,
-      overlay,
-      mpv,
-      client,
-      options.file,
-      options.logFile,
-      options.onEnd
-    )
+    const session = new PlayerSession(mainWindow, videoWindow, overlay, mpv, client, options)
     await session.attach()
     return session
   }
@@ -189,7 +202,29 @@ export class PlayerSession {
           : this.close()
       case 'close':
         return this.close()
+      case 'play-next':
+        return this.options.onNext?.()
     }
+  }
+
+  /** Další soubor (díl) ve stejném okně, bez zavření přehrávače. */
+  load(options: LoadOptions): void {
+    if (this.finished) return
+    this.switching = true
+    this.fixedTitle = options.title
+    this.update({
+      title: options.title,
+      next: options.next,
+      position: 0,
+      duration: 0,
+      ended: false
+    })
+    // `start` platí pro další načtený soubor; na konci dílu je mpv pozastavené (keep-open).
+    void this.client
+      .setProperty('start', options.startSec ? options.startSec.toFixed(1) : 'none')
+      .then(() => this.client.command('loadfile', options.file, 'replace'))
+      .then(() => this.client.setProperty('pause', false))
+      .catch(() => undefined)
   }
 
   /** Požádá mpv o ukončení; když nezareaguje, ukončí ho natvrdo. */
@@ -206,7 +241,7 @@ export class PlayerSession {
       const crashed = code !== 0 && code !== null
       this.finish(
         crashed
-          ? `Přehrávač neočekávaně skončil (kód ${code}).${this.logFile ? ` Podrobnosti: ${this.logFile}` : ''}`
+          ? `Přehrávač neočekávaně skončil (kód ${code}).${this.options.logFile ? ` Podrobnosti: ${this.options.logFile}` : ''}`
           : undefined
       )
     })
@@ -256,18 +291,26 @@ export class PlayerSession {
     switch (name) {
       case 'pause':
         return this.update({ paused: value === true })
+      case 'path':
+        if (typeof value === 'string') this.switching = false
+        return
       case 'time-pos':
-        return this.update({ position: asNumber(value) }, true)
+        // Při ukončení nebo výměně souboru mpv hlásí „žádná pozice“ – ta se nesmí uložit jako 0.
+        if (typeof value !== 'number' || this.switching) return
+        this.update({ position: value }, true)
+        return this.options.onProgress?.(value, this.state.duration)
       case 'duration':
-        return this.update({ duration: asNumber(value) })
+        if (typeof value !== 'number' || this.switching) return
+        return this.update({ duration: value })
       case 'volume':
         return this.update({ volume: asNumber(value) })
       case 'mute':
         return this.update({ muted: value === true })
       case 'eof-reached':
+        if (this.switching) return
         return this.update({ ended: value === true })
       case 'media-title':
-        if (typeof value === 'string' && value) this.update({ title: value })
+        if (!this.fixedTitle && typeof value === 'string' && value) this.update({ title: value })
         return
       case 'audio-codec-name':
         this.audio.codecName = value
@@ -324,7 +367,7 @@ export class PlayerSession {
     if (!this.overlay.isDestroyed()) this.overlay.destroy()
     this.restoreMainWindow()
     if (!this.videoWindow.isDestroyed()) this.videoWindow.destroy()
-    this.onEnd(error ? { error } : {})
+    this.options.onEnd(error ? { error } : {})
   }
 
   /** Hlavní okno se vrátí tam, kde naposledy bylo okno s videem. */

@@ -1,12 +1,15 @@
 import { useState } from 'react'
-import { Info, Play } from 'lucide-react'
+import { Check, Info, Play } from 'lucide-react'
 import { useParams } from 'react-router'
+import { canResume, episodeCode, progressRatio, remainingText } from '../../../shared/playback'
 import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
 import {
   mergeSeasons,
   playableFile,
   showFiles,
+  upNext,
+  watchedTitle,
   type EpisodeView,
   type TitleItem
 } from '../app/catalogData'
@@ -14,8 +17,6 @@ import { placeholderStyle, titlePalette, useAmbientPalette } from '../app/palett
 import Artwork from '../components/Artwork'
 import DetailHeader from '../components/DetailHeader'
 import MediaBadges from '../components/MediaBadges'
-
-const pad = (n: number): string => String(n).padStart(2, '0')
 
 export default function ShowDetailPage(): React.JSX.Element {
   const { id } = useParams()
@@ -39,9 +40,8 @@ export default function ShowDetailPage(): React.JSX.Element {
     seasons.find((s) => s.number === seasonNumber) ??
     seasons.find((s) => s.episodes.some((e) => e.disk)) ??
     seasons[0]
-  const firstEpisode = seasons
-    .flatMap((s) => s.episodes)
-    .find((e) => e.disk && playableFile(e.disk.files))
+  const next = upNext(show)
+  const nextCode = next && episodeCode(next.episode.season, next.episode.episode)
   const tags = [...new Set(showFiles(show).flatMap((f) => f.tags))]
   const total = seasons.reduce((sum, s) => sum + s.episodes.length, 0)
 
@@ -57,13 +57,17 @@ export default function ShowDetailPage(): React.JSX.Element {
         ]}
         badges={<MediaBadges file={undefined} tags={tags} />}
       >
-        {firstEpisode?.disk && (
+        {next && (
           <button
             className="btn primary"
-            onClick={() => void play(playableFile(firstEpisode.disk!.files)!.id)}
+            onClick={() => void play(next.file.id, next.mode === 'resume' ? 'resume' : undefined)}
           >
-            <Play size={18} fill="currentColor" /> Přehrát S{pad(firstEpisode.season)}E
-            {pad(firstEpisode.episode)}
+            <Play size={18} fill="currentColor" />
+            {next.mode === 'resume'
+              ? `Pokračovat ${nextCode}`
+              : next.mode === 'next'
+                ? `Další díl: ${nextCode}`
+                : `Přehrát ${nextCode}`}
           </button>
         )}
       </DetailHeader>
@@ -112,6 +116,8 @@ function EpisodeRow({
   const files = episode.disk?.files ?? []
   const file = playableFile(files)
   const first = file ?? files[0]
+  const watch = episode.disk?.watch
+  const progress = watch && canResume(watch.progress) ? watch.progress : null
 
   return (
     <div className={`ep ${episode.disk ? (file ? '' : 'is-unavailable') : 'is-missing'}`}>
@@ -126,6 +132,11 @@ function EpisodeRow({
         {file && (
           <span className="ep-play">
             <Play size={20} fill="currentColor" />
+          </span>
+        )}
+        {progress && (
+          <span className="progress-bar on-image">
+            <i style={{ width: `${progressRatio(progress) * 100}%` }} />
           </span>
         )}
       </button>
@@ -145,6 +156,12 @@ function EpisodeRow({
       </div>
       <div className="ep-side">
         {first?.summary && <span>{formatTime(first.summary.durationSec)}</span>}
+        {progress && <span className="accent">{remainingText(progress)}</span>}
+        {watch && watch.watchCount > 0 && (
+          <span className="ok-dot" title={watchedTitle(watch)}>
+            <Check size={15} strokeWidth={3} />
+          </span>
+        )}
         {first && (
           <button
             className="icon-btn xs"

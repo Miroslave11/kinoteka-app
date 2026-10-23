@@ -7,6 +7,7 @@ import {
   Play,
   RotateCcw,
   RotateCw,
+  SkipForward,
   Volume2,
   VolumeX
 } from 'lucide-react'
@@ -20,6 +21,8 @@ import SeekBar from './SeekBar'
 import { useIdle } from './useIdle'
 
 const HIDE_CONTROLS_AFTER_MS = 2500
+/** Po konci dílu se další díl spustí sám po tolika sekundách. */
+const NEXT_COUNTDOWN_SECONDS = 10
 /** Odstup, podle kterého se rozliší jedno kliknutí (pauza) od dvojkliku (celá obrazovka). */
 const DOUBLE_CLICK_MS = 250
 
@@ -39,8 +42,27 @@ export default function PlayerOverlay(): React.JSX.Element {
     !state.paused && !state.ended && !overControls
   )
   const clickTimer = useRef<number | undefined>(undefined)
+  const [countdown, setCountdown] = useState<number | null>(null)
 
   useEffect(() => window.kinoteka.player.onState(setState), [])
+
+  // Konec dílu: odpočet do dalšího dílu (zruší ho návrat, nové přehrání nebo „Zrušit“).
+  const offerNext = state.ended && state.next !== null
+  useEffect(() => {
+    if (!offerNext) {
+      setCountdown(null)
+      return
+    }
+    setCountdown(NEXT_COUNTDOWN_SECONDS)
+    const timer = window.setInterval(
+      () => setCountdown((value) => (value === null ? null : value - 1)),
+      1000
+    )
+    return () => window.clearInterval(timer)
+  }, [offerNext])
+  useEffect(() => {
+    if (countdown === 0) send({ type: 'play-next' })
+  }, [countdown])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -108,10 +130,19 @@ export default function PlayerOverlay(): React.JSX.Element {
 
       {state.ended && (
         <div className="ended" {...controlsProps}>
-          <div className="ended-title">Konec</div>
+          <div className="ended-title">{state.next ? 'Konec dílu' : 'Konec'}</div>
+          {state.next && <div className="ended-next">Další díl: {state.next}</div>}
           <div className="ended-actions">
+            {state.next && (
+              <button className="btn primary" onClick={() => send({ type: 'play-next' })}>
+                <SkipForward size={18} fill="currentColor" />
+                {countdown !== null && countdown > 0
+                  ? `Další díl za ${countdown} s`
+                  : 'Přehrát další díl'}
+              </button>
+            )}
             <button
-              className="btn primary"
+              className={`btn ${state.next ? '' : 'primary'}`}
               onClick={() => {
                 send({ type: 'seek-absolute', seconds: 0 })
                 send({ type: 'set-pause', paused: false })
@@ -123,6 +154,11 @@ export default function PlayerOverlay(): React.JSX.Element {
               Zavřít
             </button>
           </div>
+          {countdown !== null && countdown > 0 && (
+            <button className="link-btn" onClick={() => setCountdown(null)}>
+              Zrušit odpočet
+            </button>
+          )}
         </div>
       )}
 
@@ -165,6 +201,15 @@ export default function PlayerOverlay(): React.JSX.Element {
             </button>
           </div>
           <div className="right">
+            {state.next && (
+              <button
+                className="icon-btn"
+                title={`Další díl: ${state.next} (N)`}
+                onClick={() => send({ type: 'play-next' })}
+              >
+                <SkipForward size={20} />
+              </button>
+            )}
             <div
               className={`volume ${passthrough ? 'is-disabled' : ''}`}
               title={
@@ -224,6 +269,9 @@ function keyToCommand(event: KeyboardEvent, state: PlayerState): PlayerCommand |
     case 'f':
     case 'F':
       return { type: 'toggle-fullscreen' }
+    case 'n':
+    case 'N':
+      return state.next ? { type: 'play-next' } : null
     case 'Escape':
       return { type: 'escape' }
     default:

@@ -1,4 +1,10 @@
 import type { CatalogFile, EpisodeItem, MovieItem, ShowItem } from '../../../shared/catalog'
+import {
+  canResume,
+  episodeCode,
+  type PlaybackProgress,
+  type WatchState
+} from '../../../shared/playback'
 import { normalizeSearch } from '../../../shared/search'
 
 export type TitleItem = ({ kind: 'movie' } & MovieItem) | ({ kind: 'show' } & ShowItem)
@@ -144,4 +150,144 @@ export function mergeSeasons(show: ShowItem): SeasonView[] {
   return [...seasons.values()]
     .map((view) => ({ ...view, episodes: view.episodes.sort((a, b) => a.episode - b.episode) }))
     .sort((a, b) => a.number - b.number)
+}
+
+// ---------- sledování ----------
+
+/** Díl seriálu s názvem a obrázkem z TMDB (pokud je zná). */
+export function episodeLabel(show: ShowItem, episode: EpisodeItem): string {
+  const known = show.metadata?.seasons
+    .find((s) => s.number === episode.season)
+    ?.episodes.find((e) => e.number === episode.episode)
+  const name = known?.name ?? episode.name
+  return [episodeCode(episode.season, episode.episode), name].filter(Boolean).join(' · ')
+}
+
+const episodeStill = (show: ShowItem, episode: EpisodeItem): string | null =>
+  show.metadata?.seasons
+    .find((s) => s.number === episode.season)
+    ?.episodes.find((e) => e.number === episode.episode)?.stillUrl ?? null
+
+export interface UpNext {
+  episode: EpisodeItem
+  file: CatalogFile
+  /** resume = rozkoukaný díl, next = další po zhlédnutém, start = první díl. */
+  mode: 'resume' | 'next' | 'start'
+  /** Kdy se se seriálem naposledy něco dělo (řazení řady „Pokračovat“). */
+  activityAt: string
+}
+
+/** Co pustit u seriálu: rozkoukaný díl, další po naposledy zhlédnutém, nebo první díl. */
+export function upNext(show: ShowItem): UpNext | null {
+  const playable = show.seasons
+    .flatMap((season) => season.episodes)
+    .map((episode) => ({ episode, file: playableFile(episode.files) }))
+    .filter((entry): entry is { episode: EpisodeItem; file: CatalogFile } => !!entry.file)
+  const all = show.seasons.flatMap((season) => season.episodes)
+
+  const latest = <T>(items: T[], at: (item: T) => string | null): T | undefined =>
+    items.reduce<T | undefined>((best, item) => {
+      const time = at(item)
+      return time && (!best || time > at(best)!) ? item : best
+    }, undefined)
+
+  const inProgress = latest(
+    playable.filter((entry) => canResume(entry.episode.watch.progress)),
+    (entry) => entry.episode.watch.progress!.updatedAt
+  )
+  const lastWatched = latest(all, (episode) => episode.watch.lastWatchedAt)
+  const watchedAt = lastWatched?.watch.lastWatchedAt ?? null
+
+  if (inProgress && (!watchedAt || inProgress.episode.watch.progress!.updatedAt >= watchedAt)) {
+    return {
+      ...inProgress,
+      mode: 'resume',
+      activityAt: inProgress.episode.watch.progress!.updatedAt
+    }
+  }
+  if (lastWatched && watchedAt) {
+    const order = (e: EpisodeItem): number => e.season * 10_000 + e.episode
+    const next = playable.find((entry) => order(entry.episode) > order(lastWatched))
+    if (next) return { ...next, mode: 'next', activityAt: watchedAt }
+    return null
+  }
+  const first = playable[0]
+  return first ? { ...first, mode: 'start', activityAt: '' } : null
+}
+
+export interface ContinueItem {
+  key: string
+  title: TitleItem
+  fileId: number
+  /** U dílu „S01E03 · Název“, u filmu null. */
+  episode: string | null
+  /** null = další díl, který ještě nezačal. */
+  progress: PlaybackProgress | null
+  imageUrl: string | null
+  activityAt: string
+}
+
+/** Řada „Pokračovat ve sledování“: rozkoukané filmy a díly a další díly seriálů. */
+export function continueWatching(titles: TitleItem[]): ContinueItem[] {
+  const items: ContinueItem[] = []
+  for (const title of titles) {
+    if (title.kind === 'movie') {
+      const file = playableFile(title.files)
+      const progress = title.watch.progress
+      if (file && canResume(progress)) {
+        items.push({
+          key: `movie-${title.id}`,
+          title,
+          fileId: file.id,
+          episode: null,
+          progress,
+          imageUrl: title.metadata?.backdropUrl ?? null,
+          activityAt: progress.updatedAt
+        })
+      }
+      continue
+    }
+    const next = upNext(title)
+    if (!next || next.mode === 'start') continue
+    items.push({
+      key: `show-${title.id}`,
+      title,
+      fileId: next.file.id,
+      episode: episodeLabel(title, next.episode),
+      progress: next.mode === 'resume' ? next.episode.watch.progress : null,
+      imageUrl: episodeStill(title, next.episode) ?? title.metadata?.backdropUrl ?? null,
+      activityAt: next.activityAt
+    })
+  }
+  return items.sort((a, b) => b.activityAt.localeCompare(a.activityAt))
+}
+
+/** Film nebo díl, ke kterému patří soubor – pro dialog „Pokračovat ve sledování?“. */
+export function watchForFile(
+  titles: TitleItem[],
+  fileId: number
+): { label: string; watch: WatchState } | null {
+  for (const title of titles) {
+    if (title.kind === 'movie') {
+      if (title.files.some((f) => f.id === fileId)) {
+        return { label: displayName(title), watch: title.watch }
+      }
+      continue
+    }
+    for (const episode of title.seasons.flatMap((s) => s.episodes)) {
+      if (episode.files.some((f) => f.id === fileId)) {
+        return {
+          label: `${displayName(title)} · ${episodeLabel(title, episode)}`,
+          watch: episode.watch
+        }
+      }
+    }
+  }
+  return null
+}
+
+/** „Zhlédnuto 21. 10. 2026“, případně „· 2×“. */
+export function watchedTitle(watch: WatchState): string {
+  const date = watch.lastWatchedAt ? new Date(watch.lastWatchedAt).toLocaleDateString('cs-CZ') : ''
+  return `Zhlédnuto ${date}${watch.watchCount > 1 ? ` · ${watch.watchCount}×` : ''}`.trim()
 }

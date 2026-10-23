@@ -8,8 +8,10 @@ import type {
 } from '../../shared/catalog'
 import { summarize, type MediaInfo } from '../../shared/mediaInfo'
 import type { ImdbRating, MatchStatus, TitleMetadata } from '../../shared/metadata'
+import { EMPTY_WATCH_STATE } from '../../shared/playback'
 import type { Palette } from '../../shared/posterPalette'
 import { transaction, type Database } from '../db/database'
+import { PlaybackRepository, watchKey } from '../playback/PlaybackRepository'
 import { groupMediaFiles } from './grouping'
 
 type Row = Record<string, unknown>
@@ -121,7 +123,11 @@ export interface MetadataRequest {
  * (a v dalších přírůstcích i metadata, hodnocení a historii).
  */
 export class CatalogRepository {
-  constructor(private readonly db: Database) {}
+  private readonly playback: PlaybackRepository
+
+  constructor(private readonly db: Database) {
+    this.playback = new PlaybackRepository(db)
+  }
 
   rebuild(now = new Date()): void {
     const files = this.db
@@ -225,32 +231,44 @@ export class CatalogRepository {
         }
       }
 
-      // Tituly a díly bez souborů zatím mažeme. Až budou mít hodnocení a historii
-      // (přírůstek 12), musí zůstat – tahle podmínka se pak rozšíří.
+      // Tituly a díly bez souborů se mažou, kromě zhlédnutých – deník o ně nesmí přijít.
+      // Když se soubor vrátí, připojí se k nim zase podle klíče názvu.
       this.db.exec(
-        'DELETE FROM episode WHERE id NOT IN (SELECT episode_id FROM media_file WHERE episode_id IS NOT NULL)'
+        `DELETE FROM episode
+         WHERE id NOT IN (SELECT episode_id FROM media_file WHERE episode_id IS NOT NULL)
+           AND id NOT IN (SELECT episode_id FROM watch_event WHERE episode_id IS NOT NULL)`
       )
       this.db.exec(
-        'DELETE FROM title WHERE id NOT IN (SELECT title_id FROM media_file WHERE title_id IS NOT NULL)'
+        `DELETE FROM title
+         WHERE id NOT IN (SELECT title_id FROM media_file WHERE title_id IS NOT NULL)
+           AND id NOT IN (SELECT title_id FROM watch_event)`
       )
     })
   }
 
+  // Knihovna ukazuje jen tituly a díly se soubory; ty bez souborů drží jen deník.
   listMovies(): MovieItem[] {
     const titles = this.db
-      .prepare("SELECT * FROM title WHERE kind = 'movie' ORDER BY name COLLATE NOCASE")
+      .prepare(
+        `SELECT * FROM title WHERE kind = 'movie'
+           AND id IN (SELECT title_id FROM media_file WHERE title_id IS NOT NULL)
+         ORDER BY name COLLATE NOCASE`
+      )
       .all()
     const files = this.filesByTitle()
     const clips = this.clipsByTitle()
+    const watch = this.playback.watchStates()
     return titles.map((row) => {
-      const movieFiles = files.get(Number(row['id'])) ?? []
+      const id = Number(row['id'])
+      const movieFiles = files.get(id) ?? []
       return {
-        id: Number(row['id']),
+        id,
         name: String(row['name']),
         year: (row['year'] as number | null) ?? null,
         tags: unionTags(movieFiles),
         files: movieFiles,
-        clips: clips.get(Number(row['id'])) ?? [],
+        clips: clips.get(id) ?? [],
+        watch: watch.get(watchKey(id, null)) ?? EMPTY_WATCH_STATE,
         ...metadataOf(row)
       }
     })
@@ -258,10 +276,21 @@ export class CatalogRepository {
 
   listShows(): ShowItem[] {
     const titles = this.db
-      .prepare("SELECT * FROM title WHERE kind = 'show' ORDER BY name COLLATE NOCASE")
+      .prepare(
+        `SELECT * FROM title WHERE kind = 'show'
+           AND id IN (SELECT title_id FROM media_file WHERE title_id IS NOT NULL)
+         ORDER BY name COLLATE NOCASE`
+      )
       .all()
     const clips = this.clipsByTitle()
-    const episodes = this.db.prepare('SELECT * FROM episode ORDER BY season, episode').all()
+    const watch = this.playback.watchStates()
+    const episodes = this.db
+      .prepare(
+        `SELECT * FROM episode
+         WHERE id IN (SELECT episode_id FROM media_file WHERE episode_id IS NOT NULL)
+         ORDER BY season, episode`
+      )
+      .all()
     const filesByEpisode = new Map<number, CatalogFile[]>()
     for (const row of this.db
       .prepare('SELECT * FROM media_file WHERE episode_id IS NOT NULL ORDER BY path')
@@ -281,7 +310,8 @@ export class CatalogRepository {
           season: number,
           episode: Number(episode['episode']),
           name: (episode['name'] as string | null) ?? null,
-          files: filesByEpisode.get(Number(episode['id'])) ?? []
+          files: filesByEpisode.get(Number(episode['id'])) ?? [],
+          watch: watch.get(watchKey(id, Number(episode['id']))) ?? EMPTY_WATCH_STATE
         })
         seasons.set(number, season)
       }

@@ -13,6 +13,8 @@ export interface PlayerState {
   ended: boolean
   audio: AudioOutputInfo | null
   video: VideoInfo | null
+  /** Další díl seriálu („S01E03 · Název“); null = není. */
+  next: string | null
 }
 
 export interface AudioOutputInfo {
@@ -40,7 +42,8 @@ export const INITIAL_PLAYER_STATE: PlayerState = {
   fullscreen: false,
   ended: false,
   audio: null,
-  video: null
+  video: null,
+  next: null
 }
 
 export type PlayerCommand =
@@ -53,6 +56,7 @@ export type PlayerCommand =
   | { type: 'toggle-fullscreen' }
   | { type: 'escape' }
   | { type: 'close' }
+  | { type: 'play-next' }
 
 export type OpenFileResult =
   | { ok: true }
@@ -77,6 +81,7 @@ export function parsePlayerCommand(value: unknown): PlayerCommand | null {
     case 'toggle-fullscreen':
     case 'escape':
     case 'close':
+    case 'play-next':
       return { type: command['type'] }
     case 'set-pause':
       return typeof command['paused'] === 'boolean'
