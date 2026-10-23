@@ -42,7 +42,12 @@ import { PlaybackRepository, type PlaybackItem } from './playback/PlaybackReposi
 import { PlaybackTracker } from './playback/PlaybackTracker'
 import { PlayerSession } from './player/PlayerSession'
 import type { TrackChoices } from './player/TrackSelector'
-import { findExternalSubtitles, prepareSubtitle } from './subtitles/externalSubtitles'
+import {
+  findDownloadedSubtitles,
+  findExternalSubtitles,
+  prepareSubtitle
+} from './subtitles/externalSubtitles'
+import { OnlineSubtitlesService } from './subtitles/OnlineSubtitlesService'
 import { loadSubtitleSettings, saveSubtitleSettings } from './subtitles/subtitleSettings'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
 import { SettingsRepository } from './settings/SettingsRepository'
@@ -86,6 +91,8 @@ const nextLabel = (item: PlaybackItem): string | null =>
 
 /** Titulky v jiném kódování než UTF-8 se převádějí do kopie v cache. */
 const subtitleCacheDir = (): string => join(app.getPath('userData'), 'cache', 'subtitles')
+/** Stažené titulky, které nešlo uložit vedle filmu (síťová složka jen pro čtení). */
+const downloadedSubtitlesDir = (): string => join(app.getPath('userData'), 'subtitles')
 
 /**
  * Výběr stop pro soubor: zapamatovaná volba pro film nebo seriál, jinak preferované jazyky;
@@ -106,9 +113,10 @@ function trackChoicesFor(file: string, item?: PlaybackItem): TrackChoices {
     subDelay: item ? playback.subDelay(item.fileId) : 0,
     externalSubtitles: async () =>
       Promise.all(
-        (await findExternalSubtitles(file)).map((found) =>
-          prepareSubtitle(found, file, subtitleCacheDir())
-        )
+        [
+          ...(await findExternalSubtitles(file)),
+          ...(await findDownloadedSubtitles(downloadedSubtitlesDir(), file))
+        ].map((found) => prepareSubtitle(found, file, subtitleCacheDir()))
       )
   }
 }
@@ -208,6 +216,55 @@ async function play(
   } catch (error) {
     return { ok: false, reason: 'error', message: (error as Error).message }
   }
+}
+
+/** Titulky z OpenSubtitles: nastavení z hlavního okna, hledání a stažení jen z ovládání přehrávače. */
+function registerOnlineSubtitlesIpc(service: OnlineSubtitlesService): void {
+  const fromPlayer = (sender: Electron.WebContents): PlayerSession | null =>
+    session && sender === session.overlay.webContents ? session : null
+
+  ipcMain.handle(IpcChannel.OnlineSubtitlesStatus, () => service.status())
+  ipcMain.handle(IpcChannel.OnlineSubtitlesSave, (_event, value: unknown) => {
+    const input =
+      typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
+    const text = (key: string): string =>
+      typeof input[key] === 'string' ? (input[key] as string) : ''
+    return service.save({
+      apiKey: text('apiKey'),
+      username: text('username'),
+      password: text('password')
+    })
+  })
+  ipcMain.handle(IpcChannel.OnlineSubtitlesRemove, () => service.remove())
+
+  ipcMain.handle(IpcChannel.OnlineSubtitlesSearch, (event) => {
+    const player = fromPlayer(event.sender)
+    if (!player) return { ok: false, message: 'Přehrávač neběží.' }
+    const item = tracker.current
+    return service.search(
+      { path: player.currentFile, library: item ? playback.libraryInfo(item.fileId) : null },
+      loadSubtitleSettings(settings).languages
+    )
+  })
+
+  ipcMain.handle(IpcChannel.OnlineSubtitlesDownload, async (event, fileId: unknown) => {
+    const player = fromPlayer(event.sender)
+    if (!player || !Number.isInteger(fileId)) return { ok: false, message: 'Přehrávač neběží.' }
+    const { result, subtitle } = await service.download(fileId as number, player.currentFile)
+    if (!subtitle) return result
+    if (!(await player.addSubtitle(subtitle))) {
+      return { ok: false, message: 'Titulky se stáhly, ale přehrávač je nenačetl.' }
+    }
+    // Stažené titulky se příště vyberou samy (stejný jazyk a název souboru).
+    const item = tracker.current
+    if (item) {
+      playback.saveTrackPreference(item.titleId, 'sub', {
+        language: subtitle.language,
+        title: subtitle.title
+      })
+    }
+    return result
+  })
 }
 
 function registerPlayerIpc(): void {
@@ -350,6 +407,16 @@ void app.whenReady().then(() => {
     saveAudioSettings(settings, value)
   )
   ipcMain.handle(IpcChannel.AudioListDevices, () => listAudioDevices(mpvExecutablePath()))
+  const onlineSubtitles = new OnlineSubtitlesService({
+    settings,
+    fetchImpl: chromiumFetch,
+    userAgent: `Kinoteka v${app.getVersion()}`,
+    fallbackDir: downloadedSubtitlesDir(),
+    conversionDir: subtitleCacheDir(),
+    // Ve vývoji jde API přesměrovat na falešný server (KINOTEKA_DEV_OPENSUBTITLES_URL).
+    baseUrl: app.isPackaged ? undefined : process.env['KINOTEKA_DEV_OPENSUBTITLES_URL']
+  })
+  registerOnlineSubtitlesIpc(onlineSubtitles)
   ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))
   ipcMain.handle(IpcChannel.SubtitlesSaveSettings, (_event, value: unknown) =>
     saveSubtitleSettings(settings, value)

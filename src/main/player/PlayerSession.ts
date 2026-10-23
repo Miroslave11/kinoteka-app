@@ -130,6 +130,7 @@ export class PlayerSession {
   private switching = false
   private fixedTitle: string | undefined
   private readonly selector: TrackSelector
+  private file: string
   /** Hlídání zaseknutí po spuštění souboru (viz `checkStall`). */
   private stallTimer: NodeJS.Timeout | null = null
   private firstPosition: number | null = null
@@ -147,6 +148,7 @@ export class PlayerSession {
   ) {
     this.fixedTitle = options.title
     this.selector = new TrackSelector(client)
+    this.file = options.file
     this.selector.reset(options.tracks)
     this.state = {
       ...INITIAL_PLAYER_STATE,
@@ -267,6 +269,7 @@ export class PlayerSession {
   load(options: LoadOptions): void {
     if (this.finished) return
     this.switching = true
+    this.file = options.file
     this.fixedTitle = options.title
     this.selector.reset(options.tracks)
     this.update({
@@ -450,11 +453,26 @@ export class PlayerSession {
     const file = picked.filePaths[0]
     if (picked.canceled || !file || this.finished) return
     const subtitle = (await this.options.prepareSubtitle?.(file).catch(() => null)) ?? null
-    const args: unknown[] = ['sub-add', subtitle?.path ?? file, 'select', subtitle?.title ?? file]
-    if (subtitle?.language) args.push(subtitle.language)
-    await this.client
-      .command(...args)
-      .catch(() => this.update({ notice: 'Titulky se nepodařilo načíst.' }))
+    const ok = await this.addSubtitle(
+      subtitle ?? { path: file, title: file, language: null, forced: false, encoding: null }
+    )
+    if (!ok) this.update({ notice: 'Titulky se nepodařilo načíst.' })
+  }
+
+  /** Přidá titulky ze souboru (ručně načtené nebo stažené) a hned je zapne. */
+  async addSubtitle(subtitle: ExternalSubtitle): Promise<boolean> {
+    if (this.finished) return false
+    const args: unknown[] = ['sub-add', subtitle.path, 'select', subtitle.title]
+    if (subtitle.language) args.push(subtitle.language)
+    return this.client.command(...args).then(
+      () => true,
+      () => false
+    )
+  }
+
+  /** Soubor, který se právě přehrává. */
+  get currentFile(): string {
+    return this.file
   }
 
   private describeVideo(): PlayerState['video'] {

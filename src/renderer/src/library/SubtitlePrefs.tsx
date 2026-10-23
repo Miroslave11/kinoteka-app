@@ -7,6 +7,7 @@ import {
   type SubtitleStyle
 } from '../../../shared/subtitles'
 import LanguageList from './LanguageList'
+import OnlineSubtitlesSettings from './OnlineSubtitlesSettings'
 
 /** Výška náhledu v bodech; mpv počítá velikost písma pro výšku obrazu 720 bodů. */
 const PREVIEW_HEIGHT = 270
@@ -97,6 +98,8 @@ export default function SubtitlePrefs(): React.JSX.Element {
           onChange={(languages) => save({ languages })}
         />
       </section>
+
+      <OnlineSubtitlesSettings />
 
       <section className="card">
         <h2>Vzhled titulků</h2>

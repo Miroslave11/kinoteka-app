@@ -118,3 +118,20 @@ export async function prepareSubtitle(
   await writeFile(converted, text, 'utf8')
   return { ...result, path: converted }
 }
+
+/**
+ * Stažené titulky uložené v datech aplikace („<id>-Film.cs.srt“) – když do složky
+ * s filmem nešlo zapisovat. Patří k videu podle názvu za číselnou předponou.
+ */
+export async function findDownloadedSubtitles(dir: string, videoPath: string): Promise<string[]> {
+  const videoBase = basename(videoPath, extname(videoPath))
+  return (await listDir(dir))
+    .filter((entry) => !entry.isDir)
+    .map((entry) => entry.name)
+    .filter((name) => {
+      const base = basename(name, extname(name)).replace(/^\d+-/, '')
+      return subtitleMatchesVideo(videoBase, base)
+    })
+    .map((name) => join(dir, name))
+    .sort()
+}

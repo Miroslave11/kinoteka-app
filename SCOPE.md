@@ -28,9 +28,10 @@ Schváleno: 2026-10-22
 8. **Výběr stop** – zvuk i titulky za běhu, preferované jazyky, zapamatování volby.
 9. **Mazání** – s potvrzením, včetně přidružených titulků, i celé série.
 10. **Deník zhlédnutých** – historie (kdy, kolikrát), hodnocení 1–5, poznámka, ruční „viděl jsem“, filtr.
+11. **Stahování titulků z internetu** _(doplněno 2026-10-23 na přání, původně mimo V1)_ – OpenSubtitles.com přes oficiální API s vlastním bezplatným klíčem; hledání podle TMDB/IMDb ID, série a dílu i otisku souboru, uložení vedle filmu.
 
 **Design:** tmavé téma ve stylu Plex, dynamické barvy z plakátu, na pozadí krátké tiché klipy vyříznuté z vlastního souboru (ffmpeg), HD pozadí z TMDB, vyhledávání, řazení, filtry.
 
 ## Mimo V1
 
-Streamování na jiná zařízení / server, vzdálený přístup, transkódování, mobilní a TV aplikace · více profilů · hudba, fotky, živá TV · lokální AI · stahování titulků z internetu · Synology DSM API, Wake-on-LAN · přejmenovávání souborů · Skip intro, DVD/Blu-ray menu, 3D · ČSFD (viz změna u bodu 5) · macOS/Linux, automatické aktualizace, podepisování · TV/ovladačové UI.
+Streamování na jiná zařízení / server, vzdálený přístup, transkódování, mobilní a TV aplikace · více profilů · hudba, fotky, živá TV · lokální AI · Synology DSM API, Wake-on-LAN · přejmenovávání souborů · Skip intro, DVD/Blu-ray menu, 3D · ČSFD (viz změna u bodu 5) · macOS/Linux, automatické aktualizace, podepisování · TV/ovladačové UI.

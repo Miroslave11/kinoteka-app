@@ -20,6 +20,7 @@ import {
   type PlayerState
 } from '../../../shared/player'
 import SeekBar from './SeekBar'
+import OnlineSubtitlesPanel from './OnlineSubtitlesPanel'
 import ShortcutHelp from './ShortcutHelp'
 import TrackPanel from './TrackPanel'
 import { useIdle } from './useIdle'
@@ -44,6 +45,7 @@ export default function PlayerOverlay(): React.JSX.Element {
   const [overControls, setOverControls] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [onlineOpen, setOnlineOpen] = useState(false)
   const [idle, wake] = useIdle(
     HIDE_CONTROLS_AFTER_MS,
     !state.paused && !state.ended && !overControls && !panelOpen
@@ -83,9 +85,10 @@ export default function PlayerOverlay(): React.JSX.Element {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       wake()
-      if (event.key === 'Escape' && (panelOpen || helpOpen)) {
+      if (event.key === 'Escape' && (panelOpen || helpOpen || onlineOpen)) {
         event.preventDefault()
         setHelpOpen(false)
+        setOnlineOpen(false)
         return setPanelOpen(false)
       }
       if (event.key === '?') {
@@ -100,7 +103,7 @@ export default function PlayerOverlay(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [state, wake, panelOpen, helpOpen])
+  }, [state, wake, panelOpen, helpOpen, onlineOpen])
 
   const onSurfaceClick = (): void => {
     window.clearTimeout(clickTimer.current)
@@ -156,6 +159,7 @@ export default function PlayerOverlay(): React.JSX.Element {
       </header>
 
       {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
+      {onlineOpen && <OnlineSubtitlesPanel onClose={() => setOnlineOpen(false)} />}
 
       {notice && (
         <div className="notice-toast" {...controlsProps}>
@@ -207,6 +211,10 @@ export default function PlayerOverlay(): React.JSX.Element {
             onSubtitle={(id) => send({ type: 'set-subtitle-track', id })}
             onDelay={(seconds) => send({ type: 'set-sub-delay', seconds })}
             onLoadSubtitle={() => send({ type: 'load-subtitle' })}
+            onSearchOnline={() => {
+              setPanelOpen(false)
+              setOnlineOpen(true)
+            }}
           />
         )}
         <SeekBar

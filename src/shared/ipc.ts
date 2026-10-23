@@ -41,6 +41,11 @@ export const IpcChannel = {
   AudioListDevices: 'audio:list-devices',
   SubtitlesGetSettings: 'subtitles:get-settings',
   SubtitlesSaveSettings: 'subtitles:save-settings',
+  OnlineSubtitlesStatus: 'online-subtitles:status',
+  OnlineSubtitlesSave: 'online-subtitles:save',
+  OnlineSubtitlesRemove: 'online-subtitles:remove',
+  OnlineSubtitlesSearch: 'online-subtitles:search',
+  OnlineSubtitlesDownload: 'online-subtitles:download',
 
   JournalList: 'journal:list',
   JournalAddManual: 'journal:add-manual',
