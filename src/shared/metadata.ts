@@ -1,6 +1,8 @@
 /** Údaje o filmu nebo seriálu z TMDB. Obrázky jsou URL do lokální cache (`kinoteka-media://`). */
 export interface TitleMetadata {
   tmdbId: number
+  /** ID na IMDb („tt0310203“) – podle něj se páruje hodnocení z IMDb. */
+  imdbId: string | null
   kind: 'movie' | 'show'
   /** Název podle TMDB v češtině (pokud existuje). */
   name: string
@@ -75,6 +77,42 @@ export type TmdbKeyStatus =
 
 export type ActionResult = { ok: true } | { ok: false; message: string }
 export type SaveKeyResult = ActionResult
+
+/** Hodnocení z IMDb (oficiální datový soubor title.ratings). */
+export interface ImdbRating {
+  id: string
+  /** 1–10 */
+  rating: number
+  votes: number
+}
+
+export interface ImdbStatus {
+  enabled: boolean
+  /** Kdy se naposledy stáhl datový soubor IMDb. */
+  downloadedAt: string | null
+  /** Kdy IMDb soubor naposledy vydalo (hlavička Last-Modified). */
+  datasetDate: string | null
+  /** Tituly s IMDb ID / z toho s hodnocením. */
+  titles: number
+  rated: number
+  updating: boolean
+  error: string | null
+}
+
+export const IMDB_TITLE_URL = 'https://www.imdb.com/title/'
+
+/** Podmínky IMDb pro datové soubory vyžadují toto uvedení zdroje. */
+export const IMDB_ATTRIBUTION =
+  'Information courtesy of IMDb (https://www.imdb.com). Used with permission.'
+
+/** 1 234 567 → „1,2 mil.“, 45 300 → „45 tis.“ */
+export function formatVotes(votes: number): string {
+  if (votes >= 1_000_000) {
+    return `${(votes / 1_000_000).toLocaleString('cs-CZ', { maximumFractionDigits: 1 })} mil.`
+  }
+  if (votes >= 1000) return `${Math.round(votes / 1000).toLocaleString('cs-CZ')} tis.`
+  return String(votes)
+}
 
 /** TMDB vyžaduje v aplikaci uvést zdroj dat. */
 export const TMDB_ATTRIBUTION =

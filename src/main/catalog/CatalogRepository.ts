@@ -7,7 +7,7 @@ import type {
   ShowItem
 } from '../../shared/catalog'
 import { summarize, type MediaInfo } from '../../shared/mediaInfo'
-import type { MatchStatus, TitleMetadata } from '../../shared/metadata'
+import type { ImdbRating, MatchStatus, TitleMetadata } from '../../shared/metadata'
 import { transaction, type Database } from '../db/database'
 import { groupMediaFiles } from './grouping'
 
@@ -56,7 +56,11 @@ const MATCH_STATUSES: MatchStatus[] = [
   'disabled'
 ]
 
-function metadataOf(row: Row): { metadata: TitleMetadata | null; matchStatus: MatchStatus } {
+function metadataOf(row: Row): {
+  metadata: TitleMetadata | null
+  matchStatus: MatchStatus
+  imdb: ImdbRating | null
+} {
   let metadata: TitleMetadata | null = null
   if (typeof row['metadata'] === 'string') {
     try {
@@ -66,7 +70,28 @@ function metadataOf(row: Row): { metadata: TitleMetadata | null; matchStatus: Ma
     }
   }
   const status = row['match_status'] as MatchStatus
-  return { metadata, matchStatus: MATCH_STATUSES.includes(status) ? status : 'pending' }
+  const imdbId = metadata?.imdbId
+  const rating = row['imdb_rating']
+  return {
+    metadata,
+    matchStatus: MATCH_STATUSES.includes(status) ? status : 'pending',
+    imdb:
+      imdbId && typeof rating === 'number'
+        ? { id: imdbId, rating, votes: Number(row['imdb_votes'] ?? 0) }
+        : null
+  }
+}
+
+function toMetadataRequest(row: Row): MetadataRequest {
+  return {
+    id: Number(row['id']),
+    kind: row['kind'] === 'show' ? 'show' : 'movie',
+    name: String(row['name']),
+    year: (row['year'] as number | null) ?? null,
+    alternativeNames: parseTags(row['alternative_names']),
+    tmdbId: (row['tmdb_id'] as number | null) ?? null,
+    status: (row['match_status'] as MatchStatus) ?? 'pending'
+  }
 }
 
 /** Co potřebuje služba metadat k dohledání titulu. */
@@ -76,6 +101,9 @@ export interface MetadataRequest {
   name: string
   year: number | null
   alternativeNames: string[]
+  /** Už známé TMDB ID – pak se jen znovu načtou údaje, bez nového vyhledávání. */
+  tmdbId: number | null
+  status: MatchStatus
 }
 
 /**
@@ -261,38 +289,100 @@ export class CatalogRepository {
 
   // ---------- metadata ----------
 
-  /** Tituly, které čekají na dohledání (a chybné, u kterých už uplynula hodina). */
+  /**
+   * Tituly, které čekají na dohledání, chybné (po hodině znovu) a spárované s vynuceným
+   * obnovením údajů (metadata_updated_at = NULL).
+   */
   titlesNeedingMetadata(now = new Date()): MetadataRequest[] {
     const retryBefore = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
     return this.db
       .prepare(
-        `SELECT id, kind, name, year, alternative_names FROM title
+        `SELECT * FROM title
          WHERE match_status = 'pending'
             OR (match_status = 'error' AND (metadata_updated_at IS NULL OR metadata_updated_at < ?))
+            OR (match_status IN ('matched', 'manual') AND tmdb_id IS NOT NULL
+                AND metadata_updated_at IS NULL)
          ORDER BY id`
       )
       .all(retryBefore)
-      .map((row) => ({
-        id: Number(row['id']),
-        kind: row['kind'] === 'show' ? 'show' : 'movie',
-        name: String(row['name']),
-        year: (row['year'] as number | null) ?? null,
-        alternativeNames: parseTags(row['alternative_names'])
-      }))
+      .map(toMetadataRequest)
   }
 
   titleForMetadata(id: number): MetadataRequest | undefined {
+    const row = this.db.prepare('SELECT * FROM title WHERE id = ?').get(id)
+    return row ? toMetadataRequest(row) : undefined
+  }
+
+  /** „Znovu načíst údaje“: u spárovaného titulu jen obnoví údaje z TMDB, jinak hledá znovu. */
+  expireMetadata(id: number): void {
+    this.db
+      .prepare(
+        `UPDATE title SET metadata_updated_at = NULL,
+         match_status = CASE WHEN tmdb_id IS NULL THEN 'pending' ELSE match_status END
+         WHERE id = ?`
+      )
+      .run(id)
+  }
+
+  // ---------- hodnocení IMDb ----------
+
+  /** Tituly s IMDb ID (z údajů TMDB). */
+  imdbIds(): { id: number; imdbId: string }[] {
+    return this.db
+      .prepare(
+        `SELECT id, json_extract(metadata, '$.imdbId') AS imdb_id FROM title
+         WHERE json_extract(metadata, '$.imdbId') IS NOT NULL`
+      )
+      .all()
+      .map((row) => ({ id: Number(row['id']), imdbId: String(row['imdb_id']) }))
+  }
+
+  /** Kolik titulů má IMDb ID a kolik z nich hodnocení. */
+  imdbCounts(): { titles: number; rated: number } {
     const row = this.db
-      .prepare('SELECT id, kind, name, year, alternative_names FROM title WHERE id = ?')
-      .get(id)
-    if (!row) return undefined
-    return {
-      id,
-      kind: row['kind'] === 'show' ? 'show' : 'movie',
-      name: String(row['name']),
-      year: (row['year'] as number | null) ?? null,
-      alternativeNames: parseTags(row['alternative_names'])
-    }
+      .prepare(
+        `SELECT count(*) AS titles, count(imdb_rating) AS rated FROM title
+         WHERE json_extract(metadata, '$.imdbId') IS NOT NULL`
+      )
+      .get()
+    return { titles: Number(row?.['titles'] ?? 0), rated: Number(row?.['rated'] ?? 0) }
+  }
+
+  /** Tituly s IMDb ID, které ještě hodnocení nemají. */
+  countMissingImdbRatings(): number {
+    const row = this.db
+      .prepare(
+        `SELECT count(*) AS n FROM title
+         WHERE json_extract(metadata, '$.imdbId') IS NOT NULL AND imdb_updated_at IS NULL`
+      )
+      .get()
+    return Number(row?.['n'] ?? 0)
+  }
+
+  /** Zapíše hodnocení; titul, který v datech IMDb není, dostane NULL (třeba zatím nevyšel). */
+  /**
+   * @param targets tituly, jejichž hodnocení se v souboru hledala – titul, který IMDb ID dostal
+   *   až během čtení souboru, se nesmí označit jako hotový.
+   */
+  saveImdbRatings(
+    ratings: Map<string, { rating: number; votes: number }>,
+    targets: { id: number; imdbId: string }[],
+    now = new Date()
+  ): number {
+    // Titul mohl mezitím dostat jiné IMDb ID (nová shoda) – pak se jeho záznam nemění.
+    const update = this.db.prepare(
+      `UPDATE title SET imdb_rating = ?, imdb_votes = ?, imdb_updated_at = ?
+       WHERE id = ? AND json_extract(metadata, '$.imdbId') = ?`
+    )
+    let found = 0
+    transaction(this.db, () => {
+      for (const { id, imdbId } of targets) {
+        const rating = ratings.get(imdbId)
+        if (rating) found++
+        update.run(rating?.rating ?? null, rating?.votes ?? null, now.toISOString(), id, imdbId)
+      }
+    })
+    return found
   }
 
   saveMetadata(
@@ -301,6 +391,12 @@ export class CatalogRepository {
     status: 'matched' | 'manual',
     now = new Date()
   ): void {
+    // Jiný titul na TMDB = jiné hodnocení z IMDb, staré se zahodí.
+    this.db
+      .prepare(
+        'UPDATE title SET imdb_rating = NULL, imdb_votes = NULL, imdb_updated_at = NULL WHERE id = ? AND tmdb_id IS NOT ?'
+      )
+      .run(id, metadata.tmdbId)
     this.db
       .prepare(
         `UPDATE title SET tmdb_id = ?, metadata = ?, match_status = ?, metadata_error = NULL,

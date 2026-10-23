@@ -24,5 +24,9 @@ export const IpcChannel = {
   MetadataRemoveKey: 'metadata:remove-key',
   MetadataSearch: 'metadata:search',
   MetadataApplyMatch: 'metadata:apply-match',
-  MetadataRefresh: 'metadata:refresh'
+  MetadataRefresh: 'metadata:refresh',
+
+  ImdbStatus: 'imdb:status',
+  ImdbSetEnabled: 'imdb:set-enabled',
+  ImdbUpdateNow: 'imdb:update-now'
 } as const

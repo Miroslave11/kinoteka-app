@@ -17,7 +17,7 @@ export const addedAt = (title: TitleItem): string =>
 export const playableFile = (files: CatalogFile[]): CatalogFile | undefined =>
   files.find((file) => file.available)
 
-export type SortKey = 'added' | 'name' | 'year'
+export type SortKey = 'added' | 'name' | 'year' | 'rating'
 
 export interface TitleFilters {
   query: string
@@ -52,6 +52,9 @@ export function filterTitles<T extends TitleItem>(titles: T[], filters: TitleFil
   return result.sort((a, b) => {
     if (filters.sort === 'name') return byName(a, b)
     if (filters.sort === 'year') return (b.year ?? 0) - (a.year ?? 0) || byName(a, b)
+    if (filters.sort === 'rating') {
+      return (b.imdb?.rating ?? -1) - (a.imdb?.rating ?? -1) || byName(a, b)
+    }
     return addedAt(b).localeCompare(addedAt(a)) || byName(a, b)
   })
 }

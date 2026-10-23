@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { ArrowLeft, ExternalLink, MonitorPlay, RefreshCw, SearchCheck } from 'lucide-react'
 import { useNavigate } from 'react-router'
+import { IMDB_TITLE_URL } from '../../../shared/metadata'
 import { displayName, displayYear, type TitleItem } from '../app/catalogData'
 import { placeholderStyle } from '../app/palette'
 import Artwork from './Artwork'
 import FixMatchDialog from './FixMatchDialog'
+import ImdbBadge from './ImdbBadge'
 
 interface DetailHeaderProps {
   title: TitleItem
@@ -21,7 +23,7 @@ const STATUS_TEXT: Record<string, string> = {
   error: 'Údaje z TMDB se nepodařilo načíst, zkusí se znovu.'
 }
 
-/** Horní část detailu filmu i seriálu: pozadí, plakát, logo/název, údaje z TMDB. */
+/** Horní část detailu filmu i seriálu: pozadí, plakát, logo/název, údaje z TMDB a IMDb. */
 export default function DetailHeader({
   title,
   meta,
@@ -30,7 +32,7 @@ export default function DetailHeader({
 }: DetailHeaderProps): React.JSX.Element {
   const navigate = useNavigate()
   const [fixing, setFixing] = useState(false)
-  const metadata = title.metadata
+  const { metadata, imdb } = title
   const name = displayName(title)
   const original =
     metadata?.originalName ?? (title.kind === 'show' ? title.alternativeNames[0] : null)
@@ -79,6 +81,7 @@ export default function DetailHeader({
           {original && <div className="orig">{original}</div>}
           <div className="meta">{allMeta}</div>
           <div className="ratings">
+            {imdb && <ImdbBadge imdb={imdb} />}
             {metadata?.rating && (
               <span className="tmdb">
                 TMDB {metadata.rating.toLocaleString('cs-CZ', { maximumFractionDigits: 1 })}
@@ -112,6 +115,16 @@ export default function DetailHeader({
               >
                 <RefreshCw size={15} /> Znovu načíst údaje
               </button>
+            )}
+            {metadata?.imdbId && (
+              <a
+                className="link"
+                href={`${IMDB_TITLE_URL}${metadata.imdbId}/`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink size={15} /> IMDb
+              </a>
             )}
             {metadata && (
               <a className="link" href={metadata.tmdbUrl} target="_blank" rel="noreferrer">

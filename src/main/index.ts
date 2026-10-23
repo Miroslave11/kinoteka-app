@@ -6,6 +6,8 @@ import { VIDEO_EXTENSIONS } from '../shared/library'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
 import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
+import { registerImdbIpc } from './imdb/imdbIpc'
+import { ImdbService } from './imdb/ImdbService'
 import { openDatabase } from './db/database'
 import { runFfprobe } from './media/ffprobe'
 import { ImageCache } from './metadata/ImageCache'
@@ -130,7 +132,18 @@ void app.whenReady().then(() => {
     (credential) =>
       new TmdbClient({ credential, baseUrl: devTmdb && `${devTmdb}/3`, fetchImpl: chromiumFetch })
   )
-  metadata.on('changed', () => broadcast(IpcChannel.LibraryChanged))
+  // Ve vývoji jde datový soubor IMDb přesměrovat na lokální kopii (KINOTEKA_DEV_IMDB_URL).
+  const imdb = new ImdbService(catalog, settings, {
+    fetch: chromiumFetch,
+    cacheDir: join(app.getPath('userData'), 'cache', 'imdb'),
+    url: app.isPackaged ? undefined : process.env['KINOTEKA_DEV_IMDB_URL']
+  })
+  imdb.on('changed', () => broadcast(IpcChannel.LibraryChanged))
+  // Nová shoda na TMDB = nové IMDb ID, ke kterému se doplní hodnocení.
+  metadata.on('changed', () => {
+    broadcast(IpcChannel.LibraryChanged)
+    void imdb.run()
+  })
   handleMediaProtocol(
     new ImageCache(
       join(app.getPath('userData'), 'cache', 'tmdb'),
@@ -149,6 +162,8 @@ void app.whenReady().then(() => {
   void probe?.run()
   void metadata.run()
   registerMetadataIpc(metadata)
+  registerImdbIpc(imdb)
+  void imdb.run()
   ipcMain.handle(IpcChannel.CatalogListMovies, () => catalog.listMovies())
   ipcMain.handle(IpcChannel.CatalogListShows, () => catalog.listShows())
   ipcMain.handle(IpcChannel.CatalogFileDetails, (_event, id: unknown) =>

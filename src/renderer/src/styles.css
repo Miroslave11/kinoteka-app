@@ -1543,3 +1543,63 @@ option {
 p.info-chip {
   width: fit-content;
 }
+
+/* ---------- IMDb ---------- */
+.imdb {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #000;
+  background: #f5c518;
+}
+
+.imdb b {
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.imdb small {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.imdb.compact {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  vertical-align: 1px;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+/* Hodnocení pod plakátem: .cap span by jinak přebarvilo text na šedou. */
+.cap .imdb.compact {
+  color: #000;
+}
+
+.muted.small + .kv {
+  margin-top: 12px;
+}

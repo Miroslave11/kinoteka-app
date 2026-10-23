@@ -144,3 +144,23 @@ describe('MetadataService', () => {
     expect(catalog.listMovies()[0]!.matchStatus).toBe('matched')
   })
 })
+
+describe('MetadataService – obnova údajů', () => {
+  it('Znovu načíst: načte podle známého TMDB ID, nehledá a ruční shodu zachová', async () => {
+    addFile('Úkryt nebo past (2026) cz dabing.mkv')
+    catalog.rebuild()
+    const api = fakeApi()
+    const metadata = service(api)
+    const id = catalog.listMovies()[0]!.id
+    await metadata.applyMatch(id, 9001)
+    vi.mocked(api.searchMovie).mockClear()
+
+    await metadata.refresh(id)
+
+    expect(api.searchMovie).not.toHaveBeenCalled()
+    expect(catalog.listMovies()[0]).toMatchObject({
+      matchStatus: 'manual',
+      metadata: { tmdbId: 9001, imdbId: 'tt0000001' }
+    })
+  })
+})

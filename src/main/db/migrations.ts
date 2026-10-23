@@ -84,5 +84,32 @@ export const MIGRATIONS: readonly string[] = [
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  `,
+
+  // 5 – údaje z ČSFD (ID přes Wikidata, stránka filmu)
+  `
+  ALTER TABLE title ADD COLUMN csfd_id INTEGER;
+  ALTER TABLE title ADD COLUMN csfd TEXT;
+  ALTER TABLE title ADD COLUMN csfd_status TEXT NOT NULL DEFAULT 'pending';
+  ALTER TABLE title ADD COLUMN csfd_error TEXT;
+  ALTER TABLE title ADD COLUMN csfd_updated_at TEXT;
+  `,
+
+  // 6 – ČSFD nahrazeno hodnocením z IMDb (ČSFD aplikaci nevydávalo stránky filmů)
+  `
+  ALTER TABLE title DROP COLUMN csfd_id;
+  ALTER TABLE title DROP COLUMN csfd;
+  ALTER TABLE title DROP COLUMN csfd_status;
+  ALTER TABLE title DROP COLUMN csfd_error;
+  ALTER TABLE title DROP COLUMN csfd_updated_at;
+  DELETE FROM settings WHERE key LIKE 'csfd.%';
+
+  ALTER TABLE title ADD COLUMN imdb_rating REAL;
+  ALTER TABLE title ADD COLUMN imdb_votes INTEGER;
+  ALTER TABLE title ADD COLUMN imdb_updated_at TEXT;
+
+  -- Starší údaje z TMDB nemají IMDb ID: obnovit je podle už známého TMDB ID (bez nového hledání).
+  UPDATE title SET metadata_updated_at = NULL
+  WHERE tmdb_id IS NOT NULL AND json_extract(metadata, '$.imdbId') IS NULL;
   `
 ]
