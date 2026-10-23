@@ -4,3 +4,4 @@
 *.ico binary
 *.mkv binary
 *.mp4 binary
+*.bat text eol=crlf
