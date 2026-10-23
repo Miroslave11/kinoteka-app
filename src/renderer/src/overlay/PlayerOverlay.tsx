@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
-  AudioLines,
+  Subtitles,
   Maximize,
   Minimize,
   Pause,
@@ -190,8 +190,13 @@ export default function PlayerOverlay(): React.JSX.Element {
       <footer className="bottom" {...controlsProps}>
         {panelOpen && (
           <TrackPanel
-            tracks={state.audioTracks}
-            onSelect={(id) => send({ type: 'set-audio-track', id })}
+            audioTracks={state.audioTracks}
+            subtitleTracks={state.subtitleTracks}
+            subDelay={state.subDelay}
+            onAudio={(id) => send({ type: 'set-audio-track', id })}
+            onSubtitle={(id) => send({ type: 'set-subtitle-track', id })}
+            onDelay={(seconds) => send({ type: 'set-sub-delay', seconds })}
+            onLoadSubtitle={() => send({ type: 'load-subtitle' })}
           />
         )}
         <SeekBar
@@ -234,10 +239,10 @@ export default function PlayerOverlay(): React.JSX.Element {
           <div className="right">
             <button
               className={`icon-btn ${panelOpen ? 'is-on' : ''}`}
-              title="Zvukové stopy (A)"
+              title="Zvuk a titulky (A, S)"
               onClick={() => setPanelOpen((open) => !open)}
             >
-              <AudioLines size={20} />
+              <Subtitles size={20} />
             </button>
             {state.next && (
               <button
@@ -315,6 +320,21 @@ function keyToCommand(event: KeyboardEvent, state: PlayerState): PlayerCommand |
       const current = tracks.findIndex((t) => t.selected)
       return { type: 'set-audio-track', id: tracks[(current + 1) % tracks.length]!.id }
     }
+    case 's':
+    case 'S': {
+      // Titulky dokola: vypnuté → stopy → vypnuté.
+      const tracks = state.subtitleTracks
+      if (tracks.length === 0) return null
+      const current = tracks.findIndex((t) => t.selected)
+      const next = tracks[current + 1]
+      return { type: 'set-subtitle-track', id: next ? next.id : null }
+    }
+    case 'z':
+    case 'Z':
+      return { type: 'set-sub-delay', seconds: state.subDelay - 0.1 }
+    case 'x':
+    case 'X':
+      return { type: 'set-sub-delay', seconds: state.subDelay + 0.1 }
     case 'n':
     case 'N':
       return state.next ? { type: 'play-next' } : null

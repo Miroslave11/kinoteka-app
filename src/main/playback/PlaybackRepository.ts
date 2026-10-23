@@ -159,6 +159,27 @@ export class PlaybackRepository {
       .run(titleId, kind, preference.language, preference.title)
   }
 
+  /** Uložený posun titulků pro soubor (s); 0 = žádný. */
+  subDelay(fileId: number): number {
+    const row = this.db
+      .prepare('SELECT delay FROM file_sub_delay WHERE media_file_id = ?')
+      .get(fileId)
+    return row ? Number(row['delay']) : 0
+  }
+
+  saveSubDelay(fileId: number, delay: number): void {
+    if (Math.abs(delay) < 0.001) {
+      this.db.prepare('DELETE FROM file_sub_delay WHERE media_file_id = ?').run(fileId)
+      return
+    }
+    this.db
+      .prepare(
+        `INSERT INTO file_sub_delay (media_file_id, delay) VALUES (?, ?)
+         ON CONFLICT (media_file_id) DO UPDATE SET delay = excluded.delay`
+      )
+      .run(fileId, delay)
+  }
+
   /** Stav sledování všech filmů a dílů pro katalog (klíč z `watchKey`). */
   watchStates(): Map<string, WatchState> {
     const states = new Map<string, WatchState>()

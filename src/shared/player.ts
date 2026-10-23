@@ -1,4 +1,5 @@
 import type { AudioTrack } from './audio'
+import type { SubtitleTrack } from './subtitles'
 
 /** Co právě hraje – posílá hlavní proces do ovládacího overlaye. */
 export interface PlayerState {
@@ -19,6 +20,9 @@ export interface PlayerState {
   next: string | null
   /** Zvukové stopy souboru (vybraná má `selected`). */
   audioTracks: AudioTrack[]
+  subtitleTracks: SubtitleTrack[]
+  /** Posun titulků v sekundách (kladný = později). */
+  subDelay: number
   /** Upozornění, které overlay na chvíli ukáže. */
   notice: string | null
 }
@@ -51,6 +55,8 @@ export const INITIAL_PLAYER_STATE: PlayerState = {
   video: null,
   next: null,
   audioTracks: [],
+  subtitleTracks: [],
+  subDelay: 0,
   notice: null
 }
 
@@ -66,6 +72,10 @@ export type PlayerCommand =
   | { type: 'close' }
   | { type: 'play-next' }
   | { type: 'set-audio-track'; id: number }
+  /** null = titulky vypnout */
+  | { type: 'set-subtitle-track'; id: number | null }
+  | { type: 'set-sub-delay'; seconds: number }
+  | { type: 'load-subtitle' }
 
 export type OpenFileResult =
   | { ok: true }
@@ -91,6 +101,7 @@ export function parsePlayerCommand(value: unknown): PlayerCommand | null {
     case 'escape':
     case 'close':
     case 'play-next':
+    case 'load-subtitle':
       return { type: command['type'] }
     case 'set-pause':
       return typeof command['paused'] === 'boolean'
@@ -107,6 +118,15 @@ export function parsePlayerCommand(value: unknown): PlayerCommand | null {
     case 'set-audio-track':
       return Number.isInteger(command['id']) && (command['id'] as number) > 0
         ? { type: 'set-audio-track', id: command['id'] as number }
+        : null
+    case 'set-subtitle-track':
+      return command['id'] === null ||
+        (Number.isInteger(command['id']) && (command['id'] as number) > 0)
+        ? { type: 'set-subtitle-track', id: command['id'] as number | null }
+        : null
+    case 'set-sub-delay':
+      return isFiniteNumber(command['seconds']) && Math.abs(command['seconds']) <= 600
+        ? { type: 'set-sub-delay', seconds: Math.round(command['seconds'] * 10) / 10 }
         : null
     case 'set-volume':
       return isFiniteNumber(command['volume'])

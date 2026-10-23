@@ -10,6 +10,16 @@ describe('parsePlayerCommand', () => {
       id: 2
     })
     expect(parsePlayerCommand({ type: 'set-audio-track', id: '2' })).toBeNull()
+    expect(parsePlayerCommand({ type: 'set-subtitle-track', id: null })).toEqual({
+      type: 'set-subtitle-track',
+      id: null
+    })
+    expect(parsePlayerCommand({ type: 'set-sub-delay', seconds: 1.25 })).toEqual({
+      type: 'set-sub-delay',
+      seconds: 1.3
+    })
+    expect(parsePlayerCommand({ type: 'set-sub-delay', seconds: 9999 })).toBeNull()
+    expect(parsePlayerCommand({ type: 'load-subtitle' })).toEqual({ type: 'load-subtitle' })
     expect(parsePlayerCommand({ type: 'seek-relative', seconds: -10 })).toEqual({
       type: 'seek-relative',
       seconds: -10

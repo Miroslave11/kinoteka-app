@@ -124,6 +124,16 @@ describe('PlaybackRepository', () => {
     expect(playback.trackPreference(titleId, 'sub')).toBeNull()
   })
 
+  it('posun titulků se pamatuje pro soubor, nula záznam smaže', () => {
+    const file = addFile('Den odhalení (2026).mkv')
+    expect(playback.subDelay(file)).toBe(0)
+    playback.saveSubDelay(file, -1.5)
+    playback.saveSubDelay(file, 0.8)
+    expect(playback.subDelay(file)).toBe(0.8)
+    playback.saveSubDelay(file, 0)
+    expect(db.prepare('SELECT COUNT(*) AS n FROM file_sub_delay').get()).toEqual({ n: 0 })
+  })
+
   it('zhlédnutý titul zůstane po smazání souboru v databázi a vrátí se s ním', () => {
     const file = addFile('Den odhalení (2026).mkv')
     catalog.rebuild()

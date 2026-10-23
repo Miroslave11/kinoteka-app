@@ -1783,3 +1783,46 @@ p.info-chip {
   content: counter(lang) '. ';
   color: var(--dim);
 }
+
+/* ---------- Nastavení → Titulky ---------- */
+.sub-preview {
+  position: relative;
+  max-width: 480px;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    radial-gradient(80% 90% at 70% 20%, rgb(255 170 90 / 0.55), transparent 60%),
+    linear-gradient(160deg, #3a4a63, #121722 70%);
+}
+
+.sub-preview-text {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  width: max-content;
+  max-width: 92%;
+  padding: 0 6px;
+  line-height: 1.25;
+  text-align: center;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.sub-style input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.sub-style input[type='color'] {
+  width: 56px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.form-grid.sub-style {
+  margin-bottom: 16px;
+}

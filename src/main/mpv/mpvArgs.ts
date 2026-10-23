@@ -13,6 +13,8 @@ export interface MpvLaunchOptions {
   audioChannels?: string
   /** Kódy jazyků pro výchozí výběr zvukové stopy, jak je píší kontejnery. */
   audioLanguages?: readonly string[]
+  /** Styl titulků (volby `--sub-…`). */
+  subtitleArgs?: readonly string[]
   logFile?: string
   /** Začít od této pozice (s) – pokračování v rozkoukaném filmu. */
   startSec?: number
@@ -47,8 +49,10 @@ export function buildMpvArgs(options: MpvLaunchOptions): string[] {
     `--audio-device=${options.audioDevice ?? 'auto'}`,
     `--audio-channels=${options.audioChannels ?? 'auto'}`,
     `--alang=${(options.audioLanguages ?? ['cze', 'ces', 'cs', 'eng', 'en']).join(',')}`,
-    '--slang=cze,ces,cs,eng,en',
-    '--sub-auto=fuzzy'
+    // Titulky vybírá a externí soubory přidává aplikace (kvůli kódování a zapamatované volbě).
+    '--sub-auto=no',
+    '--sid=no',
+    ...(options.subtitleArgs ?? [])
   ]
   if (options.startSec && options.startSec > 0) args.push(`--start=${options.startSec.toFixed(1)}`)
   if (options.logFile) args.push(`--log-file=${options.logFile}`)

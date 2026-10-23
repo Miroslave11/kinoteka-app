@@ -5,6 +5,7 @@ import { IpcChannel } from '../shared/ipc'
 import { VIDEO_EXTENSIONS } from '../shared/library'
 import { canResume, parsePlayRequest } from '../shared/playback'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
+import { subtitleStyleArgs, SUBTITLES_OFF } from '../shared/subtitles'
 import {
   audioLaunchOptions,
   listAudioDevices,
@@ -31,7 +32,10 @@ import { LibraryRepository } from './library/LibraryRepository'
 import { LibraryService } from './library/LibraryService'
 import { PlaybackRepository, type PlaybackItem } from './playback/PlaybackRepository'
 import { PlaybackTracker } from './playback/PlaybackTracker'
-import { PlayerSession, type AudioChoice } from './player/PlayerSession'
+import { PlayerSession } from './player/PlayerSession'
+import type { TrackChoices } from './player/TrackSelector'
+import { findExternalSubtitles, prepareSubtitle } from './subtitles/externalSubtitles'
+import { loadSubtitleSettings, saveSubtitleSettings } from './subtitles/subtitleSettings'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
 import { SettingsRepository } from './settings/SettingsRepository'
 import { createMainWindowOptions } from './windowOptions'
@@ -67,11 +71,34 @@ function resumePosition(item: PlaybackItem): number | undefined {
 const nextLabel = (item: PlaybackItem): string | null =>
   playback.nextEpisode(item)?.shortLabel ?? null
 
-/** Zvuková stopa: zapamatovaná pro film nebo seriál, jinak podle preferovaných jazyků. */
-const audioChoiceFor = (item?: PlaybackItem): AudioChoice => ({
-  remembered: item ? playback.trackPreference(item.titleId, 'audio') : null,
-  languages: loadAudioSettings(settings).languages
-})
+/** Titulky v jiném kódování než UTF-8 se převádějí do kopie v cache. */
+const subtitleCacheDir = (): string => join(app.getPath('userData'), 'cache', 'subtitles')
+
+/**
+ * Výběr stop pro soubor: zapamatovaná volba pro film nebo seriál, jinak preferované jazyky;
+ * k tomu externí titulky vedle souboru a uložený posun titulků.
+ */
+function trackChoicesFor(file: string, item?: PlaybackItem): TrackChoices {
+  const subtitleSettings = loadSubtitleSettings(settings)
+  return {
+    audio: {
+      remembered: item ? playback.trackPreference(item.titleId, 'audio') : null,
+      languages: loadAudioSettings(settings).languages
+    },
+    subtitles: {
+      remembered: item ? playback.trackPreference(item.titleId, 'sub') : null,
+      mode: subtitleSettings.mode,
+      languages: subtitleSettings.languages
+    },
+    subDelay: item ? playback.subDelay(item.fileId) : 0,
+    externalSubtitles: async () =>
+      Promise.all(
+        (await findExternalSubtitles(file)).map((found) =>
+          prepareSubtitle(found, file, subtitleCacheDir())
+        )
+      )
+  }
+}
 
 /**
  * Spustí přehrávání. Soubor z knihovny (`item`) si pamatuje pozici a zhlédnutí;
@@ -93,7 +120,10 @@ async function startPlayback(
     startSec,
     next: item ? nextLabel(item) : null,
     audio: audioLaunchOptions(loadAudioSettings(settings)),
-    audioChoice: audioChoiceFor(item),
+    tracks: trackChoicesFor(file, item),
+    subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
+    prepareSubtitle: (path) =>
+      prepareSubtitle(path, tracker.current?.path ?? file, subtitleCacheDir()),
     logFile: join(app.getPath('logs'), 'mpv.log'),
     onProgress: (position, duration) => {
       if (session === started) tracker.update(position, duration)
@@ -108,6 +138,21 @@ async function startPlayback(
         language: track.language,
         title: track.title
       })
+    },
+    onSubtitleChosen: (track) => {
+      const current = tracker.current
+      if (session !== started || !current) return
+      playback.saveTrackPreference(
+        current.titleId,
+        'sub',
+        track
+          ? { language: track.language, title: track.title }
+          : { language: SUBTITLES_OFF, title: null }
+      )
+    },
+    onSubDelayChanged: (seconds) => {
+      const current = tracker.current
+      if (session === started && current) playback.saveSubDelay(current.fileId, seconds)
     },
     onEnd: (info) => {
       if (session === started) {
@@ -133,7 +178,7 @@ function playNext(current: PlayerSession): void {
     title: next.label,
     startSec: resumePosition(next),
     next: nextLabel(next),
-    audioChoice: audioChoiceFor(next)
+    tracks: trackChoicesFor(next.path, next)
   })
 }
 
@@ -277,6 +322,10 @@ void app.whenReady().then(() => {
     saveAudioSettings(settings, value)
   )
   ipcMain.handle(IpcChannel.AudioListDevices, () => listAudioDevices(mpvExecutablePath()))
+  ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))
+  ipcMain.handle(IpcChannel.SubtitlesSaveSettings, (_event, value: unknown) =>
+    saveSubtitleSettings(settings, value)
+  )
   ipcMain.handle(IpcChannel.PreviewStatus, () => previews?.status() ?? null)
   ipcMain.handle(IpcChannel.PreviewSetClipsEnabled, (_event, enabled: unknown) =>
     typeof enabled === 'boolean' ? previews?.setClipsEnabled(enabled) : undefined

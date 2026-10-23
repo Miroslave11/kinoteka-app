@@ -161,5 +161,13 @@ export const MIGRATIONS: readonly string[] = [
     track_title TEXT,
     PRIMARY KEY (title_id, kind)
   );
+  `,
+
+  // 10 – posun časování titulků pro konkrétní soubor (titulky sedí k určitému vydání)
+  `
+  CREATE TABLE file_sub_delay (
+    media_file_id INTEGER PRIMARY KEY REFERENCES media_file (id) ON DELETE CASCADE,
+    delay REAL NOT NULL
+  );
   `
 ]
