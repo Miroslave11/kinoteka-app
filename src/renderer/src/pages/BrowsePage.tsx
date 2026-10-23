@@ -5,7 +5,8 @@ import {
   filterOptions,
   filterTitles,
   type SortKey,
-  type TitleFilters
+  type TitleFilters,
+  type WatchedFilter
 } from '../app/catalogData'
 import { useAmbientPalette } from '../app/palette'
 import Poster from '../components/Poster'
@@ -14,7 +15,13 @@ const SORTS: [SortKey, string][] = [
   ['added', 'Naposledy přidané'],
   ['name', 'Název'],
   ['year', 'Rok'],
-  ['rating', 'Hodnocení IMDb']
+  ['rating', 'Hodnocení IMDb'],
+  ['my-rating', 'Moje hodnocení']
+]
+
+const WATCHED: [WatchedFilter, string][] = [
+  ['unwatched', 'Nezhlédnuté'],
+  ['watched', 'Zhlédnuté']
 ]
 
 /** Mřížka filmů nebo seriálů s filtry a řazením. */
@@ -28,6 +35,12 @@ export default function BrowsePage({ kind }: { kind: 'movie' | 'show' }): React.
   const visible = useMemo(() => filterTitles(ofKind, filters), [ofKind, filters])
   const update = (patch: Partial<TitleFilters>): void => setFilters((f) => ({ ...f, ...patch }))
   const chip = (active: boolean): string => `chip ${active ? 'on' : ''}`
+  const filtered =
+    filters.resolution !== null ||
+    filters.tag !== null ||
+    filters.genre !== null ||
+    filters.decade !== null ||
+    filters.watched !== 'all'
 
   return (
     <div className="page">
@@ -68,6 +81,54 @@ export default function BrowsePage({ kind }: { kind: 'movie' | 'show' }): React.
             {tag}
           </button>
         ))}
+        <span className="spacer" />
+        <button className="btn sm" onClick={() => setFilters(DEFAULT_FILTERS)} hidden={!filtered}>
+          Zrušit filtry
+        </button>
+      </div>
+
+      <div className="toolbar">
+        {WATCHED.map(([id, label]) => (
+          <button
+            key={id}
+            className={chip(filters.watched === id)}
+            onClick={() => update({ watched: filters.watched === id ? 'all' : id })}
+          >
+            {label}
+          </button>
+        ))}
+        {options.genres.length > 0 && (
+          <label className="chip select">
+            Žánr:
+            <select
+              value={filters.genre ?? ''}
+              onChange={(e) => update({ genre: e.target.value || null })}
+            >
+              <option value="">všechny</option>
+              {options.genres.map((genre) => (
+                <option key={genre} value={genre}>
+                  {genre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {options.decades.length > 1 && (
+          <label className="chip select">
+            Rok:
+            <select
+              value={filters.decade ?? ''}
+              onChange={(e) => update({ decade: e.target.value ? Number(e.target.value) : null })}
+            >
+              <option value="">všechny</option>
+              {options.decades.map((decade) => (
+                <option key={decade} value={decade}>
+                  {decade}–{decade + 9}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <span className="spacer" />
         <label className="chip select">
           Řadit:

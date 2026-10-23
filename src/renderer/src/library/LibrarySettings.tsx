@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { FolderPlus, HardDrive, Network, Play, RefreshCw, Server, Trash2 } from 'lucide-react'
 import {
   formatRelativeTime,
@@ -28,6 +28,10 @@ export default function LibrarySettings(): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ text: string; error?: boolean } | null>(null)
   const [networkPath, setNetworkPath] = useState<string | null>(null)
+  const [autoScan, setAutoScan] = useState<boolean | null>(null)
+  useEffect(() => {
+    void library.autoScan().then(setAutoScan)
+  }, [library])
   const [confirmRemove, setConfirmRemove] = useState<number | null>(null)
 
   const run = async (work: () => Promise<void>): Promise<void> => {
@@ -128,12 +132,24 @@ export default function LibrarySettings(): React.JSX.Element {
           </button>
         </div>
         {message && <p className={`notice ${message.error ? 'is-error' : ''}`}>{message.text}</p>}
+        <label className="toggle-row auto-scan">
+          <input
+            type="checkbox"
+            checked={autoScan ?? true}
+            disabled={autoScan === null}
+            onChange={() => {
+              const next = !autoScan
+              setAutoScan(next)
+              void library.setAutoScan(next)
+            }}
+          />
+          <span>Automatický sken při startu a každých 30 minut</span>
+        </label>
       </section>
 
       <section className="card">
         <h2>
-          Nalezené soubory{' '}
-          <small>{files.length} · dočasný seznam, roztřídění přijde v dalším přírůstku</small>
+          Nalezené soubory <small>{files.length} · jak je aplikace našla na disku</small>
         </h2>
         {files.length > 0 && (
           <table className="files">

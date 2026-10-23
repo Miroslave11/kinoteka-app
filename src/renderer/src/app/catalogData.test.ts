@@ -8,6 +8,7 @@ import {
   filterOptions,
   filterTitles,
   mergeSeasons,
+  searchTitles,
   upNext,
   watchForFile,
   type TitleItem
@@ -119,7 +120,101 @@ describe('filterOptions', () => {
   it('nabídne jen hodnoty, které v knihovně existují, v pevném pořadí', () => {
     expect(filterOptions(titles)).toEqual({
       resolutions: ['4K', '1080p'],
-      tags: ['CZ dabing', 'CZ titulky']
+      tags: ['CZ dabing', 'CZ titulky'],
+      genres: [],
+      decades: [2020]
+    })
+  })
+})
+
+describe('hledání a nové filtry', () => {
+  const meta = (overrides: Partial<TitleMetadata>): TitleMetadata =>
+    ({
+      tmdbId: 1,
+      imdbId: null,
+      kind: 'movie',
+      name: 'X',
+      originalName: null,
+      year: null,
+      overview: null,
+      tagline: null,
+      genres: [],
+      countries: [],
+      runtimeMin: null,
+      rating: null,
+      posterUrl: null,
+      backdropUrl: null,
+      logoUrl: null,
+      cast: [],
+      directors: [],
+      trailerUrl: null,
+      tmdbUrl: '',
+      seasons: [],
+      ...overrides
+    }) as TitleMetadata
+  const withMeta = (
+    title: TitleItem,
+    overrides: Partial<TitleMetadata>,
+    extra: object = {}
+  ): TitleItem =>
+    ({ ...title, metadata: meta({ name: title.name, ...overrides }), ...extra }) as TitleItem
+
+  const library: TitleItem[] = [
+    withMeta(movie(1, 'Prázdnota', 2020, [file()]), {
+      genres: ['Horor'],
+      year: 2020,
+      cast: [{ name: 'Tom Hardy', role: null, photoUrl: null }]
+    }),
+    withMeta(
+      movie(2, 'Vetřelec', 1979, [
+        file({ summary: { resolution: '4K', hdr: null, audio: null, durationSec: 1 } })
+      ]),
+      {
+        originalName: 'Alien',
+        genres: ['Sci-Fi', 'Horor'],
+        year: 1979,
+        directors: ['Ridley Scott']
+      },
+      { watch: { progress: null, watchCount: 1, lastWatchedAt: '2026-10-01' }, myRating: 5 }
+    ),
+    withMeta(
+      movie(3, 'Mad Max', 2015, [
+        file({ summary: { resolution: '4K', hdr: null, audio: null, durationSec: 1 } })
+      ]),
+      {
+        year: 2015,
+        cast: [{ name: 'Tom Hardy', role: 'Max', photoUrl: null }]
+      }
+    )
+  ]
+
+  it('najde film podle originálního názvu a herce', () => {
+    expect(names(filterTitles(library, { ...DEFAULT_FILTERS, query: 'alien' }))).toEqual([
+      'Vetřelec'
+    ])
+    const found = searchTitles(library, 'hardy')
+    expect(found.byName).toEqual([])
+    expect(found.byPerson.map((m) => [m.title.name, m.people])).toEqual([
+      ['Mad Max', ['Tom Hardy']],
+      ['Prázdnota', ['Tom Hardy']]
+    ])
+    expect(searchTitles(library, 'ridley').byPerson[0]!.title.name).toBe('Vetřelec')
+  })
+
+  it('žánr, desetiletí, zhlédnuté a moje hodnocení', () => {
+    const f = DEFAULT_FILTERS
+    expect(names(filterTitles(library, { ...f, genre: 'Horor', sort: 'name' }))).toEqual([
+      'Prázdnota',
+      'Vetřelec'
+    ])
+    expect(names(filterTitles(library, { ...f, decade: 1970 }))).toEqual(['Vetřelec'])
+    expect(names(filterTitles(library, { ...f, resolution: '4K', watched: 'unwatched' }))).toEqual([
+      'Mad Max'
+    ])
+    expect(names(filterTitles(library, { ...f, sort: 'my-rating' }))[0]).toBe('Vetřelec')
+    expect(filterOptions(library)).toMatchObject({
+      genres: ['Horor', 'Sci-Fi'],
+      decades: [2020, 2010, 1970]
     })
   })
 })

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Subtitles,
+  Keyboard,
   Maximize,
   Minimize,
   Pause,
@@ -19,6 +20,7 @@ import {
   type PlayerState
 } from '../../../shared/player'
 import SeekBar from './SeekBar'
+import ShortcutHelp from './ShortcutHelp'
 import TrackPanel from './TrackPanel'
 import { useIdle } from './useIdle'
 
@@ -41,6 +43,7 @@ export default function PlayerOverlay(): React.JSX.Element {
   const [state, setState] = useState<PlayerState>(INITIAL_PLAYER_STATE)
   const [overControls, setOverControls] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [idle, wake] = useIdle(
     HIDE_CONTROLS_AFTER_MS,
     !state.paused && !state.ended && !overControls && !panelOpen
@@ -80,9 +83,14 @@ export default function PlayerOverlay(): React.JSX.Element {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       wake()
-      if (event.key === 'Escape' && panelOpen) {
+      if (event.key === 'Escape' && (panelOpen || helpOpen)) {
         event.preventDefault()
+        setHelpOpen(false)
         return setPanelOpen(false)
+      }
+      if (event.key === '?') {
+        event.preventDefault()
+        return setHelpOpen((open) => !open)
       }
       const command = keyToCommand(event, state)
       if (command) {
@@ -92,7 +100,7 @@ export default function PlayerOverlay(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [state, wake, panelOpen])
+  }, [state, wake, panelOpen, helpOpen])
 
   const onSurfaceClick = (): void => {
     window.clearTimeout(clickTimer.current)
@@ -146,6 +154,8 @@ export default function PlayerOverlay(): React.JSX.Element {
           </span>
         )}
       </header>
+
+      {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
 
       {notice && (
         <div className="notice-toast" {...controlsProps}>
@@ -279,6 +289,13 @@ export default function PlayerOverlay(): React.JSX.Element {
               />
             </div>
             <button
+              className={`icon-btn ${helpOpen ? 'is-on' : ''}`}
+              title="Klávesové zkratky (?)"
+              onClick={() => setHelpOpen((open) => !open)}
+            >
+              <Keyboard size={20} />
+            </button>
+            <button
               className="icon-btn"
               title="Celá obrazovka (F, dvojklik)"
               onClick={() => send({ type: 'toggle-fullscreen' })}
@@ -299,9 +316,29 @@ function keyToCommand(event: KeyboardEvent, state: PlayerState): PlayerCommand |
     case 'K':
       return { type: 'toggle-pause' }
     case 'ArrowLeft':
+    case 'j':
+    case 'J':
       return { type: 'seek-relative', seconds: -10 }
     case 'ArrowRight':
+    case 'l':
+    case 'L':
       return { type: 'seek-relative', seconds: 10 }
+    case 'Home':
+      return { type: 'seek-absolute', seconds: 0 }
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+      // Skok na desetiny délky (5 = polovina), jako na YouTube.
+      return state.duration > 0
+        ? { type: 'seek-absolute', seconds: (state.duration * Number(event.key)) / 10 }
+        : null
     case 'ArrowUp':
       return { type: 'set-volume', volume: state.volume + 5 }
     case 'ArrowDown':

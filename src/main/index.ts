@@ -14,6 +14,7 @@ import {
   loadAudioSettings,
   saveAudioSettings
 } from './audio/audioSettings'
+import { registerAppInfoIpc } from './appInfo'
 import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
 import { registerImdbIpc } from './imdb/imdbIpc'
@@ -32,6 +33,7 @@ import { MetadataService } from './metadata/MetadataService'
 import { TMDB_IMAGE_URL, TmdbClient } from './metadata/TmdbClient'
 import { ProbeService } from './media/ProbeService'
 import { binaryPath, ffprobeExecutablePath, mpvExecutablePath } from './mpv/binary'
+import { AutoScan } from './library/AutoScan'
 import { registerLibraryIpc } from './library/libraryIpc'
 import { LibraryRepository } from './library/LibraryRepository'
 import { LibraryService } from './library/LibraryService'
@@ -356,6 +358,13 @@ void app.whenReady().then(() => {
     Number.isInteger(id) ? catalog.fileDetails(id as number) : null
   )
   registerLibraryIpc(library, repository)
+  registerAppInfoIpc()
+  const autoScan = new AutoScan(settings, () => library.scanAll())
+  autoScan.start()
+  ipcMain.handle(IpcChannel.LibraryAutoScan, () => autoScan.enabled())
+  ipcMain.handle(IpcChannel.LibrarySetAutoScan, (_event, enabled: unknown) => {
+    if (typeof enabled === 'boolean') autoScan.setEnabled(enabled)
+  })
   registerPlayerIpc()
 
   const win = createMainWindow()
