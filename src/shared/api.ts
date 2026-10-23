@@ -6,7 +6,13 @@ import type {
   ScanProgress,
   ScanResult
 } from './library'
-import type { ActionResult, MetadataSearchResult, SaveKeyResult, TmdbKeyStatus } from './metadata'
+import type {
+  ActionResult,
+  ImdbStatus,
+  MetadataSearchResult,
+  SaveKeyResult,
+  TmdbKeyStatus
+} from './metadata'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
 /** API, které preload zpřístupní oknům jako `window.kinoteka`. */
@@ -51,12 +57,11 @@ export interface KinotekaApi {
     /** Znovu načte údaje titulu z TMDB. */
     refresh(titleId: number): Promise<void>
   }
-  csfd: {
-    enabled(): Promise<boolean>
+  imdb: {
+    status(): Promise<ImdbStatus>
     setEnabled(enabled: boolean): Promise<void>
-    /** Ruční propojení titulu odkazem z ČSFD. */
-    link(titleId: number, url: string): Promise<ActionResult>
-    refresh(titleId: number): Promise<void>
+    /** Stáhne datový soubor IMDb hned (jinak jednou týdně). */
+    updateNow(): Promise<void>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>

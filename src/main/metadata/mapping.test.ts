@@ -8,6 +8,7 @@ describe('mapMovie', () => {
   it('převede základní údaje', () => {
     expect(movie).toMatchObject({
       tmdbId: 9001,
+      imdbId: 'tt0000001',
       kind: 'movie',
       name: 'Prázdnota',
       originalName: 'The Void',
@@ -42,6 +43,7 @@ describe('mapShow', () => {
   it('převede seriál včetně tvůrců, českého loga a českého traileru', () => {
     expect(show).toMatchObject({
       kind: 'show',
+      imdbId: 'tt0000002',
       name: 'Vidím vás',
       originalName: 'The Watcher',
       year: 2022,

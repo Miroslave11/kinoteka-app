@@ -27,8 +27,7 @@ const MOVIES: MovieItem[] = [
     files: [file(1, ['CZ dabing'])],
     metadata: null,
     matchStatus: 'pending',
-    csfd: null,
-    csfdStatus: 'pending'
+    imdb: null
   },
   {
     id: 2,
@@ -38,8 +37,7 @@ const MOVIES: MovieItem[] = [
     files: [file(2, ['CZ titulky'])],
     metadata: null,
     matchStatus: 'pending',
-    csfd: null,
-    csfdStatus: 'pending'
+    imdb: null
   }
 ]
 

@@ -13,7 +13,8 @@ import Poster from '../components/Poster'
 const SORTS: [SortKey, string][] = [
   ['added', 'Naposledy přidané'],
   ['name', 'Název'],
-  ['year', 'Rok']
+  ['year', 'Rok'],
+  ['rating', 'Hodnocení IMDb']
 ]
 
 /** Mřížka filmů nebo seriálů s filtry a řazením. */

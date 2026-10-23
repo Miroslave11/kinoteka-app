@@ -1,7 +1,6 @@
 import type { FolderKind } from './library'
 import type { MediaInfo, MediaSummary } from './mediaInfo'
-import type { CsfdData, CsfdStatus } from './csfd'
-import type { MatchStatus, TitleMetadata } from './metadata'
+import type { ImdbRating, MatchStatus, TitleMetadata } from './metadata'
 
 /** Soubor patřící k filmu nebo dílu. */
 export interface CatalogFile {
@@ -39,8 +38,7 @@ export interface MovieItem {
   files: CatalogFile[]
   metadata: TitleMetadata | null
   matchStatus: MatchStatus
-  csfd: CsfdData | null
-  csfdStatus: CsfdStatus
+  imdb: ImdbRating | null
 }
 
 export interface EpisodeItem {
@@ -67,6 +65,5 @@ export interface ShowItem {
   episodeCount: number
   metadata: TitleMetadata | null
   matchStatus: MatchStatus
-  csfd: CsfdData | null
-  csfdStatus: CsfdStatus
+  imdb: ImdbRating | null
 }

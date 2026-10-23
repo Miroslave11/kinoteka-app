@@ -6,8 +6,8 @@ import { VIDEO_EXTENSIONS } from '../shared/library'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
 import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
-import { registerCsfdIpc } from './csfd/csfdIpc'
-import { CsfdService } from './csfd/CsfdService'
+import { registerImdbIpc } from './imdb/imdbIpc'
+import { ImdbService } from './imdb/ImdbService'
 import { openDatabase } from './db/database'
 import { runFfprobe } from './media/ffprobe'
 import { ImageCache } from './metadata/ImageCache'
@@ -132,17 +132,17 @@ void app.whenReady().then(() => {
     (credential) =>
       new TmdbClient({ credential, baseUrl: devTmdb && `${devTmdb}/3`, fetchImpl: chromiumFetch })
   )
-  // Ve vývoji jde ČSFD a Wikidata přesměrovat na lokální kopii (KINOTEKA_DEV_CSFD_URL, …_WIKIDATA_URL).
-  const csfd = new CsfdService(catalog, settings, {
+  // Ve vývoji jde datový soubor IMDb přesměrovat na lokální kopii (KINOTEKA_DEV_IMDB_URL).
+  const imdb = new ImdbService(catalog, settings, {
     fetch: chromiumFetch,
-    baseUrl: app.isPackaged ? undefined : process.env['KINOTEKA_DEV_CSFD_URL'],
-    wikidataUrl: app.isPackaged ? undefined : process.env['KINOTEKA_DEV_WIKIDATA_URL']
+    cacheDir: join(app.getPath('userData'), 'cache', 'imdb'),
+    url: app.isPackaged ? undefined : process.env['KINOTEKA_DEV_IMDB_URL']
   })
-  csfd.on('changed', () => broadcast(IpcChannel.LibraryChanged))
-  // Nová shoda na TMDB = nové TMDB ID, podle kterého se dá najít ID z ČSFD.
+  imdb.on('changed', () => broadcast(IpcChannel.LibraryChanged))
+  // Nová shoda na TMDB = nové IMDb ID, ke kterému se doplní hodnocení.
   metadata.on('changed', () => {
     broadcast(IpcChannel.LibraryChanged)
-    void csfd.run()
+    void imdb.run()
   })
   handleMediaProtocol(
     new ImageCache(
@@ -162,8 +162,8 @@ void app.whenReady().then(() => {
   void probe?.run()
   void metadata.run()
   registerMetadataIpc(metadata)
-  registerCsfdIpc(csfd)
-  void csfd.run()
+  registerImdbIpc(imdb)
+  void imdb.run()
   ipcMain.handle(IpcChannel.CatalogListMovies, () => catalog.listMovies())
   ipcMain.handle(IpcChannel.CatalogListShows, () => catalog.listShows())
   ipcMain.handle(IpcChannel.CatalogFileDetails, (_event, id: unknown) =>

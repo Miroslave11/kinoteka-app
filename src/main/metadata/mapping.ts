@@ -85,8 +85,11 @@ function common(json: Json, kind: 'movie' | 'show'): TitleMetadata {
     .map((c) => str(c['iso_3166_1']))
     .concat(Array.isArray(json['origin_country']) ? (json['origin_country'] as string[]) : [])
     .filter((c): c is string => Boolean(c))
+  // Film má imdb_id přímo, seriál jen v external_ids.
+  const imdbId = str(json['imdb_id']) ?? str(obj(json['external_ids'])['imdb_id'])
   return {
     tmdbId: Number(json['id']),
+    imdbId: imdbId && /^tt\d+$/.test(imdbId) ? imdbId : null,
     kind,
     name,
     originalName: original && original !== name ? original : null,

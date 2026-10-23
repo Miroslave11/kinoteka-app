@@ -7,8 +7,7 @@ import type {
   ShowItem
 } from '../../shared/catalog'
 import { summarize, type MediaInfo } from '../../shared/mediaInfo'
-import type { CsfdData, CsfdStatus } from '../../shared/csfd'
-import type { MatchStatus, TitleMetadata } from '../../shared/metadata'
+import type { ImdbRating, MatchStatus, TitleMetadata } from '../../shared/metadata'
 import { transaction, type Database } from '../db/database'
 import { groupMediaFiles } from './grouping'
 
@@ -57,22 +56,10 @@ const MATCH_STATUSES: MatchStatus[] = [
   'disabled'
 ]
 
-const CSFD_STATUSES: CsfdStatus[] = ['pending', 'linked', 'manual', 'notfound', 'error']
-
-function parseJson<T>(value: unknown): T | null {
-  if (typeof value !== 'string') return null
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return null
-  }
-}
-
 function metadataOf(row: Row): {
   metadata: TitleMetadata | null
   matchStatus: MatchStatus
-  csfd: CsfdData | null
-  csfdStatus: CsfdStatus
+  imdb: ImdbRating | null
 } {
   let metadata: TitleMetadata | null = null
   if (typeof row['metadata'] === 'string') {
@@ -83,12 +70,27 @@ function metadataOf(row: Row): {
     }
   }
   const status = row['match_status'] as MatchStatus
-  const csfdStatus = row['csfd_status'] as CsfdStatus
+  const imdbId = metadata?.imdbId
+  const rating = row['imdb_rating']
   return {
     metadata,
     matchStatus: MATCH_STATUSES.includes(status) ? status : 'pending',
-    csfd: parseJson<CsfdData>(row['csfd']),
-    csfdStatus: CSFD_STATUSES.includes(csfdStatus) ? csfdStatus : 'pending'
+    imdb:
+      imdbId && typeof rating === 'number'
+        ? { id: imdbId, rating, votes: Number(row['imdb_votes'] ?? 0) }
+        : null
+  }
+}
+
+function toMetadataRequest(row: Row): MetadataRequest {
+  return {
+    id: Number(row['id']),
+    kind: row['kind'] === 'show' ? 'show' : 'movie',
+    name: String(row['name']),
+    year: (row['year'] as number | null) ?? null,
+    alternativeNames: parseTags(row['alternative_names']),
+    tmdbId: (row['tmdb_id'] as number | null) ?? null,
+    status: (row['match_status'] as MatchStatus) ?? 'pending'
   }
 }
 
@@ -99,6 +101,9 @@ export interface MetadataRequest {
   name: string
   year: number | null
   alternativeNames: string[]
+  /** Už známé TMDB ID – pak se jen znovu načtou údaje, bez nového vyhledávání. */
+  tmdbId: number | null
+  status: MatchStatus
 }
 
 /**
@@ -284,38 +289,100 @@ export class CatalogRepository {
 
   // ---------- metadata ----------
 
-  /** Tituly, které čekají na dohledání (a chybné, u kterých už uplynula hodina). */
+  /**
+   * Tituly, které čekají na dohledání, chybné (po hodině znovu) a spárované s vynuceným
+   * obnovením údajů (metadata_updated_at = NULL).
+   */
   titlesNeedingMetadata(now = new Date()): MetadataRequest[] {
     const retryBefore = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
     return this.db
       .prepare(
-        `SELECT id, kind, name, year, alternative_names FROM title
+        `SELECT * FROM title
          WHERE match_status = 'pending'
             OR (match_status = 'error' AND (metadata_updated_at IS NULL OR metadata_updated_at < ?))
+            OR (match_status IN ('matched', 'manual') AND tmdb_id IS NOT NULL
+                AND metadata_updated_at IS NULL)
          ORDER BY id`
       )
       .all(retryBefore)
-      .map((row) => ({
-        id: Number(row['id']),
-        kind: row['kind'] === 'show' ? 'show' : 'movie',
-        name: String(row['name']),
-        year: (row['year'] as number | null) ?? null,
-        alternativeNames: parseTags(row['alternative_names'])
-      }))
+      .map(toMetadataRequest)
   }
 
   titleForMetadata(id: number): MetadataRequest | undefined {
+    const row = this.db.prepare('SELECT * FROM title WHERE id = ?').get(id)
+    return row ? toMetadataRequest(row) : undefined
+  }
+
+  /** „Znovu načíst údaje“: u spárovaného titulu jen obnoví údaje z TMDB, jinak hledá znovu. */
+  expireMetadata(id: number): void {
+    this.db
+      .prepare(
+        `UPDATE title SET metadata_updated_at = NULL,
+         match_status = CASE WHEN tmdb_id IS NULL THEN 'pending' ELSE match_status END
+         WHERE id = ?`
+      )
+      .run(id)
+  }
+
+  // ---------- hodnocení IMDb ----------
+
+  /** Tituly s IMDb ID (z údajů TMDB). */
+  imdbIds(): { id: number; imdbId: string }[] {
+    return this.db
+      .prepare(
+        `SELECT id, json_extract(metadata, '$.imdbId') AS imdb_id FROM title
+         WHERE json_extract(metadata, '$.imdbId') IS NOT NULL`
+      )
+      .all()
+      .map((row) => ({ id: Number(row['id']), imdbId: String(row['imdb_id']) }))
+  }
+
+  /** Kolik titulů má IMDb ID a kolik z nich hodnocení. */
+  imdbCounts(): { titles: number; rated: number } {
     const row = this.db
-      .prepare('SELECT id, kind, name, year, alternative_names FROM title WHERE id = ?')
-      .get(id)
-    if (!row) return undefined
-    return {
-      id,
-      kind: row['kind'] === 'show' ? 'show' : 'movie',
-      name: String(row['name']),
-      year: (row['year'] as number | null) ?? null,
-      alternativeNames: parseTags(row['alternative_names'])
-    }
+      .prepare(
+        `SELECT count(*) AS titles, count(imdb_rating) AS rated FROM title
+         WHERE json_extract(metadata, '$.imdbId') IS NOT NULL`
+      )
+      .get()
+    return { titles: Number(row?.['titles'] ?? 0), rated: Number(row?.['rated'] ?? 0) }
+  }
+
+  /** Tituly s IMDb ID, které ještě hodnocení nemají. */
+  countMissingImdbRatings(): number {
+    const row = this.db
+      .prepare(
+        `SELECT count(*) AS n FROM title
+         WHERE json_extract(metadata, '$.imdbId') IS NOT NULL AND imdb_updated_at IS NULL`
+      )
+      .get()
+    return Number(row?.['n'] ?? 0)
+  }
+
+  /** Zapíše hodnocení; titul, který v datech IMDb není, dostane NULL (třeba zatím nevyšel). */
+  /**
+   * @param targets tituly, jejichž hodnocení se v souboru hledala – titul, který IMDb ID dostal
+   *   až během čtení souboru, se nesmí označit jako hotový.
+   */
+  saveImdbRatings(
+    ratings: Map<string, { rating: number; votes: number }>,
+    targets: { id: number; imdbId: string }[],
+    now = new Date()
+  ): number {
+    // Titul mohl mezitím dostat jiné IMDb ID (nová shoda) – pak se jeho záznam nemění.
+    const update = this.db.prepare(
+      `UPDATE title SET imdb_rating = ?, imdb_votes = ?, imdb_updated_at = ?
+       WHERE id = ? AND json_extract(metadata, '$.imdbId') = ?`
+    )
+    let found = 0
+    transaction(this.db, () => {
+      for (const { id, imdbId } of targets) {
+        const rating = ratings.get(imdbId)
+        if (rating) found++
+        update.run(rating?.rating ?? null, rating?.votes ?? null, now.toISOString(), id, imdbId)
+      }
+    })
+    return found
   }
 
   saveMetadata(
@@ -324,11 +391,10 @@ export class CatalogRepository {
     status: 'matched' | 'manual',
     now = new Date()
   ): void {
-    // Jiný titul na TMDB = jiný film i na ČSFD; ručně propojené ČSFD se nemění.
+    // Jiný titul na TMDB = jiné hodnocení z IMDb, staré se zahodí.
     this.db
       .prepare(
-        `UPDATE title SET csfd_id = NULL, csfd = NULL, csfd_status = 'pending', csfd_error = NULL
-         WHERE id = ? AND tmdb_id IS NOT ? AND csfd_status != 'manual'`
+        'UPDATE title SET imdb_rating = NULL, imdb_votes = NULL, imdb_updated_at = NULL WHERE id = ? AND tmdb_id IS NOT ?'
       )
       .run(id, metadata.tmdbId)
     this.db
@@ -337,77 +403,6 @@ export class CatalogRepository {
          metadata_updated_at = ? WHERE id = ?`
       )
       .run(metadata.tmdbId, JSON.stringify(metadata), status, now.toISOString(), id)
-  }
-
-  // ---------- ČSFD ----------
-
-  /** Tituly s TMDB ID, u kterých se ještě nehledalo ID z ČSFD. */
-  csfdLookups(): { id: number; kind: 'movie' | 'show'; tmdbId: number }[] {
-    return this.db
-      .prepare(
-        "SELECT id, kind, tmdb_id FROM title WHERE csfd_status = 'pending' AND tmdb_id IS NOT NULL ORDER BY id"
-      )
-      .all()
-      .map((row) => ({
-        id: Number(row['id']),
-        kind: row['kind'] === 'show' ? 'show' : 'movie',
-        tmdbId: Number(row['tmdb_id'])
-      }))
-  }
-
-  /**
-   * Tituly, u kterých je potřeba načíst stránku ČSFD: ještě nenačtené, starší než 30 dní,
-   * nebo s chybou starší než 6 hodin.
-   */
-  csfdFetches(now = new Date()): { id: number; csfdId: number }[] {
-    const day = 24 * 60 * 60 * 1000
-    const stale = new Date(now.getTime() - 30 * day).toISOString()
-    const retry = new Date(now.getTime() - day / 4).toISOString()
-    return this.db
-      .prepare(
-        `SELECT id, csfd_id FROM title WHERE csfd_id IS NOT NULL AND (
-           (csfd_status IN ('linked', 'manual') AND (csfd IS NULL OR csfd_updated_at < ?))
-           OR (csfd_status = 'error' AND (csfd_updated_at IS NULL OR csfd_updated_at < ?))
-         ) ORDER BY csfd IS NOT NULL, id`
-      )
-      .all(stale, retry)
-      .map((row) => ({ id: Number(row['id']), csfdId: Number(row['csfd_id']) }))
-  }
-
-  setCsfdLink(id: number, csfdId: number | null, status: CsfdStatus): void {
-    this.db
-      .prepare(
-        `UPDATE title SET csfd_id = ?, csfd_status = ?, csfd_error = NULL,
-         csfd = CASE WHEN csfd_id IS ? THEN csfd ELSE NULL END WHERE id = ?`
-      )
-      .run(csfdId, status, csfdId, id)
-  }
-
-  saveCsfd(id: number, data: CsfdData, now = new Date()): void {
-    this.db
-      .prepare(
-        `UPDATE title SET csfd = ?, csfd_error = NULL, csfd_updated_at = ?,
-         csfd_status = CASE WHEN csfd_status = 'manual' THEN 'manual' ELSE 'linked' END WHERE id = ?`
-      )
-      .run(JSON.stringify(data), now.toISOString(), id)
-  }
-
-  setCsfdError(id: number, error: string, now = new Date()): void {
-    this.db
-      .prepare(
-        "UPDATE title SET csfd_status = 'error', csfd_error = ?, csfd_updated_at = ? WHERE id = ?"
-      )
-      .run(error, now.toISOString(), id)
-  }
-
-  /** Vynutí nové načtení stránky ČSFD (tlačítko „Znovu načíst údaje“). */
-  expireCsfd(id: number): void {
-    this.db
-      .prepare('UPDATE title SET csfd_updated_at = NULL WHERE id = ? AND csfd_id IS NOT NULL')
-      .run(id)
-    this.db
-      .prepare("UPDATE title SET csfd_status = 'linked' WHERE id = ? AND csfd_status = 'error'")
-      .run(id)
   }
 
   setMatchStatus(

@@ -17,7 +17,7 @@ export const addedAt = (title: TitleItem): string =>
 export const playableFile = (files: CatalogFile[]): CatalogFile | undefined =>
   files.find((file) => file.available)
 
-export type SortKey = 'added' | 'name' | 'year'
+export type SortKey = 'added' | 'name' | 'year' | 'rating'
 
 export interface TitleFilters {
   query: string
@@ -52,6 +52,9 @@ export function filterTitles<T extends TitleItem>(titles: T[], filters: TitleFil
   return result.sort((a, b) => {
     if (filters.sort === 'name') return byName(a, b)
     if (filters.sort === 'year') return (b.year ?? 0) - (a.year ?? 0) || byName(a, b)
+    if (filters.sort === 'rating') {
+      return (b.imdb?.rating ?? -1) - (a.imdb?.rating ?? -1) || byName(a, b)
+    }
     return addedAt(b).localeCompare(addedAt(a)) || byName(a, b)
   })
 }
@@ -71,12 +74,10 @@ export function filterOptions(titles: TitleItem[]): { resolutions: string[]; tag
   }
 }
 
-/** Název k zobrazení: český název z TMDB, jinak z ČSFD, jinak z názvu souboru. */
-export const displayName = (title: TitleItem): string =>
-  title.metadata?.name || title.csfd?.name || title.name
+/** Název k zobrazení: český název z TMDB, jinak z názvu souboru. */
+export const displayName = (title: TitleItem): string => title.metadata?.name || title.name
 
-export const displayYear = (title: TitleItem): number | null =>
-  title.metadata?.year ?? title.csfd?.year ?? title.year
+export const displayYear = (title: TitleItem): number | null => title.metadata?.year ?? title.year
 
 export interface EpisodeView {
   season: number

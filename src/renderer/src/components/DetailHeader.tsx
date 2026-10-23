@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { ArrowLeft, ExternalLink, Link2, MonitorPlay, RefreshCw, SearchCheck } from 'lucide-react'
+import { ArrowLeft, ExternalLink, MonitorPlay, RefreshCw, SearchCheck } from 'lucide-react'
 import { useNavigate } from 'react-router'
+import { IMDB_TITLE_URL } from '../../../shared/metadata'
 import { displayName, displayYear, type TitleItem } from '../app/catalogData'
 import { placeholderStyle } from '../app/palette'
 import Artwork from './Artwork'
-import CsfdLinkDialog from './CsfdLinkDialog'
-import CsfdRating from './CsfdRating'
 import FixMatchDialog from './FixMatchDialog'
+import ImdbBadge from './ImdbBadge'
 
 interface DetailHeaderProps {
   title: TitleItem
@@ -23,7 +23,7 @@ const STATUS_TEXT: Record<string, string> = {
   error: 'Údaje z TMDB se nepodařilo načíst, zkusí se znovu.'
 }
 
-/** Horní část detailu filmu i seriálu: pozadí, plakát, logo/název, údaje z TMDB a ČSFD. */
+/** Horní část detailu filmu i seriálu: pozadí, plakát, logo/název, údaje z TMDB a IMDb. */
 export default function DetailHeader({
   title,
   meta,
@@ -31,26 +31,19 @@ export default function DetailHeader({
   children
 }: DetailHeaderProps): React.JSX.Element {
   const navigate = useNavigate()
-  const [dialog, setDialog] = useState<'fix' | 'csfd' | null>(null)
-  const { metadata, csfd } = title
+  const [fixing, setFixing] = useState(false)
+  const { metadata, imdb } = title
   const name = displayName(title)
   const original =
-    metadata?.originalName ??
-    csfd?.originalName ??
-    (title.kind === 'show' ? title.alternativeNames[0] : null)
-  // Žánry a země z ČSFD jsou česky a přesnější, jinak z TMDB.
-  const genres = csfd?.genres.length ? csfd.genres : (metadata?.genres ?? [])
-  const country = csfd?.countries[0] ?? metadata?.countries[0]
-  const allMeta = [displayYear(title), ...meta, ...genres.slice(0, 3), country]
+    metadata?.originalName ?? (title.kind === 'show' ? title.alternativeNames[0] : null)
+  const allMeta = [
+    displayYear(title),
+    ...meta,
+    ...(metadata?.genres.slice(0, 3) ?? []),
+    metadata?.countries[0]
+  ]
     .filter(Boolean)
     .join(' · ')
-  const plot = csfd?.plot ?? metadata?.overview
-  const plotSource = csfd?.plot ? 'ČSFD' : metadata?.overview ? 'TMDB' : null
-
-  const refresh = (): void => {
-    void window.kinoteka.metadata.refresh(title.id)
-    void window.kinoteka.csfd.refresh(title.id)
-  }
 
   return (
     <>
@@ -88,7 +81,7 @@ export default function DetailHeader({
           {original && <div className="orig">{original}</div>}
           <div className="meta">{allMeta}</div>
           <div className="ratings">
-            {csfd && <CsfdRating csfd={csfd} />}
+            {imdb && <ImdbBadge imdb={imdb} />}
             {metadata?.rating && (
               <span className="tmdb">
                 TMDB {metadata.rating.toLocaleString('cs-CZ', { maximumFractionDigits: 1 })}
@@ -109,41 +102,36 @@ export default function DetailHeader({
             <p className="notice">{STATUS_TEXT[title.matchStatus]}</p>
           )}
           {metadata?.tagline && <p className="tagline">„{metadata.tagline}“</p>}
-          {plot && (
-            <p className="plot">
-              {plot}
-              {plotSource && <span className="source"> ({plotSource})</span>}
-            </p>
-          )}
+          {metadata?.overview && <p className="plot">{metadata.overview}</p>}
 
           <div className="detail-links">
-            <button className="link" onClick={() => setDialog('fix')}>
+            <button className="link" onClick={() => setFixing(true)}>
               <SearchCheck size={15} /> Opravit shodu
             </button>
-            {(metadata || csfd) && (
-              <button className="link" onClick={refresh}>
+            {metadata && (
+              <button
+                className="link"
+                onClick={() => void window.kinoteka.metadata.refresh(title.id)}
+              >
                 <RefreshCw size={15} /> Znovu načíst údaje
               </button>
             )}
-            {csfd ? (
-              <a className="link" href={csfd.url} target="_blank" rel="noreferrer">
-                <ExternalLink size={15} /> ČSFD
+            {metadata?.imdbId && (
+              <a
+                className="link"
+                href={`${IMDB_TITLE_URL}${metadata.imdbId}/`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink size={15} /> IMDb
               </a>
-            ) : null}
-            <button className="link" onClick={() => setDialog('csfd')}>
-              <Link2 size={15} /> {csfd ? 'Změnit propojení s ČSFD' : 'Propojit s ČSFD'}
-            </button>
+            )}
             {metadata && (
               <a className="link" href={metadata.tmdbUrl} target="_blank" rel="noreferrer">
                 <ExternalLink size={15} /> TMDB
               </a>
             )}
           </div>
-          {title.csfdStatus === 'notfound' && (
-            <p className="muted small">
-              ČSFD se automaticky nenašlo – vlož odkaz přes „Propojit s ČSFD“.
-            </p>
-          )}
         </div>
       </div>
 
@@ -172,8 +160,7 @@ export default function DetailHeader({
         </section>
       )}
 
-      {dialog === 'fix' && <FixMatchDialog title={title} onClose={() => setDialog(null)} />}
-      {dialog === 'csfd' && <CsfdLinkDialog title={title} onClose={() => setDialog(null)} />}
+      {fixing && <FixMatchDialog title={title} onClose={() => setFixing(false)} />}
     </>
   )
 }

@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router'
 import { useAmbientPalette } from '../app/palette'
 import LibrarySettings from '../library/LibrarySettings'
-import CsfdSettings from '../library/CsfdSettings'
+import ImdbSettings from '../library/ImdbSettings'
 import MetadataSettings from '../library/MetadataSettings'
 import PlayerTest from '../library/PlayerTest'
 
@@ -9,7 +9,7 @@ type Section = 'knihovna' | 'metadata' | 'prehravac'
 
 const SECTIONS: [Section, string][] = [
   ['knihovna', 'Knihovna'],
-  ['metadata', 'Metadata (TMDB, ČSFD)'],
+  ['metadata', 'Metadata (TMDB, IMDb)'],
   ['prehravac', 'Přehrávač']
 ]
 
@@ -39,7 +39,7 @@ export default function SettingsPage(): React.JSX.Element {
           {section === 'metadata' && (
             <>
               <MetadataSettings />
-              <CsfdSettings />
+              <ImdbSettings />
             </>
           )}
           {section === 'prehravac' && <PlayerTest />}

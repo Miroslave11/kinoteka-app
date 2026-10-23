@@ -120,7 +120,8 @@ export class MetadataService extends EventEmitter<MetadataServiceEvents> {
   async refresh(titleId: number): Promise<void> {
     const request = this.catalog.titleForMetadata(titleId)
     if (!request) return
-    this.catalog.setMatchStatus(titleId, 'pending')
+    // Spárovaný titul se jen obnoví podle TMDB ID – ruční shoda zůstane zachovaná.
+    this.catalog.expireMetadata(titleId)
     this.emit('changed')
     await this.run()
   }
@@ -143,6 +144,17 @@ export class MetadataService extends EventEmitter<MetadataServiceEvents> {
 
   private async process(client: TmdbApi, request: MetadataRequest): Promise<void> {
     try {
+      // Už spárovaný titul (i s chybou při obnově) se načte podle TMDB ID, bez nového hledání.
+      if (request.tmdbId !== null && request.status !== 'pending') {
+        const metadata = await this.details(client, request.kind, request.tmdbId)
+        this.catalog.saveMetadata(
+          request.id,
+          metadata,
+          request.status === 'manual' ? 'manual' : 'matched'
+        )
+        this.emit('changed')
+        return
+      }
       const match = await this.findMatch(client, request)
       if (!match) {
         this.catalog.setMatchStatus(request.id, 'unmatched')

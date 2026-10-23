@@ -4,6 +4,7 @@
  */
 export const MOVIE_PRAZDNOTA = {
   id: 9001,
+  imdb_id: 'tt0000001',
   title: 'Prázdnota',
   original_title: 'The Void',
   release_date: '2020-03-12',
@@ -50,6 +51,7 @@ export const MOVIE_PRAZDNOTA = {
 
 export const SHOW_VIDIM_VAS = {
   id: 9100,
+  external_ids: { imdb_id: 'tt0000002' },
   name: 'Vidím vás',
   original_name: 'The Watcher',
   first_air_date: '2022-10-13',

@@ -26,8 +26,7 @@ export const IpcChannel = {
   MetadataApplyMatch: 'metadata:apply-match',
   MetadataRefresh: 'metadata:refresh',
 
-  CsfdEnabled: 'csfd:enabled',
-  CsfdSetEnabled: 'csfd:set-enabled',
-  CsfdLink: 'csfd:link',
-  CsfdRefresh: 'csfd:refresh'
+  ImdbStatus: 'imdb:status',
+  ImdbSetEnabled: 'imdb:set-enabled',
+  ImdbUpdateNow: 'imdb:update-now'
 } as const
