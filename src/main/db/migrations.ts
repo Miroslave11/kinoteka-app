@@ -181,5 +181,18 @@ export const MIGRATIONS: readonly string[] = [
     rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
     updated_at TEXT NOT NULL
   );
+  `,
+
+  // 12 – ruční zařazení souboru (film / díl seriálu), přepíše rozpoznání z názvu souboru
+  `
+  CREATE TABLE file_classification (
+    media_file_id INTEGER PRIMARY KEY REFERENCES media_file (id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('movie', 'episode')),
+    title TEXT NOT NULL,
+    year INTEGER,
+    season INTEGER,
+    episode INTEGER,
+    episode_title TEXT
+  );
   `
 ]

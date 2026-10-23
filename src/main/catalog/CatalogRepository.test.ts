@@ -95,3 +95,61 @@ describe('CatalogRepository', () => {
     expect(shows[0]!.episodeCount).toBe(3)
   })
 })
+
+describe('ruční zařazení souboru', () => {
+  it('soubor rozpoznaný jako film zařadí jako díl existujícího seriálu', () => {
+    addFile('Země gangů S01E01.mkv')
+    const odd = addFile('Puzzle.mkv')
+    catalog.rebuild()
+    expect(catalog.classification(odd)).toMatchObject({ manual: false, current: { kind: 'movie' } })
+    const showId = catalog.listShows()[0]!.id
+
+    catalog.setClassification(odd, {
+      kind: 'episode',
+      title: 'Země gangů',
+      year: null,
+      season: 1,
+      episode: 2,
+      episodeTitle: 'Puzzle'
+    })
+    catalog.rebuild()
+
+    expect(catalog.listMovies()).toEqual([])
+    const [show] = catalog.listShows()
+    expect(show!.id).toBe(showId)
+    expect(show!.seasons[0]!.episodes.map((e) => [e.episode, e.name])).toEqual([
+      [1, null],
+      [2, 'Puzzle']
+    ])
+    expect(catalog.titleOfFile(odd)).toEqual({ titleId: showId, kind: 'show' })
+    expect(catalog.fileDetails(odd)!.classification).toMatchObject({
+      manual: true,
+      current: { kind: 'episode', season: 1, episode: 2 }
+    })
+  })
+
+  it('díl zařadí jako film a ruční zařazení přežije další sken', () => {
+    const file = addFile('Pilot S01E01 (2024).mkv')
+    catalog.rebuild()
+    expect(catalog.listShows()).toHaveLength(1)
+
+    catalog.setClassification(file, { kind: 'movie', title: 'Pilot', year: 2024 })
+    catalog.rebuild()
+    catalog.rebuild()
+    expect(catalog.listShows()).toEqual([])
+    expect(catalog.listMovies()).toMatchObject([{ name: 'Pilot', year: 2024 }])
+  })
+
+  it('vrácení automatického rozpoznání', () => {
+    const file = addFile('Den odhalení (2026).mkv')
+    catalog.rebuild()
+    catalog.setClassification(file, { kind: 'movie', title: 'Jiný název', year: 2020 })
+    catalog.rebuild()
+    expect(catalog.listMovies()[0]!.name).toBe('Jiný název')
+
+    catalog.setClassification(file, null)
+    catalog.rebuild()
+    expect(catalog.listMovies()).toMatchObject([{ name: 'Den odhalení', year: 2026 }])
+    expect(catalog.classification(file)!.manual).toBe(false)
+  })
+})

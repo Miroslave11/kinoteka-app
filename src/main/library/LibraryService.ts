@@ -67,6 +67,11 @@ export class LibraryService extends EventEmitter<LibraryServiceEvents> {
     return folder
   }
 
+  /** Změna zařazení souborů (ručně) – přestavba katalogu a oznámení oknům. */
+  catalogChanged(): void {
+    this.emit('changed')
+  }
+
   /** Soubory smazané z disku aplikací – z knihovny hned, bez čekání na sken. */
   filesRemoved(ids: number[]): void {
     this.repository.removeFiles(ids)

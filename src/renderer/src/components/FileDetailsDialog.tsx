@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { Pencil, X } from 'lucide-react'
+import { useNavigate } from 'react-router'
 import type { FileDetails } from '../../../shared/catalog'
+import { describeClassification } from '../../../shared/classification'
 import { languageName } from '../../../shared/languages'
 import { formatSize } from '../../../shared/library'
 import { audioLabel, formatBitrate, resolutionLabel } from '../../../shared/mediaInfo'
 import { formatTime } from '../../../shared/player'
+import { useApp } from '../app/AppContext'
+import ClassifyForm from './ClassifyForm'
 
 interface Props {
   fileId: number
@@ -14,6 +18,9 @@ interface Props {
 /** Panel „Vlastnosti souboru“ – technické údaje z ffprobe. */
 export default function FileDetailsDialog({ fileId, onClose }: Props): React.JSX.Element {
   const [details, setDetails] = useState<FileDetails | null | undefined>(undefined)
+  const [editing, setEditing] = useState(false)
+  const { shows } = useApp()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const { catalog, library } = window.kinoteka
@@ -66,6 +73,21 @@ export default function FileDetailsDialog({ fileId, onClose }: Props): React.JSX
               {info &&
                 ` · ${info.container} · ${formatTime(info.durationSec)} · ${formatBitrate(info.bitrate)}`}
             </dd>
+
+            {details.classification && (
+              <>
+                <dt>Zařazení</dt>
+                <dd className="track">
+                  {describeClassification(details.classification.current)}
+                  {details.classification.manual && <span className="badge">ručně</span>}
+                  {!editing && (
+                    <button className="link" onClick={() => setEditing(true)}>
+                      <Pencil size={13} /> Upravit zařazení
+                    </button>
+                  )}
+                </dd>
+              </>
+            )}
 
             {details.pending && (
               <>
@@ -126,6 +148,25 @@ export default function FileDetailsDialog({ fileId, onClose }: Props): React.JSX
               </>
             )}
           </dl>
+        )}
+        {details?.classification && editing && (
+          <ClassifyForm
+            fileId={fileId}
+            current={details.classification.current}
+            manual={details.classification.manual}
+            showNames={[...new Set(shows.map((show) => show.name))].sort((a, b) =>
+              a.localeCompare(b, 'cs')
+            )}
+            onCancel={() => setEditing(false)}
+            onSaved={(result) => {
+              setEditing(false)
+              if (!result) return
+              onClose()
+              navigate(
+                result.kind === 'movie' ? `/filmy/${result.titleId}` : `/serialy/${result.titleId}`
+              )
+            }}
+          />
         )}
       </div>
     </div>

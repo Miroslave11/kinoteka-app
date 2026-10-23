@@ -48,7 +48,9 @@ const api: KinotekaApi = {
   catalog: {
     listMovies: () => ipcRenderer.invoke(IpcChannel.CatalogListMovies),
     listShows: () => ipcRenderer.invoke(IpcChannel.CatalogListShows),
-    getFileDetails: (fileId) => ipcRenderer.invoke(IpcChannel.CatalogFileDetails, fileId)
+    getFileDetails: (fileId) => ipcRenderer.invoke(IpcChannel.CatalogFileDetails, fileId),
+    classify: (fileId, classification) =>
+      ipcRenderer.invoke(IpcChannel.CatalogClassify, fileId, classification)
   },
   metadata: {
     keyStatus: () => ipcRenderer.invoke(IpcChannel.MetadataKeyStatus),
