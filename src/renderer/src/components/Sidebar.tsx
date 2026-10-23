@@ -22,9 +22,9 @@ export default function Sidebar(): React.JSX.Element {
         <NavLink to="/serialy" className={link}>
           <Tv size={18} /> Seriály <span className="count">{shows.length}</span>
         </NavLink>
-        <span className="nav-disabled" title="Přibude v přírůstku 12">
-          <BookOpen size={18} /> Deník <span className="count">brzy</span>
-        </span>
+        <NavLink to="/denik" className={link}>
+          <BookOpen size={18} /> Deník
+        </NavLink>
       </nav>
 
       <div className="side-sep">Knihovny</div>

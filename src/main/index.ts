@@ -15,6 +15,8 @@ import {
 import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
 import { registerImdbIpc } from './imdb/imdbIpc'
+import { registerJournalIpc } from './journal/journalIpc'
+import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
 import { openDatabase } from './db/database'
 import { makeClip, posterPixels } from './media/ffmpeg'
@@ -315,6 +317,7 @@ void app.whenReady().then(() => {
   void metadata.run()
   registerMetadataIpc(metadata)
   registerImdbIpc(imdb)
+  registerJournalIpc(new JournalRepository(db), () => broadcast(IpcChannel.LibraryChanged))
   void imdb.run()
   void previews?.run()
   ipcMain.handle(IpcChannel.AudioGetSettings, () => loadAudioSettings(settings))

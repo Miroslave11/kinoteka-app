@@ -36,6 +36,12 @@ export const IpcChannel = {
   SubtitlesGetSettings: 'subtitles:get-settings',
   SubtitlesSaveSettings: 'subtitles:save-settings',
 
+  JournalList: 'journal:list',
+  JournalAddManual: 'journal:add-manual',
+  JournalUpdate: 'journal:update',
+  JournalRemove: 'journal:remove',
+  JournalSetRating: 'journal:set-rating',
+
   PreviewStatus: 'preview:status',
   PreviewSetClipsEnabled: 'preview:set-clips-enabled'
 } as const

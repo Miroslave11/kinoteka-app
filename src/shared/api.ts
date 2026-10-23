@@ -15,6 +15,7 @@ import type {
 } from './metadata'
 import type { PreviewStatus } from './posterPalette'
 import type { AudioDevice, AudioSettings } from './audio'
+import type { JournalEntry, ManualEntry } from './journal'
 import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
@@ -49,6 +50,15 @@ export interface KinotekaApi {
     getSettings(): Promise<SubtitleSettings>
     /** Uloží nastavení titulků (projeví se při dalším spuštění přehrávání). */
     saveSettings(value: SubtitleSettings): Promise<SubtitleSettings>
+  }
+  journal: {
+    list(): Promise<JournalEntry[]>
+    /** „Viděl jsem“ – vrací počet nových záznamů. */
+    addManual(entry: ManualEntry): Promise<number>
+    update(id: number, patch: { watchedAt?: string; note?: string | null }): Promise<void>
+    remove(id: number): Promise<void>
+    /** Moje hodnocení titulu 1–5; null = zrušit. */
+    setRating(titleId: number, rating: number | null): Promise<void>
   }
   catalog: {
     /** Filmy rozpoznané z názvů souborů. Změny hlásí `library.onChanged`. */

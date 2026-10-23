@@ -8,6 +8,7 @@ import Artwork from './Artwork'
 import BackgroundClips from './BackgroundClips'
 import FixMatchDialog from './FixMatchDialog'
 import ImdbBadge from './ImdbBadge'
+import Stars from './Stars'
 
 interface DetailHeaderProps {
   title: TitleItem
@@ -90,6 +91,14 @@ export default function DetailHeader({
               </span>
             )}
             {badges}
+            <span className="my-rating">
+              Moje hodnocení
+              <Stars
+                value={title.myRating}
+                size={16}
+                onChange={(rating) => void window.kinoteka.journal.setRating(title.id, rating)}
+              />
+            </span>
           </div>
           <div className="actions">
             {children}

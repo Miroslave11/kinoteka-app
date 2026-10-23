@@ -1,18 +1,21 @@
-import { Info, Play } from 'lucide-react'
+import { useState } from 'react'
+import { CircleCheck, Info, Play } from 'lucide-react'
 import { useParams } from 'react-router'
 import { formatSize } from '../../../shared/library'
 import { canResume, remainingText } from '../../../shared/playback'
 import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
-import { playableFile, watchedTitle, type TitleItem } from '../app/catalogData'
+import { displayName, playableFile, watchedTitle, type TitleItem } from '../app/catalogData'
 import { titlePalette, useAmbientPalette } from '../app/palette'
 import DetailHeader from '../components/DetailHeader'
 import MediaBadges from '../components/MediaBadges'
+import WatchedDialog from '../components/WatchedDialog'
 
 export default function MovieDetailPage(): React.JSX.Element {
   const { id } = useParams()
   const { movies, loading, play, showDetails } = useApp()
   const movie = movies.find((m) => m.id === Number(id))
+  const [marking, setMarking] = useState(false)
   useAmbientPalette(movie ? titlePalette(movie) : null)
 
   if (!movie) {
@@ -44,12 +47,21 @@ export default function MovieDetailPage(): React.JSX.Element {
         <button className="btn primary" disabled={!file} onClick={() => file && void play(file.id)}>
           <Play size={18} fill="currentColor" /> {file ? 'Přehrát' : 'Soubor nedostupný'}
         </button>
+        <button className="btn" onClick={() => setMarking(true)}>
+          <CircleCheck size={18} /> Viděl jsem
+        </button>
         {first && (
           <button className="btn" onClick={() => showDetails(first.id)}>
             <Info size={18} /> Vlastnosti souboru
           </button>
         )}
       </DetailHeader>
+      {marking && (
+        <WatchedDialog
+          target={{ titleId: movie.id, episodeIds: [], label: displayName(title) }}
+          onClose={() => setMarking(false)}
+        />
+      )}
 
       {movie.files.length > 1 && (
         <section className="d-section card">

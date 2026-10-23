@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Check, Info, Play } from 'lucide-react'
+import { Check, CircleCheck, Info, Play } from 'lucide-react'
 import { useParams } from 'react-router'
 import { canResume, episodeCode, progressRatio, remainingText } from '../../../shared/playback'
 import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
 import {
+  displayName,
   mergeSeasons,
   playableFile,
   showFiles,
@@ -17,12 +18,14 @@ import { placeholderStyle, titlePalette, useAmbientPalette } from '../app/palett
 import Artwork from '../components/Artwork'
 import DetailHeader from '../components/DetailHeader'
 import MediaBadges from '../components/MediaBadges'
+import WatchedDialog from '../components/WatchedDialog'
 
 export default function ShowDetailPage(): React.JSX.Element {
   const { id } = useParams()
   const { shows, loading, play } = useApp()
   const show = shows.find((s) => s.id === Number(id))
   const [seasonNumber, setSeasonNumber] = useState<number | null>(null)
+  const [marking, setMarking] = useState(false)
   useAmbientPalette(show ? titlePalette(show) : null)
 
   if (!show) {
@@ -44,6 +47,10 @@ export default function ShowDetailPage(): React.JSX.Element {
   const nextCode = next && episodeCode(next.episode.season, next.episode.episode)
   const tags = [...new Set(showFiles(show).flatMap((f) => f.tags))]
   const total = seasons.reduce((sum, s) => sum + s.episodes.length, 0)
+  // Série jako zhlédnutá = dosud nezhlédnuté díly na disku (když jsou všechny zhlédnuté, znovu všechny).
+  const onDisk = (season?.episodes ?? []).flatMap((e) => (e.disk ? [e.disk] : []))
+  const unwatched = onDisk.filter((e) => e.watch.watchCount === 0)
+  const seasonEpisodes = (unwatched.length > 0 ? unwatched : onDisk).map((e) => e.id)
 
   return (
     <div className="detail-page">
@@ -92,23 +99,41 @@ export default function ShowDetailPage(): React.JSX.Element {
               </span>
             </button>
           ))}
+          {seasonEpisodes.length > 0 && (
+            <button className="btn sm season-watched" onClick={() => setMarking(true)}>
+              <CircleCheck size={16} /> Označit sérii jako zhlédnutou
+            </button>
+          )}
         </div>
         {season?.episodes.map((episode) => (
           <EpisodeRow
             key={`${episode.season}x${episode.episode}`}
+            titleId={show.id}
             showName={show.name}
             episode={episode}
           />
         ))}
       </section>
+      {marking && season && (
+        <WatchedDialog
+          target={{
+            titleId: show.id,
+            episodeIds: seasonEpisodes,
+            label: `${displayName(title)} · ${season.name}`
+          }}
+          onClose={() => setMarking(false)}
+        />
+      )}
     </div>
   )
 }
 
 function EpisodeRow({
+  titleId,
   showName,
   episode
 }: {
+  titleId: number
   showName: string
   episode: EpisodeView
 }): React.JSX.Element {
@@ -157,10 +182,27 @@ function EpisodeRow({
       <div className="ep-side">
         {first?.summary && <span>{formatTime(first.summary.durationSec)}</span>}
         {progress && <span className="accent">{remainingText(progress)}</span>}
-        {watch && watch.watchCount > 0 && (
+        {watch && watch.watchCount > 0 ? (
           <span className="ok-dot" title={watchedTitle(watch)}>
             <Check size={15} strokeWidth={3} />
           </span>
+        ) : (
+          episode.disk && (
+            <button
+              className="icon-btn xs"
+              title="Označit jako zhlédnuté (zapíše se do deníku s dnešním datem)"
+              onClick={() =>
+                void window.kinoteka.journal.addManual({
+                  titleId,
+                  episodeIds: [episode.disk!.id],
+                  watchedAt: new Date().toISOString(),
+                  note: null
+                })
+              }
+            >
+              <CircleCheck size={15} />
+            </button>
+          )
         )}
         {first && (
           <button

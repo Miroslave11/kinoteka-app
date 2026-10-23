@@ -1826,3 +1826,226 @@ p.info-chip {
 .form-grid.sub-style {
   margin-bottom: 16px;
 }
+
+/* ---------- deník a hodnocení ---------- */
+.stars {
+  display: inline-flex;
+  gap: 2px;
+  color: #3b3f48;
+}
+
+.stars .on {
+  color: var(--accent);
+}
+
+.stars button {
+  display: grid;
+  padding: 1px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.stars.is-editable button.on {
+  color: var(--accent);
+}
+
+.stars.is-editable button:hover {
+  transform: scale(1.15);
+}
+
+.my-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid var(--line);
+}
+
+.cap .my-stars {
+  margin-left: 6px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.stat {
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid var(--line);
+}
+
+.stat b {
+  display: block;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.stat span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.journal .toolbar .divider {
+  width: 1px;
+  height: 22px;
+  background: var(--line);
+}
+
+.journal .month {
+  margin: 26px 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.h-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 190px 110px 76px;
+  gap: 18px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+}
+
+.h-row:hover {
+  background: rgb(255 255 255 / 0.04);
+}
+
+.h-poster {
+  width: 56px;
+  aspect-ratio: 2 / 3;
+  border-radius: 6px;
+  box-shadow: none;
+  padding: 0;
+}
+
+.h-main {
+  min-width: 0;
+}
+
+.h-title {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.h-title:disabled {
+  cursor: default;
+}
+
+.h-row .note {
+  margin-top: 3px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.h-row .when {
+  font-size: 13px;
+  color: #cfd3da;
+}
+
+.h-row .when span {
+  display: block;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.h-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.btn.danger {
+  background: #d9534f;
+  color: #fff;
+}
+
+.watched-dialog {
+  width: min(560px, 100%);
+}
+
+.watched-dialog .form-grid {
+  grid-template-columns: 110px minmax(0, 1fr);
+}
+
+.watched-dialog textarea {
+  resize: vertical;
+  font: inherit;
+  color: inherit;
+}
+
+.watched-pick {
+  margin-bottom: 16px;
+}
+
+.watched-pick > .field {
+  width: 100%;
+}
+
+.pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.pick:hover,
+.pick.on {
+  background: rgb(255 255 255 / 0.08);
+}
+
+.pick small {
+  margin-left: auto;
+  color: var(--dim);
+}
+
+.pick-episodes {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 12px;
+}
+
+.season-watched {
+  margin-left: auto;
+}
