@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  AudioLines,
   Maximize,
   Minimize,
   Pause,
@@ -18,11 +19,13 @@ import {
   type PlayerState
 } from '../../../shared/player'
 import SeekBar from './SeekBar'
+import TrackPanel from './TrackPanel'
 import { useIdle } from './useIdle'
 
 const HIDE_CONTROLS_AFTER_MS = 2500
 /** Po konci dílu se další díl spustí sám po tolika sekundách. */
 const NEXT_COUNTDOWN_SECONDS = 10
+const NOTICE_MS = 10_000
 /** Odstup, podle kterého se rozliší jedno kliknutí (pauza) od dvojkliku (celá obrazovka). */
 const DOUBLE_CLICK_MS = 250
 
@@ -37,14 +40,24 @@ function endsAt(state: PlayerState): string {
 export default function PlayerOverlay(): React.JSX.Element {
   const [state, setState] = useState<PlayerState>(INITIAL_PLAYER_STATE)
   const [overControls, setOverControls] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
   const [idle, wake] = useIdle(
     HIDE_CONTROLS_AFTER_MS,
-    !state.paused && !state.ended && !overControls
+    !state.paused && !state.ended && !overControls && !panelOpen
   )
   const clickTimer = useRef<number | undefined>(undefined)
   const [countdown, setCountdown] = useState<number | null>(null)
 
   useEffect(() => window.kinoteka.player.onState(setState), [])
+
+  // Upozornění z přehrávače (např. přechod na PCM) se na chvíli ukáže nahoře.
+  const [notice, setNotice] = useState<string | null>(null)
+  useEffect(() => {
+    setNotice(state.notice)
+    if (!state.notice) return
+    const timer = window.setTimeout(() => setNotice(null), NOTICE_MS)
+    return () => window.clearTimeout(timer)
+  }, [state.notice])
 
   // Konec dílu: odpočet do dalšího dílu (zruší ho návrat, nové přehrání nebo „Zrušit“).
   const offerNext = state.ended && state.next !== null
@@ -67,6 +80,10 @@ export default function PlayerOverlay(): React.JSX.Element {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       wake()
+      if (event.key === 'Escape' && panelOpen) {
+        event.preventDefault()
+        return setPanelOpen(false)
+      }
       const command = keyToCommand(event, state)
       if (command) {
         event.preventDefault()
@@ -75,10 +92,12 @@ export default function PlayerOverlay(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [state, wake])
+  }, [state, wake, panelOpen])
 
   const onSurfaceClick = (): void => {
     window.clearTimeout(clickTimer.current)
+    // Klik mimo otevřený panel stop ho jen zavře.
+    if (panelOpen) return setPanelOpen(false)
     clickTimer.current = window.setTimeout(() => send({ type: 'toggle-pause' }), DOUBLE_CLICK_MS)
   }
   const onSurfaceDoubleClick = (): void => {
@@ -128,6 +147,12 @@ export default function PlayerOverlay(): React.JSX.Element {
         )}
       </header>
 
+      {notice && (
+        <div className="notice-toast" {...controlsProps}>
+          {notice}
+        </div>
+      )}
+
       {state.ended && (
         <div className="ended" {...controlsProps}>
           <div className="ended-title">{state.next ? 'Konec dílu' : 'Konec'}</div>
@@ -163,6 +188,12 @@ export default function PlayerOverlay(): React.JSX.Element {
       )}
 
       <footer className="bottom" {...controlsProps}>
+        {panelOpen && (
+          <TrackPanel
+            tracks={state.audioTracks}
+            onSelect={(id) => send({ type: 'set-audio-track', id })}
+          />
+        )}
         <SeekBar
           position={state.position}
           duration={state.duration}
@@ -201,6 +232,13 @@ export default function PlayerOverlay(): React.JSX.Element {
             </button>
           </div>
           <div className="right">
+            <button
+              className={`icon-btn ${panelOpen ? 'is-on' : ''}`}
+              title="Zvukové stopy (A)"
+              onClick={() => setPanelOpen((open) => !open)}
+            >
+              <AudioLines size={20} />
+            </button>
             {state.next && (
               <button
                 className="icon-btn"
@@ -269,6 +307,14 @@ function keyToCommand(event: KeyboardEvent, state: PlayerState): PlayerCommand |
     case 'f':
     case 'F':
       return { type: 'toggle-fullscreen' }
+    case 'a':
+    case 'A': {
+      // Přepne na další zvukovou stopu dokola.
+      const tracks = state.audioTracks
+      if (tracks.length < 2) return null
+      const current = tracks.findIndex((t) => t.selected)
+      return { type: 'set-audio-track', id: tracks[(current + 1) % tracks.length]!.id }
+    }
     case 'n':
     case 'N':
       return state.next ? { type: 'play-next' } : null

@@ -150,5 +150,16 @@ export const MIGRATIONS: readonly string[] = [
     source TEXT NOT NULL DEFAULT 'auto'
   );
   CREATE INDEX watch_event_title ON watch_event (title_id);
+  `,
+
+  // 9 – zapamatovaná volba zvukové stopy (a v přírůstku 11 titulků) pro film nebo celý seriál
+  `
+  CREATE TABLE title_track_pref (
+    title_id INTEGER NOT NULL REFERENCES title (id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('audio', 'sub')),
+    language TEXT,
+    track_title TEXT,
+    PRIMARY KEY (title_id, kind)
+  );
   `
 ]

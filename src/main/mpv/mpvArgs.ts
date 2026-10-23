@@ -7,6 +7,12 @@ export interface MpvLaunchOptions {
   windowId: string
   ipcPath: string
   passthroughCodecs: readonly string[]
+  /** Zvukové zařízení mpv (`wasapi/{…}`); výchozí „auto“. */
+  audioDevice?: string
+  /** Hodnota `--audio-channels` při dekódování (PCM); výchozí „auto“. */
+  audioChannels?: string
+  /** Kódy jazyků pro výchozí výběr zvukové stopy, jak je píší kontejnery. */
+  audioLanguages?: readonly string[]
   logFile?: string
   /** Začít od této pozice (s) – pokračování v rozkoukaném filmu. */
   startSec?: number
@@ -38,8 +44,9 @@ export function buildMpvArgs(options: MpvLaunchOptions): string[] {
     // Zvuk: WASAPI, Dolby/DTS jako bitstream, jinak vícekanálové PCM podle zařízení.
     '--ao=wasapi',
     `--audio-spdif=${options.passthroughCodecs.join(',')}`,
-    '--audio-channels=auto',
-    '--alang=cze,ces,cs,eng,en',
+    `--audio-device=${options.audioDevice ?? 'auto'}`,
+    `--audio-channels=${options.audioChannels ?? 'auto'}`,
+    `--alang=${(options.audioLanguages ?? ['cze', 'ces', 'cs', 'eng', 'en']).join(',')}`,
     '--slang=cze,ces,cs,eng,en',
     '--sub-auto=fuzzy'
   ]

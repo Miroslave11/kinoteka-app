@@ -74,7 +74,13 @@ export class MpvClient extends EventEmitter<MpvClientEvents> {
     while (newline >= 0) {
       const line = this.buffer.slice(0, newline).trim()
       this.buffer = this.buffer.slice(newline + 1)
-      if (line) this.handleMessage(line)
+      // Chyba v jednom posluchači nesmí zastavit zpracování dalších zpráv (ty by zůstaly
+      // v bufferu až do příští dávky dat – a ta při zaseknutém mpv nemusí přijít).
+      try {
+        if (line) this.handleMessage(line)
+      } catch (error) {
+        console.error('Chyba při zpracování zprávy mpv:', error)
+      }
       newline = this.buffer.indexOf('\n')
     }
   }

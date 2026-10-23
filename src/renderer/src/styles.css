@@ -1733,3 +1733,53 @@ p.info-chip {
 .ep-side .accent {
   color: var(--accent);
 }
+
+/* ---------- Nastavení → Zvuk ---------- */
+.field {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid var(--line);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 420px);
+  gap: 12px 16px;
+  align-items: center;
+}
+
+.form-grid label {
+  color: var(--muted);
+}
+
+.lang-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  counter-reset: lang;
+}
+
+.lang-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 420px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.05);
+  counter-increment: lang;
+}
+
+.lang-list li span {
+  flex: 1;
+  font-weight: 600;
+}
+
+.lang-list li span::before {
+  content: counter(lang) '. ';
+  color: var(--dim);
+}

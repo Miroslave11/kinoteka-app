@@ -112,6 +112,18 @@ describe('PlaybackRepository', () => {
     expect(playback.nextEpisode(playback.itemForFile(s2)!)).toBeUndefined()
   })
 
+  it('pamatuje si zvukovou stopu pro celý seriál a přepíše ji novou volbou', () => {
+    const file = addFile('Země gangů S01E01.mkv')
+    catalog.rebuild()
+    const { titleId } = playback.itemForFile(file)!
+    expect(playback.trackPreference(titleId, 'audio')).toBeNull()
+
+    playback.saveTrackPreference(titleId, 'audio', { language: 'en', title: null })
+    playback.saveTrackPreference(titleId, 'audio', { language: 'cs', title: 'Dabing' })
+    expect(playback.trackPreference(titleId, 'audio')).toEqual({ language: 'cs', title: 'Dabing' })
+    expect(playback.trackPreference(titleId, 'sub')).toBeNull()
+  })
+
   it('zhlédnutý titul zůstane po smazání souboru v databázi a vrátí se s ním', () => {
     const file = addFile('Den odhalení (2026).mkv')
     catalog.rebuild()

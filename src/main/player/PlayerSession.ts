@@ -2,6 +2,12 @@ import { app, BaseWindow, BrowserWindow } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
+import {
+  audioTracksFromMpv,
+  chooseAudioTrack,
+  type AudioTrack,
+  type TrackPreference
+} from '../../shared/audio'
 import { IpcChannel } from '../../shared/ipc'
 import {
   describeAudioOutput,
@@ -12,13 +18,15 @@ import {
 } from '../../shared/player'
 import { mpvExecutablePath } from '../mpv/binary'
 import { connectToMpv, type MpvClient } from '../mpv/MpvClient'
-import { buildMpvArgs, DEFAULT_PASSTHROUGH_CODECS, windowHandleToId } from '../mpv/mpvArgs'
+import { buildMpvArgs, windowHandleToId, type MpvLaunchOptions } from '../mpv/mpvArgs'
 import { hardenWebContents, loadRendererPage, preloadPath } from '../rendererPage'
 import { createOverlayWindowOptions, createVideoWindowOptions } from '../windowOptions'
 
 /** Pozice se do overlaye posílá nejvýš 4× za sekundu, ostatní změny hned. */
 const POSITION_UPDATE_MS = 250
 const QUIT_TIMEOUT_MS = 2000
+/** Za jak dlouho po spuštění souboru se kontroluje, jestli se přehrávání rozběhlo. */
+const STALL_CHECK_MS = 5000
 
 const OBSERVED_PROPERTIES = [
   'pause',
@@ -33,7 +41,8 @@ const OBSERVED_PROPERTIES = [
   'audio-out-params',
   'video-format',
   'video-params',
-  'path'
+  'path',
+  'track-list'
 ]
 
 const BOUNDS_EVENTS = [
@@ -56,11 +65,20 @@ export interface PlayerSessionOptions {
   startSec?: number
   /** Popis dalšího dílu pro tlačítko „Další díl“. */
   next?: string | null
+  /** Volby zvuku pro mpv (passthrough, zařízení, kanály, jazyky). */
+  audio: Pick<
+    MpvLaunchOptions,
+    'passthroughCodecs' | 'audioDevice' | 'audioChannels' | 'audioLanguages'
+  >
+  /** Jak vybrat zvukovou stopu po načtení souboru. */
+  audioChoice?: AudioChoice
   logFile?: string
   /** Pozice a délka právě hraného souboru (několikrát za sekundu). */
   onProgress?: (position: number, duration: number) => void
   /** Uživatel chce další díl – volající pak zavolá `load()`. */
   onNext?: () => void
+  /** Uživatel ručně vybral zvukovou stopu (zapamatuje se pro titul). */
+  onAudioTrackChosen?: (track: AudioTrack) => void
   onEnd: (info: PlayerClosedInfo) => void
 }
 
@@ -69,6 +87,13 @@ export interface LoadOptions {
   title: string
   startSec?: number
   next: string | null
+  audioChoice?: AudioChoice
+}
+
+/** Zapamatovaná stopa pro titul a preferované jazyky (ISO 639-1). */
+export interface AudioChoice {
+  remembered: TrackPreference | null
+  languages: string[]
 }
 
 const asNumber = (value: unknown): number =>
@@ -99,6 +124,14 @@ export class PlayerSession {
   /** Po `load()` až do změny `path` chodí ještě události předchozího souboru. */
   private switching = false
   private fixedTitle: string | undefined
+  private audioChoice: AudioChoice | undefined
+  /** Stopa pro aktuální soubor už je vybraná (podle preferencí nebo uživatelem). */
+  private audioChosen = false
+  /** Hlídání zaseknutí po spuštění souboru (viz `checkStall`). */
+  private stallTimer: NodeJS.Timeout | null = null
+  private firstPosition: number | null = null
+  private advanced = false
+  private pcmFallback = false
   private readonly cleanups: (() => void)[] = []
 
   private constructor(
@@ -110,6 +143,7 @@ export class PlayerSession {
     private readonly options: PlayerSessionOptions
   ) {
     this.fixedTitle = options.title
+    this.audioChoice = options.audioChoice
     this.state = {
       ...INITIAL_PLAYER_STATE,
       title: options.title ?? basename(options.file),
@@ -136,7 +170,7 @@ export class PlayerSession {
       file: options.file,
       windowId: windowHandleToId(videoWindow.getNativeWindowHandle()),
       ipcPath,
-      passthroughCodecs: DEFAULT_PASSTHROUGH_CODECS,
+      ...options.audio,
       logFile: options.logFile,
       startSec: options.startSec,
       extraArgs: app.isPackaged
@@ -204,6 +238,13 @@ export class PlayerSession {
         return this.close()
       case 'play-next':
         return this.options.onNext?.()
+      case 'set-audio-track': {
+        const track = this.state.audioTracks.find((t) => t.id === command.id)
+        if (!track) return
+        this.audioChosen = true
+        run(this.client.setProperty('aid', command.id))
+        return this.options.onAudioTrackChosen?.(track)
+      }
     }
   }
 
@@ -212,12 +253,15 @@ export class PlayerSession {
     if (this.finished) return
     this.switching = true
     this.fixedTitle = options.title
+    this.audioChoice = options.audioChoice
+    this.audioChosen = false
     this.update({
       title: options.title,
       next: options.next,
       position: 0,
       duration: 0,
-      ended: false
+      ended: false,
+      audioTracks: []
     })
     // `start` platí pro další načtený soubor; na konci dílu je mpv pozastavené (keep-open).
     void this.client
@@ -225,6 +269,36 @@ export class PlayerSession {
       .then(() => this.client.command('loadfile', options.file, 'replace'))
       .then(() => this.client.setProperty('pause', false))
       .catch(() => undefined)
+    this.armStallCheck()
+  }
+
+  private armStallCheck(): void {
+    this.firstPosition = null
+    this.advanced = false
+    if (this.stallTimer) clearTimeout(this.stallTimer)
+    this.stallTimer = setTimeout(() => this.checkStall(), STALL_CHECK_MS)
+  }
+
+  /**
+   * Když zařízení passthrough neumí (např. reproduktory notebooku), mpv po neúspěšném pokusu
+   * o bitstream zůstane stát na prvním snímku místo přechodu na PCM. Pozná se to tak,
+   * že se pozice nehýbe a zvukový výstup se nespustil – pak se passthrough vypne
+   * a výstup znovu načte (do konce přehrávání).
+   */
+  private checkStall(): void {
+    this.stallTimer = null
+    if (this.finished || this.advanced || this.pcmFallback || this.state.paused) return
+    if (this.options.audio.passthroughCodecs.length === 0 || this.audio.outputFormat) return
+    if (this.state.audioTracks.length === 0) return
+    this.pcmFallback = true
+    void this.client
+      .setProperty('audio-spdif', '')
+      .then(() => this.client.command('ao-reload'))
+      .catch(() => undefined)
+    this.update({
+      notice:
+        'Zvukové zařízení neumí passthrough – zvuk teď dekóduje počítač (PCM). Natrvalo to změníš v Nastavení → Zvuk.'
+    })
   }
 
   /** Požádá mpv o ukončení; když nezareaguje, ukončí ho natvrdo. */
@@ -257,6 +331,7 @@ export class PlayerSession {
     void loadRendererPage(this.overlay, 'overlay')
 
     await Promise.all(OBSERVED_PROPERTIES.map((name) => this.client.observe(name)))
+    this.armStallCheck()
   }
 
   private listenToVideoWindow(): void {
@@ -297,6 +372,8 @@ export class PlayerSession {
       case 'time-pos':
         // Při ukončení nebo výměně souboru mpv hlásí „žádná pozice“ – ta se nesmí uložit jako 0.
         if (typeof value !== 'number' || this.switching) return
+        if (this.firstPosition === null) this.firstPosition = value
+        else if (Math.abs(value - this.firstPosition) > 0.3) this.advanced = true
         this.update({ position: value }, true)
         return this.options.onProgress?.(value, this.state.duration)
       case 'duration':
@@ -309,6 +386,9 @@ export class PlayerSession {
       case 'eof-reached':
         if (this.switching) return
         return this.update({ ended: value === true })
+      case 'track-list':
+        if (this.switching) return
+        return this.onTracks(audioTracksFromMpv(value))
       case 'media-title':
         if (!this.fixedTitle && typeof value === 'string' && value) this.update({ title: value })
         return
@@ -327,6 +407,18 @@ export class PlayerSession {
       case 'video-params':
         this.video.params = value
         return this.update({ video: this.describeVideo() })
+    }
+  }
+
+  /** Po načtení souboru jednou vybere stopu podle zapamatované volby a jazyků. */
+  private onTracks(tracks: AudioTrack[]): void {
+    this.update({ audioTracks: tracks })
+    if (this.audioChosen || tracks.length === 0 || !this.audioChoice) return
+    this.audioChosen = true
+    const { remembered, languages } = this.audioChoice
+    const id = chooseAudioTrack(tracks, remembered, languages)
+    if (id !== null && !tracks.find((t) => t.id === id)?.selected) {
+      this.client.setProperty('aid', id).catch(() => undefined)
     }
   }
 
@@ -361,6 +453,7 @@ export class PlayerSession {
     this.finished = true
     if (this.sendTimer) clearTimeout(this.sendTimer)
     if (this.quitTimer) clearTimeout(this.quitTimer)
+    if (this.stallTimer) clearTimeout(this.stallTimer)
     for (const cleanup of this.cleanups) cleanup()
     if (!this.client.isClosed) this.client.close()
     if (this.mpv.exitCode === null) this.mpv.kill()

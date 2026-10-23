@@ -1,3 +1,5 @@
+import type { AudioTrack } from './audio'
+
 /** Co právě hraje – posílá hlavní proces do ovládacího overlaye. */
 export interface PlayerState {
   title: string
@@ -15,6 +17,10 @@ export interface PlayerState {
   video: VideoInfo | null
   /** Další díl seriálu („S01E03 · Název“); null = není. */
   next: string | null
+  /** Zvukové stopy souboru (vybraná má `selected`). */
+  audioTracks: AudioTrack[]
+  /** Upozornění, které overlay na chvíli ukáže. */
+  notice: string | null
 }
 
 export interface AudioOutputInfo {
@@ -43,7 +49,9 @@ export const INITIAL_PLAYER_STATE: PlayerState = {
   ended: false,
   audio: null,
   video: null,
-  next: null
+  next: null,
+  audioTracks: [],
+  notice: null
 }
 
 export type PlayerCommand =
@@ -57,6 +65,7 @@ export type PlayerCommand =
   | { type: 'escape' }
   | { type: 'close' }
   | { type: 'play-next' }
+  | { type: 'set-audio-track'; id: number }
 
 export type OpenFileResult =
   | { ok: true }
@@ -94,6 +103,10 @@ export function parsePlayerCommand(value: unknown): PlayerCommand | null {
     case 'seek-absolute':
       return isFiniteNumber(command['seconds']) && command['seconds'] >= 0
         ? { type: 'seek-absolute', seconds: command['seconds'] }
+        : null
+    case 'set-audio-track':
+      return Number.isInteger(command['id']) && (command['id'] as number) > 0
+        ? { type: 'set-audio-track', id: command['id'] as number }
         : null
     case 'set-volume':
       return isFiniteNumber(command['volume'])

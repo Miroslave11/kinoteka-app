@@ -5,6 +5,11 @@ describe('parsePlayerCommand', () => {
   it('přijme platné příkazy', () => {
     expect(parsePlayerCommand({ type: 'toggle-pause' })).toEqual({ type: 'toggle-pause' })
     expect(parsePlayerCommand({ type: 'play-next' })).toEqual({ type: 'play-next' })
+    expect(parsePlayerCommand({ type: 'set-audio-track', id: 2 })).toEqual({
+      type: 'set-audio-track',
+      id: 2
+    })
+    expect(parsePlayerCommand({ type: 'set-audio-track', id: '2' })).toBeNull()
     expect(parsePlayerCommand({ type: 'seek-relative', seconds: -10 })).toEqual({
       type: 'seek-relative',
       seconds: -10
