@@ -111,5 +111,22 @@ export const MIGRATIONS: readonly string[] = [
   -- Starší údaje z TMDB nemají IMDb ID: obnovit je podle už známého TMDB ID (bez nového hledání).
   UPDATE title SET metadata_updated_at = NULL
   WHERE tmdb_id IS NOT NULL AND json_extract(metadata, '$.imdbId') IS NULL;
+  `,
+
+  // 7 – barvy z plakátu a klipy na pozadí
+  `
+  -- paleta (JSON) a plakát, ze kterého se počítala (při změně plakátu se spočítá znovu)
+  ALTER TABLE title ADD COLUMN palette TEXT;
+  ALTER TABLE title ADD COLUMN palette_source TEXT;
+
+  -- NULL = čeká, 'done' = hotovo, 'error' = nepovedlo se, 'skipped' = příliš krátké
+  ALTER TABLE media_file ADD COLUMN clips_status TEXT;
+
+  CREATE TABLE preview_clip (
+    media_file_id INTEGER NOT NULL REFERENCES media_file (id) ON DELETE CASCADE,
+    idx INTEGER NOT NULL,
+    file TEXT NOT NULL,
+    PRIMARY KEY (media_file_id, idx)
+  );
   `
 ]

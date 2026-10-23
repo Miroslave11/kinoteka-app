@@ -10,7 +10,7 @@ import {
   type EpisodeView,
   type TitleItem
 } from '../app/catalogData'
-import { paletteFor, placeholderStyle, useAmbientPalette } from '../app/palette'
+import { placeholderStyle, titlePalette, useAmbientPalette } from '../app/palette'
 import Artwork from '../components/Artwork'
 import DetailHeader from '../components/DetailHeader'
 import MediaBadges from '../components/MediaBadges'
@@ -22,7 +22,7 @@ export default function ShowDetailPage(): React.JSX.Element {
   const { shows, loading, play } = useApp()
   const show = shows.find((s) => s.id === Number(id))
   const [seasonNumber, setSeasonNumber] = useState<number | null>(null)
-  useAmbientPalette(show ? paletteFor(show.name) : null)
+  useAmbientPalette(show ? titlePalette(show) : null)
 
   if (!show) {
     return (

@@ -1,6 +1,6 @@
 import { CircleHelp, Play } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import { applyPalette, paletteFor, placeholderStyle } from '../app/palette'
+import { applyPalette, placeholderStyle, titlePalette } from '../app/palette'
 import { displayName, displayYear, filesOf, playableFile, type TitleItem } from '../app/catalogData'
 import Artwork from './Artwork'
 import ImdbBadge from './ImdbBadge'
@@ -32,7 +32,7 @@ export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps):
     <button
       className={`poster-card ${playableFile(files) ? '' : 'is-unavailable'}`}
       onClick={() => navigate(titlePath(title))}
-      onMouseEnter={tintOnHover ? () => applyPalette(paletteFor(title.name)) : undefined}
+      onMouseEnter={tintOnHover ? () => applyPalette(titlePalette(title)) : undefined}
       onMouseLeave={onHoverEnd}
     >
       <span className={`poster ${poster ? 'has-art' : ''}`} style={placeholderStyle(title.name)}>

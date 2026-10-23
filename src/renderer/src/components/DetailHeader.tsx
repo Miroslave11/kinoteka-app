@@ -5,6 +5,7 @@ import { IMDB_TITLE_URL } from '../../../shared/metadata'
 import { displayName, displayYear, type TitleItem } from '../app/catalogData'
 import { placeholderStyle } from '../app/palette'
 import Artwork from './Artwork'
+import BackgroundClips from './BackgroundClips'
 import FixMatchDialog from './FixMatchDialog'
 import ImdbBadge from './ImdbBadge'
 
@@ -50,6 +51,7 @@ export default function DetailHeader({
       <div className="d-back">
         <div className="clip" />
         <Artwork src={metadata?.backdropUrl} className="backdrop" />
+        <BackgroundClips clips={title.clips} />
         <div className="shade" />
       </div>
       <button className="icon-btn back" onClick={() => navigate(-1)} title="Zpět">

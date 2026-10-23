@@ -1,15 +1,17 @@
 import { useSearchParams } from 'react-router'
 import { useAmbientPalette } from '../app/palette'
+import AppearanceSettings from '../library/AppearanceSettings'
 import LibrarySettings from '../library/LibrarySettings'
 import ImdbSettings from '../library/ImdbSettings'
 import MetadataSettings from '../library/MetadataSettings'
 import PlayerTest from '../library/PlayerTest'
 
-type Section = 'knihovna' | 'metadata' | 'prehravac'
+type Section = 'knihovna' | 'metadata' | 'vzhled' | 'prehravac'
 
 const SECTIONS: [Section, string][] = [
   ['knihovna', 'Knihovna'],
   ['metadata', 'Metadata (TMDB, IMDb)'],
+  ['vzhled', 'Vzhled'],
   ['prehravac', 'Přehrávač']
 ]
 
@@ -42,6 +44,7 @@ export default function SettingsPage(): React.JSX.Element {
               <ImdbSettings />
             </>
           )}
+          {section === 'vzhled' && <AppearanceSettings />}
           {section === 'prehravac' && <PlayerTest />}
         </div>
       </div>
