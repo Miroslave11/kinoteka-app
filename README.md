@@ -7,24 +7,34 @@ Windows 10/11 · Electron + React + TypeScript · přehrávání přes mpv.
 - Implementační plán: [PLAN.md](PLAN.md)
 - Mockupy obrazovek: [docs/mockupy/index.html](docs/mockupy/index.html)
 
+## Instalace
+
+Instalátor `Kinoteka-Setup-<verze>.exe` vzniká v CI (artefakt „Kinoteka-Setup“ u každého běhu
+GitHub Actions) nebo lokálně příkazem `npm run dist` do složky `dist/`. Obsahuje mpv i ffmpeg.
+Instalátor není podepsaný, Windows SmartScreen proto při prvním spuštění zobrazí varování
+(„Další informace“ → „Přesto spustit“). Knihovna, deník a nastavení jsou v `%APPDATA%\kinoteka`
+(stejná složka jako při vývoji, takže se po instalaci zachovají) a odinstalace je nemaže.
+
 ## Vývoj
 
 Požadavky: Node.js 24, npm.
 
 ```bash
 npm install
-npm run fetch:mpv
+npm run fetch:bin
 npm run dev
 ```
 
-| Příkaz              | Co dělá                                                                                |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| `npm run dev`       | spustí aplikaci s automatickým reloadem                                                |
-| `npm run build`     | sestaví aplikaci do `out/`                                                             |
-| `npm run lint`      | ESLint                                                                                 |
-| `npm run typecheck` | kontrola typů TypeScriptu                                                              |
-| `npm test`          | automatické testy (Vitest)                                                             |
-| `npm run format`    | naformátuje kód Prettierem                                                             |
-| `npm run fetch:mpv` | jednou stáhne přehrávač mpv (pevná verze, ověřený kontrolní součet) do `resources/bin` |
+| Příkaz              | Co dělá                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `npm run dev`       | spustí aplikaci s automatickým reloadem                                               |
+| `npm run build`     | sestaví aplikaci do `out/`                                                            |
+| `npm run dist`      | sestaví instalátor do `dist/` (stáhne mpv a ffmpeg, pokud chybí)                      |
+| `npm run lint`      | ESLint                                                                                |
+| `npm run typecheck` | kontrola typů TypeScriptu                                                             |
+| `npm test`          | automatické testy (Vitest)                                                            |
+| `npm run format`    | naformátuje kód Prettierem                                                            |
+| `npm run fetch:bin` | jednou stáhne mpv a ffmpeg (pevné verze, ověřené kontrolní součty) do `resources/bin` |
 
-CI (GitHub Actions, Windows) při každém pushi spustí lint, kontrolu formátu, typů, testy a build.
+CI (GitHub Actions, Windows) při každém pushi spustí lint, kontrolu formátu, typů, testy a build
+a sestaví instalátor.

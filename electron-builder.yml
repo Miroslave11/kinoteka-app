@@ -1,0 +1,42 @@
+# Instalátor Kinotéky pro Windows (npm run dist → dist/Kinoteka-Setup-<verze>.exe).
+appId: cz.kinoteka.app
+productName: Kinotéka
+copyright: Copyright © 2026 Miroslav
+
+directories:
+  output: dist
+  buildResources: build
+
+# Aplikace je celá v out/ (electron-vite sbalí i React a ostatní závislosti okna),
+# node_modules do instalátoru nepatří.
+files:
+  - out/**/*
+  - package.json
+  - '!node_modules/**/*'
+
+# Přibalené mpv a ffmpeg (stažené skriptem npm run fetch:bin) → resources/bin vedle aplikace.
+extraResources:
+  - from: resources/bin
+    to: bin
+    filter:
+      - '**/*'
+
+asar: true
+npmRebuild: false
+
+win:
+  target:
+    - target: nsis
+      arch: x64
+  icon: build/icon.ico
+  artifactName: Kinoteka-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Kinotéka
+  # Knihovna, deník a nastavení zůstanou i po odinstalaci (pro přeinstalaci nebo aktualizaci).
+  deleteAppDataOnUninstall: false

@@ -50,6 +50,11 @@ import { createMainWindowOptions } from './windowOptions'
 // S DirectComposition kreslí Chromium obsah oken nad všechna vnořená nativní okna,
 // takže by zakryl obraz, který mpv kreslí do okna aplikace (--wid).
 app.commandLine.appendSwitch('disable-direct-composition')
+// Data (knihovna, deník, nastavení) ve stejné složce ve vývoji i v nainstalované aplikaci –
+// jinak by se podle názvu produktu („Kinotéka“) po instalaci začínalo s prázdnou knihovnou.
+if (!app.commandLine.hasSwitch('user-data-dir')) {
+  app.setPath('userData', join(app.getPath('appData'), 'kinoteka'))
+}
 registerMediaScheme()
 
 let session: PlayerSession | null = null

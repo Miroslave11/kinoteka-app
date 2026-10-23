@@ -38,3 +38,36 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  installer:
+    name: Instalátor
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalace závislostí
+        run: npm ci
+
+      # mpv a ffmpeg se stahují s pevnou verzí a kontrolou SHA-256 (skripty fetch-*.mjs).
+      - name: Cache mpv a ffmpeg
+        uses: actions/cache@v6
+        with:
+          path: resources/bin
+          key: bin-${{ hashFiles('scripts/fetch-mpv.mjs', 'scripts/fetch-ffmpeg.mjs') }}
+
+      - name: Sestavení instalátoru
+        run: npm run dist
+
+      - name: Instalátor jako artefakt
+        uses: actions/upload-artifact@v7
+        with:
+          name: Kinoteka-Setup
+          path: dist/Kinoteka-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 30
