@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, safeStorage } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
@@ -32,6 +32,10 @@ app.commandLine.appendSwitch('disable-direct-composition')
 registerMediaScheme()
 
 let session: PlayerSession | null = null
+
+/** fetch přes síť Chromia (net.fetch), který neumí objekt URL – převede ho na text. */
+const chromiumFetch: typeof fetch = (input, init) =>
+  net.fetch(input instanceof URL ? input.toString() : input, init)
 
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow(createMainWindowOptions(preloadPath()))
@@ -121,13 +125,17 @@ void app.whenReady().then(() => {
   const metadata = new MetadataService(
     catalog,
     settings,
-    (credential) => new TmdbClient({ credential, baseUrl: devTmdb && `${devTmdb}/3` })
+    // Síť přes Chromium (net.fetch): používá certifikáty a proxy Windows, takže funguje
+    // i za antivirem nebo firemní proxy, které prověřují HTTPS.
+    (credential) =>
+      new TmdbClient({ credential, baseUrl: devTmdb && `${devTmdb}/3`, fetchImpl: chromiumFetch })
   )
   metadata.on('changed', () => broadcast(IpcChannel.LibraryChanged))
   handleMediaProtocol(
     new ImageCache(
       join(app.getPath('userData'), 'cache', 'tmdb'),
-      devTmdb ? `${devTmdb}/t/p` : TMDB_IMAGE_URL
+      devTmdb ? `${devTmdb}/t/p` : TMDB_IMAGE_URL,
+      chromiumFetch
     )
   )
 

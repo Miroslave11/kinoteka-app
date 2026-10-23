@@ -20,6 +20,16 @@ export interface TmdbClientOptions {
 }
 
 type Params = Record<string, string | number | undefined>
+
+/**
+ * „fetch failed“ samo nic neříká – skutečná příčina (DNS, certifikát, timeout) je v error.cause.
+ */
+export function describeNetworkError(error: unknown): string {
+  const message = (error as Error)?.message ?? String(error)
+  const cause = (error as { cause?: { code?: string; message?: string } })?.cause
+  const detail = cause?.code ?? cause?.message
+  return detail && !message.includes(detail) ? `${message} (${detail})` : message
+}
 type Json = Record<string, unknown>
 
 const MAX_RETRIES = 3
@@ -103,7 +113,7 @@ export class TmdbClient {
         try {
           response = await this.fetchImpl(url, { headers })
         } catch (error) {
-          throw new TmdbError(`TMDB není dostupné: ${(error as Error).message}`)
+          throw new TmdbError(`TMDB není dostupné: ${describeNetworkError(error)}`)
         }
         if (response.status === 429 && attempt < MAX_RETRIES) {
           const wait = Number(response.headers.get('Retry-After')) || 1 + attempt

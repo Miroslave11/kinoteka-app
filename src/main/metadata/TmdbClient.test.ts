@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { TmdbClient, TmdbError } from './TmdbClient'
+import { describeNetworkError, TmdbClient, TmdbError } from './TmdbClient'
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}): Response =>
   new Response(JSON.stringify(body), { status, headers })
@@ -79,5 +79,17 @@ describe('TmdbClient', () => {
     })
     await Promise.all([1, 2, 3, 4, 5].map((id) => client.movie(id)))
     expect(peak).toBe(2)
+  })
+})
+
+describe('describeNetworkError', () => {
+  it('přidá skutečnou příčinu z error.cause', () => {
+    const error = new TypeError('fetch failed', {
+      cause: { code: 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY' }
+    })
+    expect(describeNetworkError(error)).toBe('fetch failed (UNABLE_TO_GET_ISSUER_CERT_LOCALLY)')
+    expect(describeNetworkError(new Error('net::ERR_NAME_NOT_RESOLVED'))).toBe(
+      'net::ERR_NAME_NOT_RESOLVED'
+    )
   })
 })
