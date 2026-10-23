@@ -15,6 +15,12 @@ Instalátor není podepsaný, Windows SmartScreen proto při prvním spuštění
 („Další informace“ → „Přesto spustit“). Knihovna, deník a nastavení jsou v `%APPDATA%\kinoteka`
 (stejná složka jako při vývoji, takže se po instalaci zachovají) a odinstalace je nemaže.
 
+## Spuštění bez instalace
+
+Dvojklik na `Spustit Kinoteku.bat` ve složce projektu. Při prvním spuštění doinstaluje
+závislosti a stáhne mpv a ffmpeg. Okno příkazového řádku nech otevřené – jeho zavřením se
+aplikace ukončí.
+
 ## Vývoj
 
 Požadavky: Node.js 24, npm.
