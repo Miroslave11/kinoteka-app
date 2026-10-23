@@ -37,6 +37,10 @@ const api: KinotekaApi = {
     remove: (id) => ipcRenderer.invoke(IpcChannel.JournalRemove, id),
     setRating: (titleId, rating) => ipcRenderer.invoke(IpcChannel.JournalSetRating, titleId, rating)
   },
+  deletion: {
+    plan: (fileIds) => ipcRenderer.invoke(IpcChannel.DeletionPlan, fileIds),
+    execute: (fileIds) => ipcRenderer.invoke(IpcChannel.DeletionExecute, fileIds)
+  },
   catalog: {
     listMovies: () => ipcRenderer.invoke(IpcChannel.CatalogListMovies),
     listShows: () => ipcRenderer.invoke(IpcChannel.CatalogListShows),

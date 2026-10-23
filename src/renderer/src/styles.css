@@ -2049,3 +2049,62 @@ p.info-chip {
 .season-watched {
   margin-left: auto;
 }
+
+/* ---------- mazání ---------- */
+.delete-dialog {
+  width: min(620px, 100%);
+}
+
+.delete-dialog p {
+  line-height: 1.5;
+}
+
+.delete-paths {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.05);
+}
+
+.delete-paths code,
+.delete-failed code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  color: #cfd3da;
+}
+
+.warnbox {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #ffe2a8;
+  background: rgb(255 180 60 / 0.12);
+  border: 1px solid rgb(255 180 60 / 0.35);
+}
+
+.warnbox svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.delete-failed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delete-failed span {
+  display: block;
+  font-size: 12px;
+  color: #ff8f8f;
+}

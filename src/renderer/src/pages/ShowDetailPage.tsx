@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Check, CircleCheck, Info, Play } from 'lucide-react'
-import { useParams } from 'react-router'
+import { Check, CircleCheck, Info, Play, Trash2 } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router'
 import { canResume, episodeCode, progressRatio, remainingText } from '../../../shared/playback'
 import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
@@ -17,6 +17,7 @@ import {
 import { placeholderStyle, titlePalette, useAmbientPalette } from '../app/palette'
 import Artwork from '../components/Artwork'
 import DetailHeader from '../components/DetailHeader'
+import DeleteDialog from '../components/DeleteDialog'
 import MediaBadges from '../components/MediaBadges'
 import WatchedDialog from '../components/WatchedDialog'
 
@@ -26,6 +27,9 @@ export default function ShowDetailPage(): React.JSX.Element {
   const show = shows.find((s) => s.id === Number(id))
   const [seasonNumber, setSeasonNumber] = useState<number | null>(null)
   const [marking, setMarking] = useState(false)
+  const [deleting, setDeleting] = useState<{ heading: string; fileIds: number[] } | null>(null)
+  const askDelete = (heading: string, fileIds: number[]): void => setDeleting({ heading, fileIds })
+  const navigate = useNavigate()
   useAmbientPalette(show ? titlePalette(show) : null)
 
   if (!show) {
@@ -104,16 +108,47 @@ export default function ShowDetailPage(): React.JSX.Element {
               <CircleCheck size={16} /> Označit sérii jako zhlédnutou
             </button>
           )}
+          {onDisk.length > 0 && season && (
+            <button
+              className="btn sm"
+              title="Smazat z disku všechny díly této série"
+              onClick={() =>
+                askDelete(
+                  `Smazat ${season.name.toLowerCase()} seriálu „${displayName(title)}“?`,
+                  onDisk.flatMap((e) => e.files.map((f) => f.id))
+                )
+              }
+            >
+              <Trash2 size={16} /> Smazat sérii
+            </button>
+          )}
         </div>
         {season?.episodes.map((episode) => (
           <EpisodeRow
             key={`${episode.season}x${episode.episode}`}
             titleId={show.id}
             showName={show.name}
+            onDelete={(fileIds) =>
+              askDelete(
+                `Smazat díl ${episodeCode(episode.season, episode.episode)}${episode.name ? ` „${episode.name}“` : ''}?`,
+                fileIds
+              )
+            }
             episode={episode}
           />
         ))}
       </section>
+      {deleting && (
+        <DeleteDialog
+          heading={deleting.heading}
+          fileIds={deleting.fileIds}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            // Smazal se celý seriál → zpět na seznam seriálů.
+            if (deleting.fileIds.length >= showFiles(show).length) navigate('/serialy')
+          }}
+        />
+      )}
       {marking && season && (
         <WatchedDialog
           target={{
@@ -131,11 +166,13 @@ export default function ShowDetailPage(): React.JSX.Element {
 function EpisodeRow({
   titleId,
   showName,
-  episode
+  episode,
+  onDelete
 }: {
   titleId: number
   showName: string
   episode: EpisodeView
+  onDelete: (fileIds: number[]) => void
 }): React.JSX.Element {
   const { play, showDetails } = useApp()
   const files = episode.disk?.files ?? []
@@ -211,6 +248,15 @@ function EpisodeRow({
             title="Vlastnosti souboru"
           >
             <Info size={14} />
+          </button>
+        )}
+        {files.length > 0 && (
+          <button
+            className="icon-btn xs"
+            onClick={() => onDelete(files.map((f) => f.id))}
+            title="Smazat díl z disku"
+          >
+            <Trash2 size={14} />
           </button>
         )}
       </div>

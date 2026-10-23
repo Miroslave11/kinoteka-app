@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { CircleCheck, Info, Play } from 'lucide-react'
-import { useParams } from 'react-router'
+import { CircleCheck, Info, Play, Trash2 } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router'
 import { formatSize } from '../../../shared/library'
 import { canResume, remainingText } from '../../../shared/playback'
 import { formatTime } from '../../../shared/player'
@@ -9,6 +9,7 @@ import { displayName, playableFile, watchedTitle, type TitleItem } from '../app/
 import { titlePalette, useAmbientPalette } from '../app/palette'
 import DetailHeader from '../components/DetailHeader'
 import MediaBadges from '../components/MediaBadges'
+import DeleteDialog from '../components/DeleteDialog'
 import WatchedDialog from '../components/WatchedDialog'
 
 export default function MovieDetailPage(): React.JSX.Element {
@@ -16,6 +17,12 @@ export default function MovieDetailPage(): React.JSX.Element {
   const { movies, loading, play, showDetails } = useApp()
   const movie = movies.find((m) => m.id === Number(id))
   const [marking, setMarking] = useState(false)
+  const [deleting, setDeleting] = useState<{
+    heading: string
+    fileIds: number[]
+    all: boolean
+  } | null>(null)
+  const navigate = useNavigate()
   useAmbientPalette(movie ? titlePalette(movie) : null)
 
   if (!movie) {
@@ -55,11 +62,33 @@ export default function MovieDetailPage(): React.JSX.Element {
             <Info size={18} /> Vlastnosti souboru
           </button>
         )}
+        <button
+          className="btn"
+          title="Smazat film z disku"
+          onClick={() =>
+            setDeleting({
+              heading: `Smazat film „${displayName(title)}“?`,
+              fileIds: movie.files.map((f) => f.id),
+              all: true
+            })
+          }
+        >
+          <Trash2 size={18} /> Smazat
+        </button>
       </DetailHeader>
       {marking && (
         <WatchedDialog
           target={{ titleId: movie.id, episodeIds: [], label: displayName(title) }}
           onClose={() => setMarking(false)}
+        />
+      )}
+
+      {deleting && (
+        <DeleteDialog
+          heading={deleting.heading}
+          fileIds={deleting.fileIds}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => deleting.all && navigate('/filmy')}
         />
       )}
 
@@ -87,6 +116,19 @@ export default function MovieDetailPage(): React.JSX.Element {
                 title="Vlastnosti souboru"
               >
                 <Info size={14} />
+              </button>
+              <button
+                className="icon-btn xs"
+                onClick={() =>
+                  setDeleting({
+                    heading: `Smazat verzi „${f.fileName}“?`,
+                    fileIds: [f.id],
+                    all: false
+                  })
+                }
+                title="Smazat tuto verzi"
+              >
+                <Trash2 size={14} />
               </button>
             </div>
           ))}

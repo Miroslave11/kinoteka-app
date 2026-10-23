@@ -1,8 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, net, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell } from 'electron'
 import { existsSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
 import { VIDEO_EXTENSIONS } from '../shared/library'
+import { parseFileIds } from '../shared/deletion'
 import { canResume, parsePlayRequest } from '../shared/playback'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
 import { subtitleStyleArgs, SUBTITLES_OFF } from '../shared/subtitles'
@@ -15,6 +17,7 @@ import {
 import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
 import { registerImdbIpc } from './imdb/imdbIpc'
+import { DeletionService } from './deletion/DeletionService'
 import { registerJournalIpc } from './journal/journalIpc'
 import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
@@ -318,6 +321,20 @@ void app.whenReady().then(() => {
   registerMetadataIpc(metadata)
   registerImdbIpc(imdb)
   registerJournalIpc(new JournalRepository(db), () => broadcast(IpcChannel.LibraryChanged))
+  const deletion = new DeletionService(repository, {
+    trash: (path) => shell.trashItem(path),
+    remove: (path) => rm(path),
+    isPlaying: (path) => session !== null && tracker.current?.path === path,
+    removedFromLibrary: (ids) => library.filesRemoved(ids)
+  })
+  ipcMain.handle(IpcChannel.DeletionPlan, (_event, ids: unknown) => {
+    const fileIds = parseFileIds(ids)
+    return fileIds ? deletion.plan(fileIds) : { files: [], totalSize: 0, network: false }
+  })
+  ipcMain.handle(IpcChannel.DeletionExecute, (_event, ids: unknown) => {
+    const fileIds = parseFileIds(ids)
+    return fileIds ? deletion.execute(fileIds) : { deleted: 0, failed: [] }
+  })
   void imdb.run()
   void previews?.run()
   ipcMain.handle(IpcChannel.AudioGetSettings, () => loadAudioSettings(settings))
