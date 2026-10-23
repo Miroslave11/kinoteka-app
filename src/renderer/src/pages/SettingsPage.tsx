@@ -5,12 +5,14 @@ import LibrarySettings from '../library/LibrarySettings'
 import ImdbSettings from '../library/ImdbSettings'
 import MetadataSettings from '../library/MetadataSettings'
 import PlayerTest from '../library/PlayerTest'
+import SoundSettings from '../library/SoundSettings'
 
-type Section = 'knihovna' | 'metadata' | 'vzhled' | 'prehravac'
+type Section = 'knihovna' | 'metadata' | 'zvuk' | 'vzhled' | 'prehravac'
 
 const SECTIONS: [Section, string][] = [
   ['knihovna', 'Knihovna'],
   ['metadata', 'Metadata (TMDB, IMDb)'],
+  ['zvuk', 'Zvuk'],
   ['vzhled', 'Vzhled'],
   ['prehravac', 'Přehrávač']
 ]
@@ -44,6 +46,7 @@ export default function SettingsPage(): React.JSX.Element {
               <ImdbSettings />
             </>
           )}
+          {section === 'zvuk' && <SoundSettings />}
           {section === 'vzhled' && <AppearanceSettings />}
           {section === 'prehravac' && <PlayerTest />}
         </div>

@@ -30,6 +30,10 @@ export const IpcChannel = {
   ImdbSetEnabled: 'imdb:set-enabled',
   ImdbUpdateNow: 'imdb:update-now',
 
+  AudioGetSettings: 'audio:get-settings',
+  AudioSaveSettings: 'audio:save-settings',
+  AudioListDevices: 'audio:list-devices',
+
   PreviewStatus: 'preview:status',
   PreviewSetClipsEnabled: 'preview:set-clips-enabled'
 } as const

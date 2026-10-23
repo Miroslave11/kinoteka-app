@@ -14,6 +14,7 @@ import type {
   TmdbKeyStatus
 } from './metadata'
 import type { PreviewStatus } from './posterPalette'
+import type { AudioDevice, AudioSettings } from './audio'
 import type { PlayRequest } from './playback'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
@@ -35,6 +36,13 @@ export interface KinotekaApi {
     onState(listener: (state: PlayerState) => void): () => void
     /** Přehrávání skončilo (zavřením nebo chybou). */
     onClosed(listener: (info: PlayerClosedInfo) => void): () => void
+  }
+  audio: {
+    getSettings(): Promise<AudioSettings>
+    /** Uloží nastavení zvuku (projeví se při dalším spuštění přehrávání) a vrátí ověřenou podobu. */
+    saveSettings(value: AudioSettings): Promise<AudioSettings>
+    /** Zvuková zařízení, jak je vidí mpv. */
+    listDevices(): Promise<AudioDevice[]>
   }
   catalog: {
     /** Filmy rozpoznané z názvů souborů. Změny hlásí `library.onChanged`. */

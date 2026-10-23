@@ -5,6 +5,12 @@ import { IpcChannel } from '../shared/ipc'
 import { VIDEO_EXTENSIONS } from '../shared/library'
 import { canResume, parsePlayRequest } from '../shared/playback'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
+import {
+  audioLaunchOptions,
+  listAudioDevices,
+  loadAudioSettings,
+  saveAudioSettings
+} from './audio/audioSettings'
 import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
 import { registerImdbIpc } from './imdb/imdbIpc'
@@ -19,13 +25,13 @@ import { registerMetadataIpc } from './metadata/metadataIpc'
 import { MetadataService } from './metadata/MetadataService'
 import { TMDB_IMAGE_URL, TmdbClient } from './metadata/TmdbClient'
 import { ProbeService } from './media/ProbeService'
-import { binaryPath, ffprobeExecutablePath } from './mpv/binary'
+import { binaryPath, ffprobeExecutablePath, mpvExecutablePath } from './mpv/binary'
 import { registerLibraryIpc } from './library/libraryIpc'
 import { LibraryRepository } from './library/LibraryRepository'
 import { LibraryService } from './library/LibraryService'
 import { PlaybackRepository, type PlaybackItem } from './playback/PlaybackRepository'
 import { PlaybackTracker } from './playback/PlaybackTracker'
-import { PlayerSession } from './player/PlayerSession'
+import { PlayerSession, type AudioChoice } from './player/PlayerSession'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
 import { SettingsRepository } from './settings/SettingsRepository'
 import { createMainWindowOptions } from './windowOptions'
@@ -38,6 +44,7 @@ registerMediaScheme()
 let session: PlayerSession | null = null
 let playback: PlaybackRepository
 let tracker: PlaybackTracker
+let settings: SettingsRepository
 
 /** fetch přes síť Chromia (net.fetch), který neumí objekt URL – převede ho na text. */
 const chromiumFetch: typeof fetch = (input, init) =>
@@ -60,6 +67,12 @@ function resumePosition(item: PlaybackItem): number | undefined {
 const nextLabel = (item: PlaybackItem): string | null =>
   playback.nextEpisode(item)?.shortLabel ?? null
 
+/** Zvuková stopa: zapamatovaná pro film nebo seriál, jinak podle preferovaných jazyků. */
+const audioChoiceFor = (item?: PlaybackItem): AudioChoice => ({
+  remembered: item ? playback.trackPreference(item.titleId, 'audio') : null,
+  languages: loadAudioSettings(settings).languages
+})
+
 /**
  * Spustí přehrávání. Soubor z knihovny (`item`) si pamatuje pozici a zhlédnutí;
  * soubor z dialogu „Otevřít soubor…“ (test přehrávače) ne.
@@ -71,18 +84,30 @@ async function startPlayback(
   startSec?: number
 ): Promise<void> {
   session?.close()
-  const started: PlayerSession = await PlayerSession.start({
+  // mpv hlásí pozici už během spouštění – do přiřazení se jeho události ignorují.
+  let started: PlayerSession | undefined = undefined
+  started = await PlayerSession.start({
     mainWindow: host,
     file,
     title: item?.label,
     startSec,
     next: item ? nextLabel(item) : null,
+    audio: audioLaunchOptions(loadAudioSettings(settings)),
+    audioChoice: audioChoiceFor(item),
     logFile: join(app.getPath('logs'), 'mpv.log'),
     onProgress: (position, duration) => {
       if (session === started) tracker.update(position, duration)
     },
     onNext: () => {
       if (session === started) playNext(started)
+    },
+    onAudioTrackChosen: (track) => {
+      const current = tracker.current
+      if (session !== started || !current) return
+      playback.saveTrackPreference(current.titleId, 'audio', {
+        language: track.language,
+        title: track.title
+      })
     },
     onEnd: (info) => {
       if (session === started) {
@@ -107,7 +132,8 @@ function playNext(current: PlayerSession): void {
     file: next.path,
     title: next.label,
     startSec: resumePosition(next),
-    next: nextLabel(next)
+    next: nextLabel(next),
+    audioChoice: audioChoiceFor(next)
   })
 }
 
@@ -179,7 +205,7 @@ void app.whenReady().then(() => {
 
   // Ve vývoji jde TMDB přesměrovat na lokální „falešný“ server (KINOTEKA_DEV_TMDB_URL).
   const devTmdb = app.isPackaged ? undefined : process.env['KINOTEKA_DEV_TMDB_URL']
-  const settings = new SettingsRepository(db, {
+  settings = new SettingsRepository(db, {
     available: () => safeStorage.isEncryptionAvailable(),
     encrypt: (plain) => safeStorage.encryptString(plain),
     decrypt: (data) => safeStorage.decryptString(data)
@@ -246,6 +272,11 @@ void app.whenReady().then(() => {
   registerImdbIpc(imdb)
   void imdb.run()
   void previews?.run()
+  ipcMain.handle(IpcChannel.AudioGetSettings, () => loadAudioSettings(settings))
+  ipcMain.handle(IpcChannel.AudioSaveSettings, (_event, value: unknown) =>
+    saveAudioSettings(settings, value)
+  )
+  ipcMain.handle(IpcChannel.AudioListDevices, () => listAudioDevices(mpvExecutablePath()))
   ipcMain.handle(IpcChannel.PreviewStatus, () => previews?.status() ?? null)
   ipcMain.handle(IpcChannel.PreviewSetClipsEnabled, (_event, enabled: unknown) =>
     typeof enabled === 'boolean' ? previews?.setClipsEnabled(enabled) : undefined

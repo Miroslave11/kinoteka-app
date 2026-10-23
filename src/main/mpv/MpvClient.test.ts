@@ -1,5 +1,5 @@
 import { duplexPair, type Duplex } from 'node:stream'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MpvClient, MpvError } from './MpvClient'
 
 /** Druhý konec spojení hraje roli mpv. */
@@ -28,6 +28,26 @@ describe('MpvClient', () => {
     expect(await sent).toEqual({ command: ['get_property', 'volume'], request_id: 1 })
     reply(mpv, { request_id: 1, error: 'success', data: 80 })
     expect(await result).toBe(80)
+  })
+
+  it('chyba v posluchači nezastaví zpracování dalších zpráv ze stejné dávky', async () => {
+    const { client, mpv, received } = setup()
+    current = client
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    client.on('property', () => {
+      throw new Error('posluchač selhal')
+    })
+    const sent = received()
+    const result = client.command('observe_property', 1, 'duration')
+    await sent
+    // Událost i odpověď přijdou v jedné dávce dat.
+    mpv.write(
+      `${JSON.stringify({ event: 'property-change', name: 'duration', data: 1 })}\n` +
+        `${JSON.stringify({ request_id: 1, error: 'success' })}\n`
+    )
+    await expect(result).resolves.toBeUndefined()
+    expect(errors).toHaveBeenCalledOnce()
+    errors.mockRestore()
   })
 
   it('chybu z mpv vrátí jako MpvError', async () => {

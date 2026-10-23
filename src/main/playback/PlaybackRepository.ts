@@ -1,3 +1,4 @@
+import type { TrackPreference } from '../../shared/audio'
 import type { TitleMetadata } from '../../shared/metadata'
 import {
   EMPTY_WATCH_STATE,
@@ -133,6 +134,29 @@ export class PlaybackRepository {
       }
     })
     return outcome
+  }
+
+  /** Zapamatovaná volba stopy pro film nebo celý seriál. */
+  trackPreference(titleId: number, kind: 'audio' | 'sub'): TrackPreference | null {
+    const row = this.db
+      .prepare('SELECT language, track_title FROM title_track_pref WHERE title_id = ? AND kind = ?')
+      .get(titleId, kind)
+    return row
+      ? {
+          language: (row['language'] as string | null) ?? null,
+          title: (row['track_title'] as string | null) ?? null
+        }
+      : null
+  }
+
+  saveTrackPreference(titleId: number, kind: 'audio' | 'sub', preference: TrackPreference): void {
+    this.db
+      .prepare(
+        `INSERT INTO title_track_pref (title_id, kind, language, track_title) VALUES (?, ?, ?, ?)
+         ON CONFLICT (title_id, kind) DO UPDATE
+         SET language = excluded.language, track_title = excluded.track_title`
+      )
+      .run(titleId, kind, preference.language, preference.title)
   }
 
   /** Stav sledování všech filmů a dílů pro katalog (klíč z `watchKey`). */

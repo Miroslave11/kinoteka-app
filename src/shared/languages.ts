@@ -61,3 +61,11 @@ export function languageName(code: string | null): string {
     return code
   }
 }
+
+/** „cs“ → všechny kódy, kterými ho můžou označovat kontejnery: „cze“, „ces“, „cs“. */
+export function languageCodes(code: string): string[] {
+  const iso1 = normalizeLanguage(code)
+  if (!iso1) return []
+  const codes = Object.keys(TO_ISO1).filter((key) => TO_ISO1[key] === iso1)
+  return codes.length > 0 ? codes : [iso1]
+}
