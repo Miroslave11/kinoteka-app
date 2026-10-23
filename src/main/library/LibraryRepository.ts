@@ -73,6 +73,14 @@ export class LibraryRepository {
     return row ? toFile(row) : undefined
   }
 
+  /** Smazané soubory z knihovny pryč (titulky, klipy a posun se smažou s nimi). */
+  removeFiles(ids: number[]): void {
+    const remove = this.db.prepare('DELETE FROM media_file WHERE id = ?')
+    transaction(this.db, () => {
+      for (const id of ids) remove.run(id)
+    })
+  }
+
   storedFiles(folderId: number): StoredFile[] {
     return this.db
       .prepare('SELECT id, path, size, mtime_ms FROM media_file WHERE folder_id = ?')

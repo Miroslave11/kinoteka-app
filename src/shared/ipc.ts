@@ -42,6 +42,9 @@ export const IpcChannel = {
   JournalRemove: 'journal:remove',
   JournalSetRating: 'journal:set-rating',
 
+  DeletionPlan: 'deletion:plan',
+  DeletionExecute: 'deletion:execute',
+
   PreviewStatus: 'preview:status',
   PreviewSetClipsEnabled: 'preview:set-clips-enabled'
 } as const

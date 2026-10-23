@@ -67,6 +67,12 @@ export class LibraryService extends EventEmitter<LibraryServiceEvents> {
     return folder
   }
 
+  /** Soubory smazané z disku aplikací – z knihovny hned, bez čekání na sken. */
+  filesRemoved(ids: number[]): void {
+    this.repository.removeFiles(ids)
+    this.emit('changed')
+  }
+
   removeFolder(id: number): void {
     this.repository.removeFolder(id)
     this.emit('changed')

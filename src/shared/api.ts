@@ -15,6 +15,7 @@ import type {
 } from './metadata'
 import type { PreviewStatus } from './posterPalette'
 import type { AudioDevice, AudioSettings } from './audio'
+import type { DeletionPlan, DeletionResult } from './deletion'
 import type { JournalEntry, ManualEntry } from './journal'
 import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
@@ -59,6 +60,12 @@ export interface KinotekaApi {
     remove(id: number): Promise<void>
     /** Moje hodnocení titulu 1–5; null = zrušit. */
     setRating(titleId: number, rating: number | null): Promise<void>
+  }
+  deletion: {
+    /** Co se smaže: soubory, titulky, velikost, jestli trvale (síť). */
+    plan(fileIds: number[]): Promise<DeletionPlan>
+    /** Smaže soubory (lokálně do Koše, na síti trvale). Deník a hodnocení zůstanou. */
+    execute(fileIds: number[]): Promise<DeletionResult>
   }
   catalog: {
     /** Filmy rozpoznané z názvů souborů. Změny hlásí `library.onChanged`. */
