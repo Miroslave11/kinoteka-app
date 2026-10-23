@@ -22,6 +22,7 @@ Schváleno: 2026-10-22
 3. **Prostorový zvuk** – passthrough přes HDMI, volitelně PCM 5.1/7.1.
 4. **Pokračování** – ukládání pozice, „Pokračovat / Od začátku“, >90 % = zhlédnuto, řada „Pokračovat ve sledování“, „Další díl“.
 5. **Metadata z ČSFD + TMDB** – název CZ/originál, rok, žánry, země, délka, režie, herci, popis, hodnocení ČSFD, plakát, pozadí; ruční „Opravit shodu“.
+   - **ČSFD (rozhodnuto 2026-10-23, varianta B):** ČSFD nemá API a v robots.txt zakazuje automatické vyhledávání. ID filmu se proto zjišťuje přes Wikidata (TMDB ID → ČSFD ID, vlastnost P2529), na ČSFD se nic nevyhledává. Aplikace načítá jen stránky detailu filmů, po jedné s pauzou 5 s, obnova nejvýš jednou za 30 dní, lze vypnout v Nastavení. Když Wikidata ID nezná, propojí se film ručně vložením odkazu. Uživatel bere na vědomí, že automatické načítání nemusí odpovídat podmínkám ČSFD.
 6. **Vlastnosti souboru** – kontejner, velikost, délka, rozlišení, kodek, HDR, fps, bitrate, zvukové a titulkové stopy (kodek, kanály, jazyk).
 7. **Titulky** – vložené i externí (`.srt/.ass/.sub`), ruční načtení, styl (velikost, barva, obrys, pozadí, pozice), posun časování, automatická detekce kódování (CP1250/UTF-8).
 8. **Výběr stop** – zvuk i titulky za běhu, preferované jazyky, zapamatování volby.

@@ -24,5 +24,10 @@ export const IpcChannel = {
   MetadataRemoveKey: 'metadata:remove-key',
   MetadataSearch: 'metadata:search',
   MetadataApplyMatch: 'metadata:apply-match',
-  MetadataRefresh: 'metadata:refresh'
+  MetadataRefresh: 'metadata:refresh',
+
+  CsfdEnabled: 'csfd:enabled',
+  CsfdSetEnabled: 'csfd:set-enabled',
+  CsfdLink: 'csfd:link',
+  CsfdRefresh: 'csfd:refresh'
 } as const

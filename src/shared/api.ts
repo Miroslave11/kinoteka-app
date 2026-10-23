@@ -51,6 +51,13 @@ export interface KinotekaApi {
     /** Znovu načte údaje titulu z TMDB. */
     refresh(titleId: number): Promise<void>
   }
+  csfd: {
+    enabled(): Promise<boolean>
+    setEnabled(enabled: boolean): Promise<void>
+    /** Ruční propojení titulu odkazem z ČSFD. */
+    link(titleId: number, url: string): Promise<ActionResult>
+    refresh(titleId: number): Promise<void>
+  }
   library: {
     listFolders(): Promise<LibraryFolder[]>
     listFiles(): Promise<MediaFileSummary[]>

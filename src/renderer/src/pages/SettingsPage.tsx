@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router'
 import { useAmbientPalette } from '../app/palette'
 import LibrarySettings from '../library/LibrarySettings'
+import CsfdSettings from '../library/CsfdSettings'
 import MetadataSettings from '../library/MetadataSettings'
 import PlayerTest from '../library/PlayerTest'
 
@@ -8,7 +9,7 @@ type Section = 'knihovna' | 'metadata' | 'prehravac'
 
 const SECTIONS: [Section, string][] = [
   ['knihovna', 'Knihovna'],
-  ['metadata', 'Metadata (TMDB)'],
+  ['metadata', 'Metadata (TMDB, ČSFD)'],
   ['prehravac', 'Přehrávač']
 ]
 
@@ -35,7 +36,12 @@ export default function SettingsPage(): React.JSX.Element {
         </nav>
         <div className="s-body">
           {section === 'knihovna' && <LibrarySettings />}
-          {section === 'metadata' && <MetadataSettings />}
+          {section === 'metadata' && (
+            <>
+              <MetadataSettings />
+              <CsfdSettings />
+            </>
+          )}
           {section === 'prehravac' && <PlayerTest />}
         </div>
       </div>

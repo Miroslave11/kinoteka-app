@@ -6,6 +6,8 @@ import { VIDEO_EXTENSIONS } from '../shared/library'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
 import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
+import { registerCsfdIpc } from './csfd/csfdIpc'
+import { CsfdService } from './csfd/CsfdService'
 import { openDatabase } from './db/database'
 import { runFfprobe } from './media/ffprobe'
 import { ImageCache } from './metadata/ImageCache'
@@ -130,7 +132,18 @@ void app.whenReady().then(() => {
     (credential) =>
       new TmdbClient({ credential, baseUrl: devTmdb && `${devTmdb}/3`, fetchImpl: chromiumFetch })
   )
-  metadata.on('changed', () => broadcast(IpcChannel.LibraryChanged))
+  // Ve vývoji jde ČSFD a Wikidata přesměrovat na lokální kopii (KINOTEKA_DEV_CSFD_URL, …_WIKIDATA_URL).
+  const csfd = new CsfdService(catalog, settings, {
+    fetch: chromiumFetch,
+    baseUrl: app.isPackaged ? undefined : process.env['KINOTEKA_DEV_CSFD_URL'],
+    wikidataUrl: app.isPackaged ? undefined : process.env['KINOTEKA_DEV_WIKIDATA_URL']
+  })
+  csfd.on('changed', () => broadcast(IpcChannel.LibraryChanged))
+  // Nová shoda na TMDB = nové TMDB ID, podle kterého se dá najít ID z ČSFD.
+  metadata.on('changed', () => {
+    broadcast(IpcChannel.LibraryChanged)
+    void csfd.run()
+  })
   handleMediaProtocol(
     new ImageCache(
       join(app.getPath('userData'), 'cache', 'tmdb'),
@@ -149,6 +162,8 @@ void app.whenReady().then(() => {
   void probe?.run()
   void metadata.run()
   registerMetadataIpc(metadata)
+  registerCsfdIpc(csfd)
+  void csfd.run()
   ipcMain.handle(IpcChannel.CatalogListMovies, () => catalog.listMovies())
   ipcMain.handle(IpcChannel.CatalogListShows, () => catalog.listShows())
   ipcMain.handle(IpcChannel.CatalogFileDetails, (_event, id: unknown) =>

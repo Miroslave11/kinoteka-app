@@ -26,7 +26,9 @@ const MOVIES: MovieItem[] = [
     tags: ['CZ dabing'],
     files: [file(1, ['CZ dabing'])],
     metadata: null,
-    matchStatus: 'pending'
+    matchStatus: 'pending',
+    csfd: null,
+    csfdStatus: 'pending'
   },
   {
     id: 2,
@@ -35,7 +37,9 @@ const MOVIES: MovieItem[] = [
     tags: ['CZ titulky'],
     files: [file(2, ['CZ titulky'])],
     metadata: null,
-    matchStatus: 'pending'
+    matchStatus: 'pending',
+    csfd: null,
+    csfdStatus: 'pending'
   }
 ]
 

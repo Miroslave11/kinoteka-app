@@ -7,6 +7,7 @@ import type {
   ShowItem
 } from '../../shared/catalog'
 import { summarize, type MediaInfo } from '../../shared/mediaInfo'
+import type { CsfdData, CsfdStatus } from '../../shared/csfd'
 import type { MatchStatus, TitleMetadata } from '../../shared/metadata'
 import { transaction, type Database } from '../db/database'
 import { groupMediaFiles } from './grouping'
@@ -56,7 +57,23 @@ const MATCH_STATUSES: MatchStatus[] = [
   'disabled'
 ]
 
-function metadataOf(row: Row): { metadata: TitleMetadata | null; matchStatus: MatchStatus } {
+const CSFD_STATUSES: CsfdStatus[] = ['pending', 'linked', 'manual', 'notfound', 'error']
+
+function parseJson<T>(value: unknown): T | null {
+  if (typeof value !== 'string') return null
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return null
+  }
+}
+
+function metadataOf(row: Row): {
+  metadata: TitleMetadata | null
+  matchStatus: MatchStatus
+  csfd: CsfdData | null
+  csfdStatus: CsfdStatus
+} {
   let metadata: TitleMetadata | null = null
   if (typeof row['metadata'] === 'string') {
     try {
@@ -66,7 +83,13 @@ function metadataOf(row: Row): { metadata: TitleMetadata | null; matchStatus: Ma
     }
   }
   const status = row['match_status'] as MatchStatus
-  return { metadata, matchStatus: MATCH_STATUSES.includes(status) ? status : 'pending' }
+  const csfdStatus = row['csfd_status'] as CsfdStatus
+  return {
+    metadata,
+    matchStatus: MATCH_STATUSES.includes(status) ? status : 'pending',
+    csfd: parseJson<CsfdData>(row['csfd']),
+    csfdStatus: CSFD_STATUSES.includes(csfdStatus) ? csfdStatus : 'pending'
+  }
 }
 
 /** Co potřebuje služba metadat k dohledání titulu. */
@@ -301,12 +324,90 @@ export class CatalogRepository {
     status: 'matched' | 'manual',
     now = new Date()
   ): void {
+    // Jiný titul na TMDB = jiný film i na ČSFD; ručně propojené ČSFD se nemění.
+    this.db
+      .prepare(
+        `UPDATE title SET csfd_id = NULL, csfd = NULL, csfd_status = 'pending', csfd_error = NULL
+         WHERE id = ? AND tmdb_id IS NOT ? AND csfd_status != 'manual'`
+      )
+      .run(id, metadata.tmdbId)
     this.db
       .prepare(
         `UPDATE title SET tmdb_id = ?, metadata = ?, match_status = ?, metadata_error = NULL,
          metadata_updated_at = ? WHERE id = ?`
       )
       .run(metadata.tmdbId, JSON.stringify(metadata), status, now.toISOString(), id)
+  }
+
+  // ---------- ČSFD ----------
+
+  /** Tituly s TMDB ID, u kterých se ještě nehledalo ID z ČSFD. */
+  csfdLookups(): { id: number; kind: 'movie' | 'show'; tmdbId: number }[] {
+    return this.db
+      .prepare(
+        "SELECT id, kind, tmdb_id FROM title WHERE csfd_status = 'pending' AND tmdb_id IS NOT NULL ORDER BY id"
+      )
+      .all()
+      .map((row) => ({
+        id: Number(row['id']),
+        kind: row['kind'] === 'show' ? 'show' : 'movie',
+        tmdbId: Number(row['tmdb_id'])
+      }))
+  }
+
+  /**
+   * Tituly, u kterých je potřeba načíst stránku ČSFD: ještě nenačtené, starší než 30 dní,
+   * nebo s chybou starší než 6 hodin.
+   */
+  csfdFetches(now = new Date()): { id: number; csfdId: number }[] {
+    const day = 24 * 60 * 60 * 1000
+    const stale = new Date(now.getTime() - 30 * day).toISOString()
+    const retry = new Date(now.getTime() - day / 4).toISOString()
+    return this.db
+      .prepare(
+        `SELECT id, csfd_id FROM title WHERE csfd_id IS NOT NULL AND (
+           (csfd_status IN ('linked', 'manual') AND (csfd IS NULL OR csfd_updated_at < ?))
+           OR (csfd_status = 'error' AND (csfd_updated_at IS NULL OR csfd_updated_at < ?))
+         ) ORDER BY csfd IS NOT NULL, id`
+      )
+      .all(stale, retry)
+      .map((row) => ({ id: Number(row['id']), csfdId: Number(row['csfd_id']) }))
+  }
+
+  setCsfdLink(id: number, csfdId: number | null, status: CsfdStatus): void {
+    this.db
+      .prepare(
+        `UPDATE title SET csfd_id = ?, csfd_status = ?, csfd_error = NULL,
+         csfd = CASE WHEN csfd_id IS ? THEN csfd ELSE NULL END WHERE id = ?`
+      )
+      .run(csfdId, status, csfdId, id)
+  }
+
+  saveCsfd(id: number, data: CsfdData, now = new Date()): void {
+    this.db
+      .prepare(
+        `UPDATE title SET csfd = ?, csfd_error = NULL, csfd_updated_at = ?,
+         csfd_status = CASE WHEN csfd_status = 'manual' THEN 'manual' ELSE 'linked' END WHERE id = ?`
+      )
+      .run(JSON.stringify(data), now.toISOString(), id)
+  }
+
+  setCsfdError(id: number, error: string, now = new Date()): void {
+    this.db
+      .prepare(
+        "UPDATE title SET csfd_status = 'error', csfd_error = ?, csfd_updated_at = ? WHERE id = ?"
+      )
+      .run(error, now.toISOString(), id)
+  }
+
+  /** Vynutí nové načtení stránky ČSFD (tlačítko „Znovu načíst údaje“). */
+  expireCsfd(id: number): void {
+    this.db
+      .prepare('UPDATE title SET csfd_updated_at = NULL WHERE id = ? AND csfd_id IS NOT NULL')
+      .run(id)
+    this.db
+      .prepare("UPDATE title SET csfd_status = 'linked' WHERE id = ? AND csfd_status = 'error'")
+      .run(id)
   }
 
   setMatchStatus(

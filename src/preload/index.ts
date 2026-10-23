@@ -36,6 +36,12 @@ const api: KinotekaApi = {
       ipcRenderer.invoke(IpcChannel.MetadataApplyMatch, titleId, tmdbId),
     refresh: (titleId) => ipcRenderer.invoke(IpcChannel.MetadataRefresh, titleId)
   },
+  csfd: {
+    enabled: () => ipcRenderer.invoke(IpcChannel.CsfdEnabled),
+    setEnabled: (enabled) => ipcRenderer.invoke(IpcChannel.CsfdSetEnabled, enabled),
+    link: (titleId, url) => ipcRenderer.invoke(IpcChannel.CsfdLink, titleId, url),
+    refresh: (titleId) => ipcRenderer.invoke(IpcChannel.CsfdRefresh, titleId)
+  },
   library: {
     listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),
     listFiles: () => ipcRenderer.invoke(IpcChannel.LibraryListFiles),

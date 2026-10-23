@@ -84,5 +84,14 @@ export const MIGRATIONS: readonly string[] = [
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  `,
+
+  // 5 – údaje z ČSFD (ID přes Wikidata, stránka filmu)
+  `
+  ALTER TABLE title ADD COLUMN csfd_id INTEGER;
+  ALTER TABLE title ADD COLUMN csfd TEXT;
+  ALTER TABLE title ADD COLUMN csfd_status TEXT NOT NULL DEFAULT 'pending';
+  ALTER TABLE title ADD COLUMN csfd_error TEXT;
+  ALTER TABLE title ADD COLUMN csfd_updated_at TEXT;
   `
 ]

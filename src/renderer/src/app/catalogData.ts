@@ -71,10 +71,12 @@ export function filterOptions(titles: TitleItem[]): { resolutions: string[]; tag
   }
 }
 
-/** Název k zobrazení: český název z TMDB, jinak z názvu souboru. */
-export const displayName = (title: TitleItem): string => title.metadata?.name || title.name
+/** Název k zobrazení: český název z TMDB, jinak z ČSFD, jinak z názvu souboru. */
+export const displayName = (title: TitleItem): string =>
+  title.metadata?.name || title.csfd?.name || title.name
 
-export const displayYear = (title: TitleItem): number | null => title.metadata?.year ?? title.year
+export const displayYear = (title: TitleItem): number | null =>
+  title.metadata?.year ?? title.csfd?.year ?? title.year
 
 export interface EpisodeView {
   season: number

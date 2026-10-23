@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { applyPalette, paletteFor, placeholderStyle } from '../app/palette'
 import { displayName, displayYear, filesOf, playableFile, type TitleItem } from '../app/catalogData'
 import Artwork from './Artwork'
+import CsfdRating from './CsfdRating'
 
 interface PosterProps {
   title: TitleItem
@@ -61,6 +62,7 @@ export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps):
         <span>
           {year ?? 'rok neznámý'}
           {title.kind === 'show' && ` · ${subtitle}`}
+          {title.csfd?.rating != null && <CsfdRating csfd={title.csfd} compact />}
         </span>
       </span>
     </button>

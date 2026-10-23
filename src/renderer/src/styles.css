@@ -1543,3 +1543,59 @@ option {
 p.info-chip {
   width: fit-content;
 }
+
+/* ---------- ČSFD ---------- */
+.csfd-rating {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: #555b66;
+}
+
+.csfd-rating.good {
+  background: #ba0305;
+}
+
+.csfd-rating.average {
+  background: #658db4;
+}
+
+.csfd-rating.poor {
+  background: #535353;
+}
+
+.csfd-rating.compact {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  vertical-align: 1px;
+}
+
+.plot .source {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.small {
+  font-size: 12px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}

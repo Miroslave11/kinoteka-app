@@ -4,3 +4,4 @@ node_modules
 resources
 docs/mockupy
 package-lock.json
+src/main/csfd/fixtures
