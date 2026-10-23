@@ -8,6 +8,7 @@ import {
   type WatchState
 } from '../../shared/playback'
 import { transaction, type Database } from '../db/database'
+import type { PlayingFile } from '../subtitles/OnlineSubtitlesService'
 
 type Row = Record<string, unknown>
 
@@ -157,6 +158,29 @@ export class PlaybackRepository {
          SET language = excluded.language, track_title = excluded.track_title`
       )
       .run(titleId, kind, preference.language, preference.title)
+  }
+
+  /** Film nebo díl k souboru s ID z TMDB a IMDb – pro hledání titulků na internetu. */
+  libraryInfo(fileId: number): PlayingFile['library'] {
+    const row = this.db
+      .prepare(
+        `SELECT t.kind, t.name, t.year, t.metadata, e.season, e.episode
+         FROM media_file f JOIN title t ON t.id = f.title_id
+         LEFT JOIN episode e ON e.id = f.episode_id
+         WHERE f.id = ?`
+      )
+      .get(fileId)
+    if (!row) return null
+    const metadata = parseMetadata(row['metadata'])
+    return {
+      kind: row['kind'] === 'show' ? 'show' : 'movie',
+      name: metadata?.originalName || metadata?.name || String(row['name']),
+      year: metadata?.year ?? (row['year'] as number | null) ?? null,
+      tmdbId: metadata?.tmdbId ?? null,
+      imdbId: metadata?.imdbId ?? null,
+      season: row['season'] === null ? null : Number(row['season']),
+      episode: row['episode'] === null ? null : Number(row['episode'])
+    }
   }
 
   /** Uložený posun titulků pro soubor (s); 0 = žádný. */

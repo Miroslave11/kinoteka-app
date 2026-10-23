@@ -2206,3 +2206,17 @@ p.info-chip {
   border: 0;
   cursor: pointer;
 }
+
+/* ---------- OpenSubtitles ---------- */
+.steps {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+
+.steps a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+}

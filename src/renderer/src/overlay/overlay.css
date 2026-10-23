@@ -500,3 +500,139 @@ button {
   margin: 0;
   color: rgb(255 255 255 / 0.75);
 }
+
+/* ---------- titulky z internetu ---------- */
+.online-subs {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  width: min(760px, calc(100vw - 48px));
+  max-height: min(620px, calc(100vh - 160px));
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: rgb(14 16 21 / 0.96);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.6);
+}
+
+.online-subs header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.online-subs h4 {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.online-subs h4 small {
+  margin-left: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgb(255 255 255 / 0.55);
+}
+
+.online-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 14px;
+  color: rgb(255 255 255 / 0.75);
+}
+
+.online-state.error {
+  color: #ff9b9b;
+}
+
+.online-state.ok {
+  color: #7fe0a8;
+}
+
+.online-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  margin: 6px -6px 0;
+}
+
+.online-item {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) auto 20px;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 8px;
+  border-radius: 10px;
+  text-align: left;
+  background: transparent;
+}
+
+.online-item:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.08);
+}
+
+.online-item:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.online-lang {
+  font-weight: 700;
+}
+
+.online-release {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.online-tags {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: rgb(255 255 255 / 0.5);
+  white-space: nowrap;
+}
+
+.online-tags i {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-style: normal;
+  background: rgb(255 255 255 / 0.1);
+  color: rgb(255 255 255 / 0.8);
+}
+
+.online-tags i.ok {
+  background: rgb(69 212 131 / 0.2);
+  color: #7fe0a8;
+}
+
+.online-tags i.warn {
+  background: rgb(255 180 60 / 0.18);
+  color: #ffcf8a;
+}
+
+.online-note {
+  margin-top: 10px;
+  font-size: 11px;
+  color: rgb(255 255 255 / 0.4);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

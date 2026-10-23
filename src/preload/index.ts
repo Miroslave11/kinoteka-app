@@ -34,6 +34,13 @@ const api: KinotekaApi = {
     getSettings: () => ipcRenderer.invoke(IpcChannel.SubtitlesGetSettings),
     saveSettings: (value) => ipcRenderer.invoke(IpcChannel.SubtitlesSaveSettings, value)
   },
+  onlineSubtitles: {
+    status: () => ipcRenderer.invoke(IpcChannel.OnlineSubtitlesStatus),
+    save: (credentials) => ipcRenderer.invoke(IpcChannel.OnlineSubtitlesSave, credentials),
+    remove: () => ipcRenderer.invoke(IpcChannel.OnlineSubtitlesRemove),
+    search: () => ipcRenderer.invoke(IpcChannel.OnlineSubtitlesSearch),
+    download: (fileId) => ipcRenderer.invoke(IpcChannel.OnlineSubtitlesDownload, fileId)
+  },
   journal: {
     list: () => ipcRenderer.invoke(IpcChannel.JournalList),
     addManual: (entry) => ipcRenderer.invoke(IpcChannel.JournalAddManual, entry),

@@ -18,6 +18,12 @@ import type { PreviewStatus } from './posterPalette'
 import type { AudioDevice, AudioSettings } from './audio'
 import type { DeletionPlan, DeletionResult } from './deletion'
 import type { JournalEntry, ManualEntry } from './journal'
+import type {
+  OnlineDownloadResult,
+  OnlineSearchResult,
+  OnlineSubtitlesCredentials,
+  OnlineSubtitlesStatus
+} from './onlineSubtitles'
 import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
@@ -66,6 +72,18 @@ export interface KinotekaApi {
     getSettings(): Promise<SubtitleSettings>
     /** Uloží nastavení titulků (projeví se při dalším spuštění přehrávání). */
     saveSettings(value: SubtitleSettings): Promise<SubtitleSettings>
+  }
+  onlineSubtitles: {
+    status(): Promise<OnlineSubtitlesStatus>
+    /** Ověří a uloží klíč API (a přihlášení); vrací chybu srozumitelně. */
+    save(
+      credentials: OnlineSubtitlesCredentials
+    ): Promise<{ ok: true } | { ok: false; message: string }>
+    remove(): Promise<void>
+    /** Jen z přehrávače: hledá titulky k právě hranému souboru. */
+    search(): Promise<OnlineSearchResult>
+    /** Jen z přehrávače: stáhne titulky, uloží je vedle filmu a zapne. */
+    download(fileId: number): Promise<OnlineDownloadResult>
   }
   journal: {
     list(): Promise<JournalEntry[]>

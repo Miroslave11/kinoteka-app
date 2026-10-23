@@ -1,4 +1,4 @@
-import { Check, FolderOpen, Minus, Plus } from 'lucide-react'
+import { Check, FolderOpen, Globe, Minus, Plus } from 'lucide-react'
 import type { AudioTrack } from '../../../shared/audio'
 import { languageName } from '../../../shared/languages'
 import type { SubtitleTrack } from '../../../shared/subtitles'
@@ -69,7 +69,8 @@ export default function TrackPanel({
   onAudio,
   onSubtitle,
   onDelay,
-  onLoadSubtitle
+  onLoadSubtitle,
+  onSearchOnline
 }: {
   audioTracks: AudioTrack[]
   subtitleTracks: SubtitleTrack[]
@@ -78,6 +79,7 @@ export default function TrackPanel({
   onSubtitle: (id: number | null) => void
   onDelay: (seconds: number) => void
   onLoadSubtitle: () => void
+  onSearchOnline: () => void
 }): React.JSX.Element {
   const subtitlesOn = subtitleTracks.some((t) => t.selected)
   return (
@@ -111,6 +113,14 @@ export default function TrackPanel({
           </span>
           <span className="track-text">
             <b>Načíst ze souboru…</b>
+          </span>
+        </button>
+        <button className="track track-load" onClick={onSearchOnline}>
+          <span className="track-check">
+            <Globe size={16} />
+          </span>
+          <span className="track-text">
+            <b>Hledat na internetu…</b>
           </span>
         </button>
         {subtitlesOn && (

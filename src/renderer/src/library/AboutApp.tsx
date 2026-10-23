@@ -55,6 +55,16 @@ export default function AboutApp(): React.JSX.Element {
           <span className="imdb">IMDb</span>
           <p>Hodnocení IMDb z oficiálního datového souboru. {IMDB_ATTRIBUTION}</p>
         </div>
+        <div className="credit">
+          <span className="badge">OpenSubtitles</span>
+          <p>
+            Titulky z internetu stahuje přes oficiální API{' '}
+            <a href="https://www.opensubtitles.com" target="_blank" rel="noreferrer">
+              OpenSubtitles.com
+            </a>{' '}
+            s tvým vlastním klíčem.
+          </p>
+        </div>
       </section>
 
       <section className="card">
