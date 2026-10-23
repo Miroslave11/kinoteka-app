@@ -21,12 +21,26 @@ import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
+export interface AppInfo {
+  version: string
+  /** Verze přibaleného mpv a ffmpeg; null = nezjištěno. */
+  mpv: string | null
+  ffmpeg: string | null
+  dataPath: string
+  logsPath: string
+}
+
 /** API, které preload zpřístupní oknům jako `window.kinoteka`. */
 export interface KinotekaApi {
   versions: {
     electron: string
     chrome: string
     node: string
+  }
+  app: {
+    info(): Promise<AppInfo>
+    /** Otevře v Průzkumníkovi složku s daty (databáze, cache) nebo se záznamy (logy). */
+    openFolder(which: 'data' | 'logs'): Promise<void>
   }
   player: {
     /** Otevře dialog pro výběr souboru a spustí přehrávání v tomto okně. */
@@ -111,6 +125,9 @@ export interface KinotekaApi {
     removeFolder(id: number): Promise<void>
     /** Naskenuje jednu složku, nebo bez parametru všechny. */
     scan(folderId?: number): Promise<ScanResult[]>
+    /** Automatický sken při startu a každých 30 minut. */
+    autoScan(): Promise<boolean>
+    setAutoScan(enabled: boolean): Promise<void>
     onChanged(listener: () => void): () => void
     onScanProgress(listener: (progress: ScanProgress) => void): () => void
   }

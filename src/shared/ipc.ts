@@ -1,5 +1,8 @@
 /** Názvy IPC kanálů mezi hlavním procesem a okny. */
 export const IpcChannel = {
+  AppInfo: 'app:info',
+  AppOpenFolder: 'app:open-folder',
+
   PlayerOpenFile: 'player:open-file',
   PlayerPlayFile: 'player:play-file',
   PlayerCommand: 'player:command',
@@ -14,6 +17,8 @@ export const IpcChannel = {
   LibraryScan: 'library:scan',
   LibraryChanged: 'library:changed',
   LibraryScanProgress: 'library:scan-progress',
+  LibraryAutoScan: 'library:auto-scan',
+  LibrarySetAutoScan: 'library:set-auto-scan',
 
   CatalogListMovies: 'catalog:list-movies',
   CatalogListShows: 'catalog:list-shows',

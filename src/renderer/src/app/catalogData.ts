@@ -23,12 +23,18 @@ export const addedAt = (title: TitleItem): string =>
 export const playableFile = (files: CatalogFile[]): CatalogFile | undefined =>
   files.find((file) => file.available)
 
-export type SortKey = 'added' | 'name' | 'year' | 'rating'
+export type SortKey = 'added' | 'name' | 'year' | 'rating' | 'my-rating'
+
+export type WatchedFilter = 'all' | 'unwatched' | 'watched'
 
 export interface TitleFilters {
   query: string
   resolution: string | null
   tag: string | null
+  genre: string | null
+  /** Desetiletí (1990, 2000…); null = všechna. */
+  decade: number | null
+  watched: WatchedFilter
   sort: SortKey
 }
 
@@ -36,48 +42,120 @@ export const DEFAULT_FILTERS: TitleFilters = {
   query: '',
   resolution: null,
   tag: null,
+  genre: null,
+  decade: null,
+  watched: 'all',
   sort: 'added'
 }
+
+/** Film zhlédnutý; seriál, když jsou zhlédnuté všechny díly na disku. */
+export function isWatched(title: TitleItem): boolean {
+  if (title.kind === 'movie') return title.watch.watchCount > 0
+  const episodes = title.seasons.flatMap((s) => s.episodes)
+  return episodes.length > 0 && episodes.every((e) => e.watch.watchCount > 0)
+}
+
+/** Názvy, pod kterými jde titul najít (soubor, TMDB, originál, alternativní). */
+const titleNames = (title: TitleItem): string[] =>
+  [
+    title.name,
+    title.metadata?.name,
+    title.metadata?.originalName,
+    ...(title.kind === 'show' ? title.alternativeNames : [])
+  ].filter((name): name is string => !!name)
+
+/** Herci a režie / tvůrci z TMDB. */
+const titlePeople = (title: TitleItem): string[] => [
+  ...(title.metadata?.directors ?? []),
+  ...(title.metadata?.cast.map((person) => person.name) ?? [])
+]
 
 /** Filtr a řazení pro mřížky filmů a seriálů. */
 export function filterTitles<T extends TitleItem>(titles: T[], filters: TitleFilters): T[] {
   const query = normalizeSearch(filters.query)
   const result = titles.filter((title) => {
     const files = filesOf(title)
-    if (query) {
-      const names = [title.name, ...(title.kind === 'show' ? title.alternativeNames : [])]
-      if (!names.some((name) => normalizeSearch(name).includes(query))) return false
+    if (query && !titleNames(title).some((name) => normalizeSearch(name).includes(query))) {
+      return false
     }
     if (filters.resolution && !files.some((f) => f.summary?.resolution === filters.resolution)) {
       return false
     }
     if (filters.tag && !files.some((f) => f.tags.includes(filters.tag!))) return false
+    if (filters.genre && !title.metadata?.genres.includes(filters.genre)) return false
+    if (filters.decade !== null) {
+      const year = displayYear(title)
+      if (year === null || Math.floor(year / 10) * 10 !== filters.decade) return false
+    }
+    if (filters.watched !== 'all' && isWatched(title) !== (filters.watched === 'watched')) {
+      return false
+    }
     return true
   })
   const byName = (a: T, b: T): number => a.name.localeCompare(b.name, 'cs')
   return result.sort((a, b) => {
     if (filters.sort === 'name') return byName(a, b)
-    if (filters.sort === 'year') return (b.year ?? 0) - (a.year ?? 0) || byName(a, b)
+    if (filters.sort === 'year')
+      return (displayYear(b) ?? 0) - (displayYear(a) ?? 0) || byName(a, b)
     if (filters.sort === 'rating') {
       return (b.imdb?.rating ?? -1) - (a.imdb?.rating ?? -1) || byName(a, b)
     }
+    if (filters.sort === 'my-rating') return (b.myRating ?? 0) - (a.myRating ?? 0) || byName(a, b)
     return addedAt(b).localeCompare(addedAt(a)) || byName(a, b)
   })
 }
 
 /** Hodnoty pro filtry, které v knihovně opravdu existují. */
-export function filterOptions(titles: TitleItem[]): { resolutions: string[]; tags: string[] } {
+export function filterOptions(titles: TitleItem[]): {
+  resolutions: string[]
+  tags: string[]
+  genres: string[]
+  decades: number[]
+} {
   const order = ['4K', '1080p', '720p', 'SD']
   const resolutions = new Set<string>()
   const tags = new Set<string>()
+  const genres = new Set<string>()
+  const decades = new Set<number>()
   for (const file of titles.flatMap(filesOf)) {
     if (file.summary) resolutions.add(file.summary.resolution)
     for (const tag of file.tags) if (/dabing|titulky/.test(tag)) tags.add(tag)
   }
+  for (const title of titles) {
+    for (const genre of title.metadata?.genres ?? []) genres.add(genre)
+    const year = displayYear(title)
+    if (year !== null) decades.add(Math.floor(year / 10) * 10)
+  }
   return {
     resolutions: order.filter((r) => resolutions.has(r)),
-    tags: [...tags].sort((a, b) => a.localeCompare(b, 'cs'))
+    tags: [...tags].sort((a, b) => a.localeCompare(b, 'cs')),
+    genres: [...genres].sort((a, b) => a.localeCompare(b, 'cs')),
+    decades: [...decades].sort((a, b) => b - a)
   }
+}
+
+export interface SearchResults {
+  /** Shoda v názvu. */
+  byName: TitleItem[]
+  /** Shoda jen v hercích nebo režii – s tím, koho hledání našlo. */
+  byPerson: { title: TitleItem; people: string[] }[]
+}
+
+/** Hledání (Ctrl+K): názvy včetně originálu, k tomu herci, režie a tvůrci z TMDB. */
+export function searchTitles(titles: TitleItem[], query: string): SearchResults {
+  const q = normalizeSearch(query)
+  if (!q) return { byName: [], byPerson: [] }
+  const byName = filterTitles(titles, { ...DEFAULT_FILTERS, query, sort: 'name' })
+  const named = new Set(byName)
+  const byPerson = titles
+    .filter((title) => !named.has(title))
+    .map((title) => ({
+      title,
+      people: [...new Set(titlePeople(title).filter((p) => normalizeSearch(p).includes(q)))]
+    }))
+    .filter((match) => match.people.length > 0)
+    .sort((a, b) => displayName(a.title).localeCompare(displayName(b.title), 'cs'))
+  return { byName, byPerson }
 }
 
 /** Název k zobrazení: český název z TMDB, jinak z názvu souboru. */

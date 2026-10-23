@@ -14,6 +14,10 @@ const api: KinotekaApi = {
     chrome: process.versions.chrome,
     node: process.versions.node
   },
+  app: {
+    info: () => ipcRenderer.invoke(IpcChannel.AppInfo),
+    openFolder: (which) => ipcRenderer.invoke(IpcChannel.AppOpenFolder, which)
+  },
   player: {
     openFile: () => ipcRenderer.invoke(IpcChannel.PlayerOpenFile),
     playFile: (request) => ipcRenderer.invoke(IpcChannel.PlayerPlayFile, request),
@@ -73,6 +77,8 @@ const api: KinotekaApi = {
     removeFolder: (id) => ipcRenderer.invoke(IpcChannel.LibraryRemoveFolder, id),
     scan: (folderId) => ipcRenderer.invoke(IpcChannel.LibraryScan, folderId),
     onChanged: (listener) => subscribe(IpcChannel.LibraryChanged, () => listener()),
+    autoScan: () => ipcRenderer.invoke(IpcChannel.LibraryAutoScan),
+    setAutoScan: (enabled) => ipcRenderer.invoke(IpcChannel.LibrarySetAutoScan, enabled),
     onScanProgress: (listener) => subscribe(IpcChannel.LibraryScanProgress, listener)
   }
 }

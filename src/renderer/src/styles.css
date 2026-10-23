@@ -2108,3 +2108,55 @@ p.info-chip {
   font-size: 12px;
   color: #ff8f8f;
 }
+
+/* ---------- hledání ---------- */
+.search-group h3 {
+  margin: 8px 0 14px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.search-group + .search-group {
+  margin-top: 28px;
+}
+
+.person-hit {
+  display: flex;
+  flex-direction: column;
+}
+
+.person-hit-name {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.auto-scan {
+  margin-top: 14px;
+}
+
+/* ---------- O aplikaci ---------- */
+.credit {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-top: 12px;
+}
+
+.credit p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.credit a {
+  color: var(--accent);
+}
+
+.credit > span {
+  flex: none;
+}
