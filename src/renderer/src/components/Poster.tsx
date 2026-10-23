@@ -13,6 +13,7 @@ import {
 } from '../app/catalogData'
 import Artwork from './Artwork'
 import ImdbBadge from './ImdbBadge'
+import { countOf } from '../../../shared/plural'
 
 interface PosterProps {
   title: TitleItem
@@ -56,9 +57,7 @@ export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps):
   const year = displayYear(title)
   const poster = title.metadata?.posterUrl
   const subtitle =
-    title.kind === 'movie'
-      ? (year ?? '')
-      : `${title.episodeCount} ${title.episodeCount >= 5 ? 'dílů' : title.episodeCount === 1 ? 'díl' : 'díly'}`
+    title.kind === 'movie' ? (year ?? '') : countOf(title.episodeCount, 'díl', 'díly', 'dílů')
   const { watched, progress } = posterWatch(title)
 
   return (

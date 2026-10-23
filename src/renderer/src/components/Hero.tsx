@@ -8,6 +8,7 @@ import Artwork from './Artwork'
 import BackgroundClips from './BackgroundClips'
 import MediaBadges from './MediaBadges'
 import { titlePath } from './Poster'
+import { countOf } from '../../../shared/plural'
 
 interface HeroProps {
   titles: TitleItem[]
@@ -34,7 +35,7 @@ export default function Hero({ titles, index, onSelect }: HeroProps): React.JSX.
     displayYear(title),
     title.kind === 'movie'
       ? first?.summary && formatTime(first.summary.durationSec)
-      : `seriál · ${title.episodeCount} ${title.episodeCount >= 5 ? 'dílů' : 'díly'} na disku`,
+      : `seriál · ${countOf(title.episodeCount, 'díl', 'díly', 'dílů')} na disku`,
     ...(metadata?.genres.slice(0, 2) ?? [])
   ].filter(Boolean)
   const key = `${title.kind}-${title.id}`

@@ -20,6 +20,7 @@ import DetailHeader from '../components/DetailHeader'
 import DeleteDialog from '../components/DeleteDialog'
 import MediaBadges from '../components/MediaBadges'
 import WatchedDialog from '../components/WatchedDialog'
+import { countOf } from '../../../shared/plural'
 
 export default function ShowDetailPage(): React.JSX.Element {
   const { id } = useParams()
@@ -61,10 +62,10 @@ export default function ShowDetailPage(): React.JSX.Element {
       <DetailHeader
         title={title}
         meta={[
-          `${seasons.length} ${seasons.length >= 5 ? 'sérií' : 'série'}`,
+          countOf(seasons.length, 'série', 'série', 'sérií'),
           show.metadata
             ? `${show.episodeCount} z ${total} dílů na disku`
-            : `${show.episodeCount} ${show.episodeCount >= 5 ? 'dílů' : 'díly'} na disku`
+            : `${countOf(show.episodeCount, 'díl', 'díly', 'dílů')} na disku`
         ]}
         badges={<MediaBadges file={undefined} tags={tags} />}
       >

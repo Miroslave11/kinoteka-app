@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PreviewStatus } from '../../../shared/posterPalette'
+import { countOf } from '../../../shared/plural'
 
 /** Nastavení → Vzhled: klipy z filmů na pozadí. */
 export default function AppearanceSettings(): React.JSX.Element {
@@ -53,7 +54,7 @@ export default function AppearanceSettings(): React.JSX.Element {
                 {!status?.clipsEnabled
                   ? 'vypnuto'
                   : status.pending > 0
-                    ? `čeká ${status.pending} ${status.pending >= 5 ? 'titulů' : 'tituly'}${status.working ? ' · vyrábím…' : ''}`
+                    ? `čeká ${countOf(status.pending, 'titul', 'tituly', 'titulů')}${status.working ? ' · vyrábím…' : ''}`
                     : 'hotovo'}
               </dd>
             </dl>

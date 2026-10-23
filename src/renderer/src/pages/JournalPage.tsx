@@ -14,6 +14,7 @@ import { useAmbientPalette, placeholderStyle } from '../app/palette'
 import Artwork from '../components/Artwork'
 import Stars from '../components/Stars'
 import WatchedDialog from '../components/WatchedDialog'
+import { plural } from '../../../shared/plural'
 
 const KINDS: [JournalKind, string][] = [
   ['all', 'Vše'],
@@ -74,11 +75,16 @@ export default function JournalPage(): React.JSX.Element {
       <div className="stats">
         <div className="stat">
           <b>{stats.moviesThisYear}</b>
-          <span>filmů zhlédnuto letos</span>
+          <span>
+            {plural(stats.moviesThisYear, 'film zhlédnutý', 'filmy zhlédnuté', 'filmů zhlédnuto')}{' '}
+            letos
+          </span>
         </div>
         <div className="stat">
           <b>{stats.episodesThisYear}</b>
-          <span>dílů seriálů letos</span>
+          <span>
+            {plural(stats.episodesThisYear, 'díl seriálu', 'díly seriálů', 'dílů seriálů')} letos
+          </span>
         </div>
         <div className="stat">
           <b>

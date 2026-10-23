@@ -8,6 +8,7 @@ import {
   type ScanResult
 } from '../../../shared/library'
 import { useLibrary } from './useLibrary'
+import { countOf } from '../../../shared/plural'
 
 function describeScan(results: ScanResult[]): string {
   const sum = (key: 'added' | 'updated' | 'moved' | 'removed'): number =>
@@ -211,7 +212,7 @@ function FolderRow(props: FolderRowProps): React.JSX.Element {
   const kind = folder.kind === 'network' ? 'Síťová složka' : 'Lokální disk'
   const status = !folder.online
     ? 'nedostupná – položky zůstávají v knihovně, nic se nemaže'
-    : `${folder.fileCount} souborů`
+    : countOf(folder.fileCount, 'soubor', 'soubory', 'souborů')
   const scanned = folder.lastScanAt ? ` · sken ${formatRelativeTime(folder.lastScanAt)}` : ''
 
   return (
@@ -222,7 +223,10 @@ function FolderRow(props: FolderRowProps): React.JSX.Element {
       <div className="folder-info">
         <code>{folder.path}</code>
         <small className={folder.online ? '' : 'warn'}>
-          {kind} · {props.scanning !== undefined ? `skenuji… ${props.scanning} souborů` : status}
+          {kind} ·{' '}
+          {props.scanning !== undefined
+            ? `skenuji… ${countOf(props.scanning, 'soubor', 'soubory', 'souborů')}`
+            : status}
           {scanned}
         </small>
       </div>
