@@ -1,3 +1,4 @@
+import type { ClassificationInfo } from './classification'
 import type { FolderKind } from './library'
 import type { MediaInfo, MediaSummary } from './mediaInfo'
 import type { ImdbRating, MatchStatus, TitleMetadata } from './metadata'
@@ -29,6 +30,8 @@ export interface FileDetails {
   error: string | null
   /** Analýza ještě neproběhla. */
   pending: boolean
+  /** Kam soubor patří; null = zatím nezařazený. */
+  classification: ClassificationInfo | null
 }
 
 export interface MovieItem {

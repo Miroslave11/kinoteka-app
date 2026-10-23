@@ -1,4 +1,5 @@
 import type { FileDetails, MovieItem, ShowItem } from './catalog'
+import type { ClassificationResult, FileClassification } from './classification'
 import type {
   AddFolderResult,
   LibraryFolder,
@@ -88,6 +89,11 @@ export interface KinotekaApi {
     listShows(): Promise<ShowItem[]>
     /** Technické vlastnosti souboru (panel „Vlastnosti souboru“). */
     getFileDetails(fileId: number): Promise<FileDetails | null>
+    /** Ruční zařazení souboru (null = vrátit rozpoznání z názvu); vrací titul, kam soubor patří. */
+    classify(
+      fileId: number,
+      classification: FileClassification | null
+    ): Promise<ClassificationResult | null>
   }
   metadata: {
     keyStatus(): Promise<TmdbKeyStatus>

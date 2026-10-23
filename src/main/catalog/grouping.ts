@@ -1,3 +1,4 @@
+import type { FileClassification } from '../../shared/classification'
 import { normalizeTitle, parseMediaPath, type ParsedName } from './naming'
 
 export interface FileForGrouping {
@@ -89,15 +90,38 @@ class KeyUnion {
   }
 }
 
-/** Rozdělí soubory na filmy a seriály (díly seskupené podle názvu seriálu, série a čísla dílu). */
-export function groupMediaFiles(files: readonly FileForGrouping[]): Grouping {
+/** Ruční zařazení nahradí výsledek parseru; štítky („CZ dabing“…) zůstanou z názvu souboru. */
+function applyClassification(parsed: ParsedName, manual: FileClassification): ParsedName {
+  const base = { ...parsed, title: manual.title, alternativeTitle: null, year: manual.year }
+  return manual.kind === 'movie'
+    ? { ...base, kind: 'movie', season: null, episode: null, episodeEnd: null, episodeTitle: null }
+    : {
+        ...base,
+        kind: 'episode',
+        season: manual.season,
+        episode: manual.episode,
+        episodeEnd: null,
+        episodeTitle: manual.episodeTitle
+      }
+}
+
+/**
+ * Rozdělí soubory na filmy a seriály (díly seskupené podle názvu seriálu, série a čísla dílu).
+ * `manual` = ruční zařazení souborů, které má přednost před rozpoznáním z názvu.
+ */
+export function groupMediaFiles(
+  files: readonly FileForGrouping[],
+  manual: ReadonlyMap<number, FileClassification> = new Map()
+): Grouping {
   const parsed = new Map<number, ParsedName>()
   const movieFiles = new Map<string, { names: string[]; years: (number | null)[]; ids: number[] }>()
   const episodeFiles: { id: number; name: ParsedName; keys: string[] }[] = []
   const union = new KeyUnion()
 
   for (const file of files) {
-    const name = parseMediaPath(file.relativePath)
+    const override = manual.get(file.id)
+    const auto = parseMediaPath(file.relativePath)
+    const name = override ? applyClassification(auto, override) : auto
     parsed.set(file.id, name)
     if (name.kind === 'movie') {
       const key = `${normalizeTitle(name.title)}|${name.year ?? ''}`

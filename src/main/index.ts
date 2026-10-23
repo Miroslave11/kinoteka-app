@@ -4,6 +4,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
 import { VIDEO_EXTENSIONS } from '../shared/library'
+import { parseClassification } from '../shared/classification'
 import { parseFileIds } from '../shared/deletion'
 import { canResume, parsePlayRequest } from '../shared/playback'
 import { parsePlayerCommand, type OpenFileResult } from '../shared/player'
@@ -359,6 +360,14 @@ void app.whenReady().then(() => {
   )
   ipcMain.handle(IpcChannel.CatalogListMovies, () => catalog.listMovies())
   ipcMain.handle(IpcChannel.CatalogListShows, () => catalog.listShows())
+  ipcMain.handle(IpcChannel.CatalogClassify, (_event, id: unknown, value: unknown) => {
+    const classification = value === null ? null : parseClassification(value)
+    if (!Number.isInteger(id) || (value !== null && !classification)) return null
+    catalog.setClassification(id as number, classification)
+    // Přestavba katalogu a dohledání metadat nového titulu běží v posluchačích změny knihovny.
+    library.catalogChanged()
+    return catalog.titleOfFile(id as number)
+  })
   ipcMain.handle(IpcChannel.CatalogFileDetails, (_event, id: unknown) =>
     Number.isInteger(id) ? catalog.fileDetails(id as number) : null
   )

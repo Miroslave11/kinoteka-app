@@ -31,6 +31,8 @@ Každý přírůstek je samostatně spustitelný a ověřitelný. Další přír
 | 14  | **Vyhledávání, filtry, dokončení**                    | Hledání (Ctrl+K), filtry (žánr, rok, rozlišení, jazyk, zhlédnuté), řazení, klávesové zkratky přehrávače, automatický sken, stránka „O aplikaci“ s uvedením zdroje TMDB.                                                                    | Filtry a řazení                                                                               | Najdi film podle herce; vyfiltruj 4K nezhlédnuté.                                                                                                                                                              |
 | 15  | **Instalátor**                                        | Instalátor `.exe` (electron-builder) s mpv a ffmpeg, sestavený v CI jako artefakt.                                                                                                                                                         | Build instalátoru v CI                                                                        | Nainstaluj, spusť, odinstaluj.                                                                                                                                                                                 |
 
+**Doplněno 2026-10-23:** ruční oprava zařazení souboru (bod 2 rozsahu – film / díl seriálu, série a díl) v okně Vlastnosti souboru. V původním rozdělení na přírůstky chyběla.
+
 ## Potom
 
 - **Krok 6:** společný end-to-end průchod celou aplikací.

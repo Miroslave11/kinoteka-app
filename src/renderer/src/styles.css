@@ -2160,3 +2160,49 @@ p.info-chip {
 .credit > span {
   flex: none;
 }
+
+/* ---------- ruční zařazení ---------- */
+.classify {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.classify h4 {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.classify .seg {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.classify .form-grid {
+  grid-template-columns: 130px minmax(0, 1fr);
+  margin-bottom: 10px;
+}
+
+.classify .field.narrow {
+  width: 90px;
+}
+
+.classify .pair {
+  display: flex;
+  gap: 8px;
+}
+
+.kv .track .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}

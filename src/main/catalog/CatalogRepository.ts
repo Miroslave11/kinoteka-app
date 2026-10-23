@@ -6,6 +6,11 @@ import type {
   SeasonItem,
   ShowItem
 } from '../../shared/catalog'
+import type {
+  ClassificationInfo,
+  ClassificationResult,
+  FileClassification
+} from '../../shared/classification'
 import { summarize, type MediaInfo } from '../../shared/mediaInfo'
 import type { ImdbRating, MatchStatus, TitleMetadata } from '../../shared/metadata'
 import { EMPTY_WATCH_STATE } from '../../shared/playback'
@@ -16,6 +21,21 @@ import { PlaybackRepository, watchKey } from '../playback/PlaybackRepository'
 import { groupMediaFiles } from './grouping'
 
 type Row = Record<string, unknown>
+
+const toClassification = (row: Row): FileClassification => {
+  const title = String(row['title'])
+  const year = (row['year'] as number | null) ?? null
+  return row['kind'] === 'episode'
+    ? {
+        kind: 'episode',
+        title,
+        year,
+        season: Number(row['season'] ?? 1),
+        episode: Number(row['episode'] ?? 0),
+        episodeTitle: (row['episode_title'] as string | null) ?? null
+      }
+    : { kind: 'movie', title, year }
+}
 
 const parseTags = (value: unknown): string[] => {
   try {
@@ -137,7 +157,7 @@ export class CatalogRepository {
       .prepare('SELECT id, relative_path FROM media_file')
       .all()
       .map((row) => ({ id: Number(row['id']), relativePath: String(row['relative_path']) }))
-    const grouping = groupMediaFiles(files)
+    const grouping = groupMediaFiles(files, this.manualClassifications())
     const timestamp = now.toISOString()
 
     transaction(this.db, () => {
@@ -512,6 +532,87 @@ export class CatalogRepository {
     return true
   }
 
+  // ---------- ruční zařazení ----------
+
+  private manualClassifications(): Map<number, FileClassification> {
+    const map = new Map<number, FileClassification>()
+    for (const row of this.db.prepare('SELECT * FROM file_classification').all()) {
+      map.set(Number(row['media_file_id']), toClassification(row))
+    }
+    return map
+  }
+
+  /** Kam soubor teď patří (ručně, nebo podle katalogu) – pro okno Vlastnosti souboru. */
+  classification(fileId: number): ClassificationInfo | null {
+    const manual = this.db
+      .prepare('SELECT * FROM file_classification WHERE media_file_id = ?')
+      .get(fileId)
+    if (manual) return { current: toClassification(manual), manual: true }
+    const row = this.db
+      .prepare(
+        `SELECT t.kind, t.name, t.year, e.season, e.episode, e.name AS episode_name
+         FROM media_file f JOIN title t ON t.id = f.title_id
+         LEFT JOIN episode e ON e.id = f.episode_id
+         WHERE f.id = ?`
+      )
+      .get(fileId)
+    if (!row) return null
+    const title = String(row['name'])
+    const year = (row['year'] as number | null) ?? null
+    return {
+      manual: false,
+      current:
+        row['kind'] === 'show'
+          ? {
+              kind: 'episode',
+              title,
+              year,
+              season: Number(row['season'] ?? 1),
+              episode: Number(row['episode'] ?? 0),
+              episodeTitle: (row['episode_name'] as string | null) ?? null
+            }
+          : { kind: 'movie', title, year }
+    }
+  }
+
+  /** Uloží ruční zařazení (null = vrátit rozpoznání z názvu). Katalog je pak potřeba přestavět. */
+  setClassification(fileId: number, classification: FileClassification | null): void {
+    if (!classification) {
+      this.db.prepare('DELETE FROM file_classification WHERE media_file_id = ?').run(fileId)
+      return
+    }
+    const episode = classification.kind === 'episode' ? classification : null
+    this.db
+      .prepare(
+        `INSERT INTO file_classification (media_file_id, kind, title, year, season, episode, episode_title)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (media_file_id) DO UPDATE SET kind = excluded.kind, title = excluded.title,
+           year = excluded.year, season = excluded.season, episode = excluded.episode,
+           episode_title = excluded.episode_title`
+      )
+      .run(
+        fileId,
+        classification.kind,
+        classification.title,
+        classification.year,
+        episode?.season ?? null,
+        episode?.episode ?? null,
+        episode?.episodeTitle ?? null
+      )
+  }
+
+  /** Titul, ke kterému soubor patří (po přestavbě katalogu). */
+  titleOfFile(fileId: number): ClassificationResult | null {
+    const row = this.db
+      .prepare(
+        'SELECT t.id, t.kind FROM media_file f JOIN title t ON t.id = f.title_id WHERE f.id = ?'
+      )
+      .get(fileId)
+    return row
+      ? { titleId: Number(row['id']), kind: row['kind'] === 'show' ? 'show' : 'movie' }
+      : null
+  }
+
   fileDetails(fileId: number): FileDetails | null {
     const row = this.db
       .prepare(
@@ -529,7 +630,8 @@ export class CatalogRepository {
       folderKind: row['folder_kind'] === 'network' ? 'network' : 'local',
       info,
       error,
-      pending: !info && !error
+      pending: !info && !error,
+      classification: this.classification(fileId)
     }
   }
 
