@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { KinotekaApi } from '../../../shared/api'
 import type { CatalogFile, MovieItem } from '../../../shared/catalog'
+import { EMPTY_WATCH_STATE } from '../../../shared/playback'
 import { AppProvider } from '../app/AppContext'
 import BrowsePage from './BrowsePage'
 
@@ -29,7 +30,8 @@ const MOVIES: MovieItem[] = [
     matchStatus: 'pending',
     imdb: null,
     palette: null,
-    clips: []
+    clips: [],
+    watch: EMPTY_WATCH_STATE
   },
   {
     id: 2,
@@ -41,7 +43,8 @@ const MOVIES: MovieItem[] = [
     matchStatus: 'pending',
     imdb: null,
     palette: null,
-    clips: []
+    clips: [],
+    watch: EMPTY_WATCH_STATE
   }
 ]
 

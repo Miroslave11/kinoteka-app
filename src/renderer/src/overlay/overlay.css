@@ -299,3 +299,24 @@ button {
   color: #0b0b0b;
   border-color: transparent;
 }
+
+.ended-next {
+  margin-top: -10px;
+  font-size: 18px;
+  color: rgb(255 255 255 / 0.8);
+}
+
+.ended-actions {
+  justify-content: center;
+}
+
+.link-btn {
+  justify-self: center;
+  font-size: 13px;
+  color: rgb(255 255 255 / 0.6);
+  text-decoration: underline;
+}
+
+.link-btn:hover {
+  color: #fff;
+}

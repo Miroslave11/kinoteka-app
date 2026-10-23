@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useApp } from '../app/AppContext'
-import { addedAt, type TitleItem } from '../app/catalogData'
+import { addedAt, continueWatching, type TitleItem } from '../app/catalogData'
 import { applyPalette, titlePalette, useAmbientPalette } from '../app/palette'
+import ContinueCard from '../components/ContinueCard'
 import Hero from '../components/Hero'
 import Poster from '../components/Poster'
 
@@ -18,9 +19,14 @@ export default function HomePage(): React.JSX.Element {
     () => [...titles].sort((a, b) => addedAt(b).localeCompare(addedAt(a))),
     [titles]
   )
+  const continuing = useMemo(() => continueWatching(titles), [titles])
   const heroTitles = recent.slice(0, HERO_COUNT)
   const heroTitle = heroTitles[heroIndex % Math.max(1, heroTitles.length)]
   useAmbientPalette(heroTitle ? titlePalette(heroTitle) : null)
+  const restorePalette = (): void => {
+    setPaused(false)
+    if (heroTitle) applyPalette(titlePalette(heroTitle))
+  }
 
   useEffect(() => {
     if (paused || heroTitles.length < 2) return
@@ -60,10 +66,7 @@ export default function HomePage(): React.JSX.Element {
               key={`${title.kind}-${title.id}`}
               title={title}
               tintOnHover
-              onHoverEnd={() => {
-                setPaused(false)
-                if (heroTitle) applyPalette(titlePalette(heroTitle))
-              }}
+              onHoverEnd={restorePalette}
             />
           ))}
         </div>
@@ -78,6 +81,16 @@ export default function HomePage(): React.JSX.Element {
         onSelect={setHeroIndex}
       />
       <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+        {continuing.length > 0 && (
+          <section className="row">
+            <h3>Pokračovat ve sledování</h3>
+            <div className="strip">
+              {continuing.map((item) => (
+                <ContinueCard key={item.key} item={item} onHoverEnd={restorePalette} />
+              ))}
+            </div>
+          </section>
+        )}
         {row('Nově přidané', recent.slice(0, 20))}
         {row(
           'Filmy',

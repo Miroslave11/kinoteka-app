@@ -1,6 +1,7 @@
 import type { FolderKind } from './library'
 import type { MediaInfo, MediaSummary } from './mediaInfo'
 import type { ImdbRating, MatchStatus, TitleMetadata } from './metadata'
+import type { WatchState } from './playback'
 import type { Palette } from './posterPalette'
 
 /** Soubor patřící k filmu nebo dílu. */
@@ -44,6 +45,8 @@ export interface MovieItem {
   palette: Palette | null
   /** Tiché klipy z filmu pro pozadí (kinoteka-media://clips/…). */
   clips: string[]
+  /** Rozkoukáno / zhlédnuto. */
+  watch: WatchState
 }
 
 export interface EpisodeItem {
@@ -52,6 +55,7 @@ export interface EpisodeItem {
   episode: number
   name: string | null
   files: CatalogFile[]
+  watch: WatchState
 }
 
 export interface SeasonItem {

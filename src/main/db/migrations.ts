@@ -128,5 +128,27 @@ export const MIGRATIONS: readonly string[] = [
     file TEXT NOT NULL,
     PRIMARY KEY (media_file_id, idx)
   );
+  `,
+
+  // 8 – rozkoukané filmy a díly, deník zhlédnutí (episode_id NULL = film)
+  `
+  CREATE TABLE playback_progress (
+    title_id INTEGER NOT NULL REFERENCES title (id) ON DELETE CASCADE,
+    episode_id INTEGER REFERENCES episode (id) ON DELETE CASCADE,
+    position REAL NOT NULL,
+    duration REAL NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX playback_progress_item ON playback_progress (title_id, IFNULL(episode_id, 0));
+
+  -- 'auto' = přehrávač (nad 90 %); ruční záznamy, hodnocení a poznámky přidá přírůstek 12
+  CREATE TABLE watch_event (
+    id INTEGER PRIMARY KEY,
+    title_id INTEGER NOT NULL REFERENCES title (id) ON DELETE CASCADE,
+    episode_id INTEGER REFERENCES episode (id) ON DELETE CASCADE,
+    watched_at TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'auto'
+  );
+  CREATE INDEX watch_event_title ON watch_event (title_id);
   `
 ]

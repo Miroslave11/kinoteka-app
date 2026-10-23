@@ -1,9 +1,10 @@
 import { Info, Play } from 'lucide-react'
 import { useParams } from 'react-router'
 import { formatSize } from '../../../shared/library'
+import { canResume, remainingText } from '../../../shared/playback'
 import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
-import { playableFile, type TitleItem } from '../app/catalogData'
+import { playableFile, watchedTitle, type TitleItem } from '../app/catalogData'
 import { titlePalette, useAmbientPalette } from '../app/palette'
 import DetailHeader from '../components/DetailHeader'
 import MediaBadges from '../components/MediaBadges'
@@ -33,7 +34,11 @@ export default function MovieDetailPage(): React.JSX.Element {
     <div className="detail-page">
       <DetailHeader
         title={title}
-        meta={[runtime]}
+        meta={[
+          runtime,
+          canResume(movie.watch.progress) && `rozkoukáno, ${remainingText(movie.watch.progress)}`,
+          movie.watch.watchCount > 0 && watchedTitle(movie.watch).toLowerCase()
+        ]}
         badges={<MediaBadges file={first} tags={movie.tags} />}
       >
         <button className="btn primary" disabled={!file} onClick={() => file && void play(file.id)}>

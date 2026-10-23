@@ -11,6 +11,11 @@ const base = {
 describe('buildMpvArgs', () => {
   const args = buildMpvArgs(base)
 
+  it('pokračování začne od uložené pozice', () => {
+    expect(buildMpvArgs({ ...base, startSec: 1865.25 })).toContain('--start=1865.3')
+    expect(args.some((arg) => arg.startsWith('--start'))).toBe(false)
+  })
+
   it('vloží obraz do okna aplikace a otevře IPC', () => {
     expect(args).toContain('--wid=123456')
     expect(args).toContain('--input-ipc-server=\\\\.\\pipe\\kinoteka-test')

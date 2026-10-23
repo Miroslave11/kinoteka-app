@@ -1,7 +1,16 @@
-import { CircleHelp, Play } from 'lucide-react'
+import { Check, CircleHelp, Play } from 'lucide-react'
 import { useNavigate } from 'react-router'
+import { canResume, progressRatio } from '../../../shared/playback'
 import { applyPalette, placeholderStyle, titlePalette } from '../app/palette'
-import { displayName, displayYear, filesOf, playableFile, type TitleItem } from '../app/catalogData'
+import {
+  displayName,
+  displayYear,
+  filesOf,
+  playableFile,
+  upNext,
+  watchedTitle,
+  type TitleItem
+} from '../app/catalogData'
 import Artwork from './Artwork'
 import ImdbBadge from './ImdbBadge'
 
@@ -15,6 +24,29 @@ interface PosterProps {
 export const titlePath = (title: TitleItem): string =>
   title.kind === 'movie' ? `/filmy/${title.id}` : `/serialy/${title.id}`
 
+/**
+ * Značky na plakátu: fajfka u zhlédnutého filmu nebo seriálu, kde jsou zhlédnuté všechny
+ * díly na disku; proužek u rozkoukaného filmu nebo dílu.
+ */
+function posterWatch(title: TitleItem): { watched: string | null; progress: number | null } {
+  if (title.kind === 'movie') {
+    return {
+      watched: title.watch.watchCount > 0 ? watchedTitle(title.watch) : null,
+      progress: canResume(title.watch.progress) ? progressRatio(title.watch.progress) : null
+    }
+  }
+  const episodes = title.seasons.flatMap((s) => s.episodes)
+  const all = episodes.length > 0 && episodes.every((e) => e.watch.watchCount > 0)
+  const next = upNext(title)
+  return {
+    watched: all ? 'Všechny díly na disku zhlédnuté' : null,
+    progress:
+      next?.mode === 'resume' && next.episode.watch.progress
+        ? progressRatio(next.episode.watch.progress)
+        : null
+  }
+}
+
 /** Plakát z TMDB (nebo zástupný přechod) s názvem; klik otevře detail. */
 export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps): React.JSX.Element {
   const navigate = useNavigate()
@@ -27,6 +59,7 @@ export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps):
     title.kind === 'movie'
       ? (year ?? '')
       : `${title.episodeCount} ${title.episodeCount >= 5 ? 'dílů' : title.episodeCount === 1 ? 'díl' : 'díly'}`
+  const { watched, progress } = posterWatch(title)
 
   return (
     <button
@@ -53,9 +86,19 @@ export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps):
             <small>{subtitle}</small>
           </span>
         )}
+        {watched && (
+          <span className="poster-watched" title={watched}>
+            <Check size={14} strokeWidth={3} />
+          </span>
+        )}
         <span className="poster-play">
           <Play size={22} fill="currentColor" />
         </span>
+        {progress !== null && (
+          <span className="progress-bar on-image">
+            <i style={{ width: `${progress * 100}%` }} />
+          </span>
+        )}
       </span>
       <span className="cap">
         <b>{name}</b>
