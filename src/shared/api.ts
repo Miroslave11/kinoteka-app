@@ -13,6 +13,7 @@ import type {
   SaveKeyResult,
   TmdbKeyStatus
 } from './metadata'
+import type { PreviewStatus } from './posterPalette'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
 /** API, které preload zpřístupní oknům jako `window.kinoteka`. */
@@ -62,6 +63,11 @@ export interface KinotekaApi {
     setEnabled(enabled: boolean): Promise<void>
     /** Stáhne datový soubor IMDb hned (jinak jednou týdně). */
     updateNow(): Promise<void>
+  }
+  preview: {
+    /** Stav klipů na pozadí; null, když chybí ffmpeg. */
+    status(): Promise<PreviewStatus | null>
+    setClipsEnabled(enabled: boolean): Promise<void>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>

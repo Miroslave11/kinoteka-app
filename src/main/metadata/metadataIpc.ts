@@ -1,30 +1,7 @@
-import { ipcMain, protocol } from 'electron'
+import { ipcMain } from 'electron'
 import { IpcChannel } from '../../shared/ipc'
 import type { ActionResult } from '../../shared/metadata'
-import type { ImageCache } from './ImageCache'
 import type { MetadataService } from './MetadataService'
-
-export const MEDIA_SCHEME = 'kinoteka-media'
-
-/** Musí proběhnout před `app.whenReady()`. */
-export function registerMediaScheme(): void {
-  protocol.registerSchemesAsPrivileged([
-    { scheme: MEDIA_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }
-  ])
-}
-
-/** kinoteka-media://tmdb/w500/abc.jpg → obrázek z cache (případně stažený z TMDB). */
-export function handleMediaProtocol(images: ImageCache): void {
-  protocol.handle(MEDIA_SCHEME, async (request) => {
-    const url = new URL(request.url)
-    if (url.hostname !== 'tmdb') return new Response(null, { status: 404 })
-    const image = await images.get(url.pathname)
-    if (!image) return new Response(null, { status: 404 })
-    return new Response(new Uint8Array(image.data), {
-      headers: { 'Content-Type': image.contentType, 'Cache-Control': 'max-age=31536000, immutable' }
-    })
-  })
-}
 
 const isId = (value: unknown): value is number => Number.isInteger(value) && (value as number) > 0
 const fail = (error: unknown): ActionResult => ({ ok: false, message: (error as Error).message })

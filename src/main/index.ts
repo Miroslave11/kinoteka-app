@@ -9,17 +9,16 @@ import { CatalogRepository } from './catalog/CatalogRepository'
 import { registerImdbIpc } from './imdb/imdbIpc'
 import { ImdbService } from './imdb/ImdbService'
 import { openDatabase } from './db/database'
+import { makeClip, posterPixels } from './media/ffmpeg'
 import { runFfprobe } from './media/ffprobe'
+import { PreviewService } from './media/PreviewService'
+import { handleMediaProtocol, registerMediaScheme } from './mediaProtocol'
 import { ImageCache } from './metadata/ImageCache'
-import {
-  handleMediaProtocol,
-  registerMediaScheme,
-  registerMetadataIpc
-} from './metadata/metadataIpc'
+import { registerMetadataIpc } from './metadata/metadataIpc'
 import { MetadataService } from './metadata/MetadataService'
 import { TMDB_IMAGE_URL, TmdbClient } from './metadata/TmdbClient'
 import { ProbeService } from './media/ProbeService'
-import { ffprobeExecutablePath } from './mpv/binary'
+import { binaryPath, ffprobeExecutablePath } from './mpv/binary'
 import { registerLibraryIpc } from './library/libraryIpc'
 import { LibraryRepository } from './library/LibraryRepository'
 import { LibraryService } from './library/LibraryService'
@@ -139,24 +138,45 @@ void app.whenReady().then(() => {
     url: app.isPackaged ? undefined : process.env['KINOTEKA_DEV_IMDB_URL']
   })
   imdb.on('changed', () => broadcast(IpcChannel.LibraryChanged))
-  // Nová shoda na TMDB = nové IMDb ID, ke kterému se doplní hodnocení.
+  const images = new ImageCache(
+    join(app.getPath('userData'), 'cache', 'tmdb'),
+    devTmdb ? `${devTmdb}/t/p` : TMDB_IMAGE_URL,
+    chromiumFetch
+  )
+  const clipsDir = join(app.getPath('userData'), 'cache', 'clips')
+  handleMediaProtocol(images, clipsDir)
+
+  // Barvy z plakátů a klipy na pozadí – potřebují ffmpeg.
+  const ffmpeg = binaryPath('ffmpeg', 'ffmpeg.exe')
+  const previews = existsSync(ffmpeg)
+    ? new PreviewService(
+        catalog,
+        settings,
+        {
+          poster: async (path) => (await images.get(path))?.data ?? null,
+          pixels: (image) => posterPixels(ffmpeg, image),
+          clip: (input, start, output, hdr) => makeClip(ffmpeg, input, start, output, hdr)
+        },
+        clipsDir
+      )
+    : null
+  previews?.on('changed', () => broadcast(IpcChannel.LibraryChanged))
+
+  // Nová shoda na TMDB = nové IMDb ID (hodnocení) a nový plakát (barvy).
   metadata.on('changed', () => {
     broadcast(IpcChannel.LibraryChanged)
     void imdb.run()
+    void previews?.run()
   })
-  handleMediaProtocol(
-    new ImageCache(
-      join(app.getPath('userData'), 'cache', 'tmdb'),
-      devTmdb ? `${devTmdb}/t/p` : TMDB_IMAGE_URL,
-      chromiumFetch
-    )
-  )
+  // Klipy potřebují délku souboru z analýzy.
+  probe?.on('changed', () => void previews?.run())
 
   // Katalog se přestaví dřív, než se změna knihovny ohlásí oknům (posluchači běží v pořadí registrace).
   library.on('changed', () => {
     catalog.rebuild()
     void probe?.run()
     void metadata.run()
+    void previews?.run()
   })
   catalog.rebuild()
   void probe?.run()
@@ -164,6 +184,11 @@ void app.whenReady().then(() => {
   registerMetadataIpc(metadata)
   registerImdbIpc(imdb)
   void imdb.run()
+  void previews?.run()
+  ipcMain.handle(IpcChannel.PreviewStatus, () => previews?.status() ?? null)
+  ipcMain.handle(IpcChannel.PreviewSetClipsEnabled, (_event, enabled: unknown) =>
+    typeof enabled === 'boolean' ? previews?.setClipsEnabled(enabled) : undefined
+  )
   ipcMain.handle(IpcChannel.CatalogListMovies, () => catalog.listMovies())
   ipcMain.handle(IpcChannel.CatalogListShows, () => catalog.listShows())
   ipcMain.handle(IpcChannel.CatalogFileDetails, (_event, id: unknown) =>

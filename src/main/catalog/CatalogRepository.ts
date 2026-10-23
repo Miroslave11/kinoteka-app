@@ -8,6 +8,7 @@ import type {
 } from '../../shared/catalog'
 import { summarize, type MediaInfo } from '../../shared/mediaInfo'
 import type { ImdbRating, MatchStatus, TitleMetadata } from '../../shared/metadata'
+import type { Palette } from '../../shared/posterPalette'
 import { transaction, type Database } from '../db/database'
 import { groupMediaFiles } from './grouping'
 
@@ -60,7 +61,14 @@ function metadataOf(row: Row): {
   metadata: TitleMetadata | null
   matchStatus: MatchStatus
   imdb: ImdbRating | null
+  palette: Palette | null
 } {
+  let palette: Palette | null
+  try {
+    palette = typeof row['palette'] === 'string' ? (JSON.parse(row['palette']) as Palette) : null
+  } catch {
+    palette = null
+  }
   let metadata: TitleMetadata | null = null
   if (typeof row['metadata'] === 'string') {
     try {
@@ -75,6 +83,7 @@ function metadataOf(row: Row): {
   return {
     metadata,
     matchStatus: MATCH_STATUSES.includes(status) ? status : 'pending',
+    palette,
     imdb:
       imdbId && typeof rating === 'number'
         ? { id: imdbId, rating, votes: Number(row['imdb_votes'] ?? 0) }
@@ -232,6 +241,7 @@ export class CatalogRepository {
       .prepare("SELECT * FROM title WHERE kind = 'movie' ORDER BY name COLLATE NOCASE")
       .all()
     const files = this.filesByTitle()
+    const clips = this.clipsByTitle()
     return titles.map((row) => {
       const movieFiles = files.get(Number(row['id'])) ?? []
       return {
@@ -240,6 +250,7 @@ export class CatalogRepository {
         year: (row['year'] as number | null) ?? null,
         tags: unionTags(movieFiles),
         files: movieFiles,
+        clips: clips.get(Number(row['id'])) ?? [],
         ...metadataOf(row)
       }
     })
@@ -249,6 +260,7 @@ export class CatalogRepository {
     const titles = this.db
       .prepare("SELECT * FROM title WHERE kind = 'show' ORDER BY name COLLATE NOCASE")
       .all()
+    const clips = this.clipsByTitle()
     const episodes = this.db.prepare('SELECT * FROM episode ORDER BY season, episode').all()
     const filesByEpisode = new Map<number, CatalogFile[]>()
     for (const row of this.db
@@ -282,6 +294,7 @@ export class CatalogRepository {
         tags: unionTags(allSeasons.flatMap((s) => s.episodes.flatMap((e) => e.files))),
         seasons: allSeasons,
         episodeCount: allSeasons.reduce((total, season) => total + season.episodes.length, 0),
+        clips: clips.get(id) ?? [],
         ...metadataOf(row)
       }
     })
@@ -480,6 +493,102 @@ export class CatalogRepository {
       error,
       pending: !info && !error
     }
+  }
+
+  // ---------- barvy a klipy na pozadí ----------
+
+  /** Tituly s plakátem, u kterých paleta chybí nebo je z jiného plakátu. */
+  titlesNeedingPalette(): { id: number; posterUrl: string }[] {
+    return this.db
+      .prepare(
+        `SELECT id, json_extract(metadata, '$.posterUrl') AS poster FROM title
+         WHERE json_extract(metadata, '$.posterUrl') IS NOT NULL
+           AND palette_source IS NOT json_extract(metadata, '$.posterUrl')`
+      )
+      .all()
+      .map((row) => ({ id: Number(row['id']), posterUrl: String(row['poster']) }))
+  }
+
+  savePalette(id: number, posterUrl: string, palette: Palette | null): void {
+    this.db
+      .prepare('UPDATE title SET palette = ?, palette_source = ? WHERE id = ?')
+      .run(palette ? JSON.stringify(palette) : null, posterUrl, id)
+  }
+
+  /**
+   * Soubory, ze kterých se mají vyrobit klipy: u filmu první dostupný soubor, u seriálu
+   * první dostupný díl. Jen analyzované soubory (je potřeba znát délku).
+   */
+  filesNeedingClips(): { id: number; path: string; durationSec: number; hdr: boolean }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT m.id, m.path, m.title_id, m.clips_status,
+                json_extract(m.media_info, '$.durationSec') AS duration,
+                json_extract(m.media_info, '$.video.hdr') AS hdr
+         FROM media_file m LEFT JOIN episode e ON e.id = m.episode_id
+         WHERE m.title_id IS NOT NULL AND m.available = 1 AND m.media_info IS NOT NULL
+         ORDER BY m.title_id, e.season, e.episode, m.path`
+      )
+      .all()
+    const seen = new Set<number>()
+    const result: { id: number; path: string; durationSec: number; hdr: boolean }[] = []
+    for (const row of rows) {
+      const titleId = Number(row['title_id'])
+      if (seen.has(titleId)) continue
+      seen.add(titleId)
+      if (row['clips_status'] !== null) continue
+      result.push({
+        id: Number(row['id']),
+        path: String(row['path']),
+        durationSec: Number(row['duration'] ?? 0),
+        hdr: row['hdr'] !== null && row['hdr'] !== undefined
+      })
+    }
+    return result
+  }
+
+  saveClips(fileId: number, files: string[], status: 'done' | 'error' | 'skipped'): void {
+    transaction(this.db, () => {
+      this.db.prepare('DELETE FROM preview_clip WHERE media_file_id = ?').run(fileId)
+      const insert = this.db.prepare(
+        'INSERT INTO preview_clip (media_file_id, idx, file) VALUES (?, ?, ?)'
+      )
+      files.forEach((file, idx) => insert.run(fileId, idx, file))
+      this.db.prepare('UPDATE media_file SET clips_status = ? WHERE id = ?').run(status, fileId)
+    })
+  }
+
+  /** Všechny soubory klipů, na které databáze odkazuje (úklid nepotřebných souborů). */
+  clipFiles(): Set<string> {
+    return new Set(
+      this.db
+        .prepare('SELECT file FROM preview_clip')
+        .all()
+        .map((row) => String(row['file']))
+    )
+  }
+
+  /** Smaže všechny klipy (vypnutí klipů v Nastavení). */
+  clearClips(): void {
+    this.db.exec('DELETE FROM preview_clip; UPDATE media_file SET clips_status = NULL')
+  }
+
+  private clipsByTitle(): Map<number, string[]> {
+    const map = new Map<number, string[]>()
+    const rows = this.db
+      .prepare(
+        `SELECT m.title_id, c.file FROM preview_clip c JOIN media_file m ON m.id = c.media_file_id
+         WHERE m.available = 1 ORDER BY m.title_id, c.media_file_id, c.idx`
+      )
+      .all()
+    for (const row of rows) {
+      const titleId = Number(row['title_id'])
+      map.set(titleId, [
+        ...(map.get(titleId) ?? []),
+        `kinoteka-media://clips/${String(row['file'])}`
+      ])
+    }
+    return map
   }
 
   private filesByTitle(): Map<number, CatalogFile[]> {

@@ -1,6 +1,7 @@
 import type { FolderKind } from './library'
 import type { MediaInfo, MediaSummary } from './mediaInfo'
 import type { ImdbRating, MatchStatus, TitleMetadata } from './metadata'
+import type { Palette } from './posterPalette'
 
 /** Soubor patřící k filmu nebo dílu. */
 export interface CatalogFile {
@@ -39,6 +40,10 @@ export interface MovieItem {
   metadata: TitleMetadata | null
   matchStatus: MatchStatus
   imdb: ImdbRating | null
+  /** Barvy prostředí spočítané z plakátu; null = náhradní barvy z názvu. */
+  palette: Palette | null
+  /** Tiché klipy z filmu pro pozadí (kinoteka-media://clips/…). */
+  clips: string[]
 }
 
 export interface EpisodeItem {
@@ -66,4 +71,8 @@ export interface ShowItem {
   metadata: TitleMetadata | null
   matchStatus: MatchStatus
   imdb: ImdbRating | null
+  /** Barvy prostředí spočítané z plakátu; null = náhradní barvy z názvu. */
+  palette: Palette | null
+  /** Tiché klipy z filmu pro pozadí (kinoteka-media://clips/…). */
+  clips: string[]
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useApp } from '../app/AppContext'
 import { addedAt, type TitleItem } from '../app/catalogData'
-import { applyPalette, paletteFor, useAmbientPalette } from '../app/palette'
+import { applyPalette, titlePalette, useAmbientPalette } from '../app/palette'
 import Hero from '../components/Hero'
 import Poster from '../components/Poster'
 
@@ -20,7 +20,7 @@ export default function HomePage(): React.JSX.Element {
   )
   const heroTitles = recent.slice(0, HERO_COUNT)
   const heroTitle = heroTitles[heroIndex % Math.max(1, heroTitles.length)]
-  useAmbientPalette(heroTitle ? paletteFor(heroTitle.name) : null)
+  useAmbientPalette(heroTitle ? titlePalette(heroTitle) : null)
 
   useEffect(() => {
     if (paused || heroTitles.length < 2) return
@@ -62,7 +62,7 @@ export default function HomePage(): React.JSX.Element {
               tintOnHover
               onHoverEnd={() => {
                 setPaused(false)
-                if (heroTitle) applyPalette(paletteFor(heroTitle.name))
+                if (heroTitle) applyPalette(titlePalette(heroTitle))
               }}
             />
           ))}

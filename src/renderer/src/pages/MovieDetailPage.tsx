@@ -4,7 +4,7 @@ import { formatSize } from '../../../shared/library'
 import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
 import { playableFile, type TitleItem } from '../app/catalogData'
-import { paletteFor, useAmbientPalette } from '../app/palette'
+import { titlePalette, useAmbientPalette } from '../app/palette'
 import DetailHeader from '../components/DetailHeader'
 import MediaBadges from '../components/MediaBadges'
 
@@ -12,7 +12,7 @@ export default function MovieDetailPage(): React.JSX.Element {
   const { id } = useParams()
   const { movies, loading, play, showDetails } = useApp()
   const movie = movies.find((m) => m.id === Number(id))
-  useAmbientPalette(movie ? paletteFor(movie.name) : null)
+  useAmbientPalette(movie ? titlePalette(movie) : null)
 
   if (!movie) {
     return (

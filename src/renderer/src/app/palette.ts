@@ -1,11 +1,7 @@
 import { useEffect } from 'react'
+import type { Palette } from '../../../shared/posterPalette'
 
-/** Barvy prostředí: dvě barvy pozadí a akcent (tlačítka, časová osa, zvýraznění). */
-export interface Palette {
-  c1: string
-  c2: string
-  accent: string
-}
+export type { Palette }
 
 export const DEFAULT_PALETTE: Palette = { c1: '#8a2a12', c2: '#2a0d1c', accent: '#ff8a3d' }
 
@@ -15,10 +11,7 @@ function hashHue(name: string): number {
   return Math.abs(hash) % 360
 }
 
-/**
- * Paleta odvozená z názvu. Dokud nejsou plakáty (TMDB, přírůstek 6) a barvy z nich
- * (přírůstek 8), má každý titul aspoň vlastní stálou barvu.
- */
+/** Náhradní paleta odvozená z názvu – pro tituly bez plakátu nebo s černobílým plakátem. */
 export function paletteFor(name: string): Palette {
   const hue = hashHue(name)
   return {
@@ -51,4 +44,9 @@ export function useAmbientPalette(palette: Palette | null): void {
     applyPalette(palette ?? DEFAULT_PALETTE)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- paleta je určená klíčem
   }, [key])
+}
+
+/** Barvy titulu: z plakátu, jinak náhradní z názvu. */
+export function titlePalette(title: { name: string; palette: Palette | null }): Palette {
+  return title.palette ?? paletteFor(title.name)
 }

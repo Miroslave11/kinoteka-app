@@ -28,5 +28,8 @@ export const IpcChannel = {
 
   ImdbStatus: 'imdb:status',
   ImdbSetEnabled: 'imdb:set-enabled',
-  ImdbUpdateNow: 'imdb:update-now'
+  ImdbUpdateNow: 'imdb:update-now',
+
+  PreviewStatus: 'preview:status',
+  PreviewSetClipsEnabled: 'preview:set-clips-enabled'
 } as const

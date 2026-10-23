@@ -30,7 +30,9 @@ const movie = (id: number, name: string, year: number | null, files: CatalogFile
   files,
   metadata: null,
   matchStatus: 'pending',
-  imdb: null
+  imdb: null,
+  palette: null,
+  clips: []
 })
 
 const titles: TitleItem[] = [
@@ -60,7 +62,9 @@ const titles: TitleItem[] = [
     episodeCount: 0,
     metadata: null,
     matchStatus: 'pending',
-    imdb: null
+    imdb: null,
+    palette: null,
+    clips: []
   }
 ]
 
@@ -133,6 +137,8 @@ describe('mergeSeasons', () => {
       seasons: [{ number: 1, episodes: [episode(2), episode(9)] }],
       matchStatus: 'matched',
       imdb: null,
+      palette: null,
+      clips: [],
       metadata: {
         seasons: [
           {

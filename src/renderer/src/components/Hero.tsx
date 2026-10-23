@@ -5,6 +5,7 @@ import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
 import { displayName, displayYear, filesOf, playableFile, type TitleItem } from '../app/catalogData'
 import Artwork from './Artwork'
+import BackgroundClips from './BackgroundClips'
 import MediaBadges from './MediaBadges'
 import { titlePath } from './Poster'
 
@@ -55,6 +56,7 @@ export default function Hero({ titles, index, onSelect }: HeroProps): React.JSX.
           </motion.div>
         )}
       </AnimatePresence>
+      <BackgroundClips clips={title.clips} />
       <div className="hero-shade" />
       <AnimatePresence mode="wait">
         <motion.div
