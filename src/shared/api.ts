@@ -6,6 +6,7 @@ import type {
   ScanProgress,
   ScanResult
 } from './library'
+import type { ActionResult, MetadataSearchResult, SaveKeyResult, TmdbKeyStatus } from './metadata'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
 /** API, které preload zpřístupní oknům jako `window.kinoteka`. */
@@ -34,6 +35,21 @@ export interface KinotekaApi {
     listShows(): Promise<ShowItem[]>
     /** Technické vlastnosti souboru (panel „Vlastnosti souboru“). */
     getFileDetails(fileId: number): Promise<FileDetails | null>
+  }
+  metadata: {
+    keyStatus(): Promise<TmdbKeyStatus>
+    /** Ověří klíč u TMDB a uloží ho (šifrovaně). */
+    saveKey(key: string): Promise<SaveKeyResult>
+    removeKey(): Promise<void>
+    /** Vyhledávání pro dialog „Opravit shodu“. */
+    search(
+      kind: 'movie' | 'show',
+      query: string,
+      year: number | null
+    ): Promise<MetadataSearchResult[]>
+    applyMatch(titleId: number, tmdbId: number): Promise<ActionResult>
+    /** Znovu načte údaje titulu z TMDB. */
+    refresh(titleId: number): Promise<void>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>

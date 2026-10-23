@@ -66,5 +66,23 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE media_file ADD COLUMN media_info TEXT;
   ALTER TABLE media_file ADD COLUMN probe_error TEXT;
+  `,
+
+  // 4 – metadata z TMDB a nastavení aplikace
+  `
+  ALTER TABLE title ADD COLUMN tmdb_id INTEGER;
+  ALTER TABLE title ADD COLUMN match_status TEXT NOT NULL DEFAULT 'pending';
+  ALTER TABLE title ADD COLUMN metadata TEXT;
+  ALTER TABLE title ADD COLUMN metadata_error TEXT;
+  ALTER TABLE title ADD COLUMN metadata_updated_at TEXT;
+  -- další klíče názvů, pod kterými se k titulu mají přiřadit soubory (sloučení podle TMDB)
+  ALTER TABLE title ADD COLUMN alias_keys TEXT NOT NULL DEFAULT '[]';
+
+  CREATE INDEX title_tmdb ON title (kind, tmdb_id);
+
+  CREATE TABLE settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
   `
 ]

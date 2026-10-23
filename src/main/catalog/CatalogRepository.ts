@@ -7,6 +7,7 @@ import type {
   ShowItem
 } from '../../shared/catalog'
 import { summarize, type MediaInfo } from '../../shared/mediaInfo'
+import type { MatchStatus, TitleMetadata } from '../../shared/metadata'
 import { transaction, type Database } from '../db/database'
 import { groupMediaFiles } from './grouping'
 
@@ -46,6 +47,37 @@ const toFile = (row: Row): CatalogFile => {
 
 const unionTags = (files: CatalogFile[]): string[] => [...new Set(files.flatMap((f) => f.tags))]
 
+const MATCH_STATUSES: MatchStatus[] = [
+  'pending',
+  'matched',
+  'manual',
+  'unmatched',
+  'error',
+  'disabled'
+]
+
+function metadataOf(row: Row): { metadata: TitleMetadata | null; matchStatus: MatchStatus } {
+  let metadata: TitleMetadata | null = null
+  if (typeof row['metadata'] === 'string') {
+    try {
+      metadata = JSON.parse(row['metadata']) as TitleMetadata
+    } catch {
+      metadata = null
+    }
+  }
+  const status = row['match_status'] as MatchStatus
+  return { metadata, matchStatus: MATCH_STATUSES.includes(status) ? status : 'pending' }
+}
+
+/** Co potřebuje služba metadat k dohledání titulu. */
+export interface MetadataRequest {
+  id: number
+  kind: 'movie' | 'show'
+  name: string
+  year: number | null
+  alternativeNames: string[]
+}
+
 /**
  * Katalog filmů a seriálů. Tituly se odvozují z názvů souborů při každém skenu (rebuild);
  * existující tituly se znovu použijí podle klíče, takže si ponechají id
@@ -64,17 +96,23 @@ export class CatalogRepository {
 
     transaction(this.db, () => {
       const existing = this.db
-        .prepare('SELECT id, kind, group_key FROM title')
+        .prepare('SELECT id, kind, group_key, alias_keys FROM title')
         .all()
         .map((row) => ({
           id: Number(row['id']),
           kind: String(row['kind']),
-          key: String(row['group_key'])
+          keys: [String(row['group_key']), ...parseTags(row['alias_keys'])]
         }))
       const used = new Set<number>()
+      // Shoda podle hlavního klíče nebo aliasu – aliasy vznikají sloučením podle TMDB,
+      // takže soubory pod různými názvy téhož filmu skončí u jednoho titulu.
       const findExisting = (kind: string, keys: string[]): number | undefined =>
-        existing.find(
-          (title) => title.kind === kind && !used.has(title.id) && keys.includes(title.key)
+        (
+          existing.find(
+            (title) =>
+              title.kind === kind && !used.has(title.id) && title.keys.some((k) => keys.includes(k))
+          ) ??
+          existing.find((title) => title.kind === kind && title.keys.some((k) => keys.includes(k)))
         )?.id
 
       const insertTitle = this.db.prepare(
@@ -94,7 +132,8 @@ export class CatalogRepository {
         const id = findExisting(kind, keys)
         const alternativeJson = JSON.stringify(alternatives)
         if (id !== undefined) {
-          updateTitle.run(key, name, alternativeJson, year, id)
+          // Druhá skupina souborů téhož titulu (alias) se jen připojí, název určuje první.
+          if (!used.has(id)) updateTitle.run(key, name, alternativeJson, year, id)
           used.add(id)
           return id
         }
@@ -172,7 +211,8 @@ export class CatalogRepository {
         name: String(row['name']),
         year: (row['year'] as number | null) ?? null,
         tags: unionTags(movieFiles),
-        files: movieFiles
+        files: movieFiles,
+        ...metadataOf(row)
       }
     })
   }
@@ -213,9 +253,116 @@ export class CatalogRepository {
         alternativeNames: parseTags(row['alternative_names']),
         tags: unionTags(allSeasons.flatMap((s) => s.episodes.flatMap((e) => e.files))),
         seasons: allSeasons,
-        episodeCount: allSeasons.reduce((total, season) => total + season.episodes.length, 0)
+        episodeCount: allSeasons.reduce((total, season) => total + season.episodes.length, 0),
+        ...metadataOf(row)
       }
     })
+  }
+
+  // ---------- metadata ----------
+
+  /** Tituly, které čekají na dohledání (a chybné, u kterých už uplynula hodina). */
+  titlesNeedingMetadata(now = new Date()): MetadataRequest[] {
+    const retryBefore = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
+    return this.db
+      .prepare(
+        `SELECT id, kind, name, year, alternative_names FROM title
+         WHERE match_status = 'pending'
+            OR (match_status = 'error' AND (metadata_updated_at IS NULL OR metadata_updated_at < ?))
+         ORDER BY id`
+      )
+      .all(retryBefore)
+      .map((row) => ({
+        id: Number(row['id']),
+        kind: row['kind'] === 'show' ? 'show' : 'movie',
+        name: String(row['name']),
+        year: (row['year'] as number | null) ?? null,
+        alternativeNames: parseTags(row['alternative_names'])
+      }))
+  }
+
+  titleForMetadata(id: number): MetadataRequest | undefined {
+    const row = this.db
+      .prepare('SELECT id, kind, name, year, alternative_names FROM title WHERE id = ?')
+      .get(id)
+    if (!row) return undefined
+    return {
+      id,
+      kind: row['kind'] === 'show' ? 'show' : 'movie',
+      name: String(row['name']),
+      year: (row['year'] as number | null) ?? null,
+      alternativeNames: parseTags(row['alternative_names'])
+    }
+  }
+
+  saveMetadata(
+    id: number,
+    metadata: TitleMetadata,
+    status: 'matched' | 'manual',
+    now = new Date()
+  ): void {
+    this.db
+      .prepare(
+        `UPDATE title SET tmdb_id = ?, metadata = ?, match_status = ?, metadata_error = NULL,
+         metadata_updated_at = ? WHERE id = ?`
+      )
+      .run(metadata.tmdbId, JSON.stringify(metadata), status, now.toISOString(), id)
+  }
+
+  setMatchStatus(
+    id: number,
+    status: MatchStatus,
+    error: string | null = null,
+    now = new Date()
+  ): void {
+    this.db
+      .prepare(
+        'UPDATE title SET match_status = ?, metadata_error = ?, metadata_updated_at = ? WHERE id = ?'
+      )
+      .run(status, error, now.toISOString(), id)
+  }
+
+  /** Po zadání nového klíče TMDB zkusí znovu vše, co se nepovedlo. */
+  resetUnmatched(): void {
+    this.db.exec(
+      "UPDATE title SET match_status = 'pending' WHERE match_status IN ('unmatched', 'error', 'disabled')"
+    )
+  }
+
+  /**
+   * Tituly, které TMDB pozná jako tentýž film/seriál, sloučí do jednoho (např. soubory
+   * pojmenované česky a anglicky). Vrací true, když se něco sloučilo – pak je potřeba rebuild.
+   */
+  mergeByTmdb(): boolean {
+    const duplicates = this.db
+      .prepare(
+        `SELECT kind, tmdb_id FROM title WHERE tmdb_id IS NOT NULL
+         GROUP BY kind, tmdb_id HAVING count(*) > 1`
+      )
+      .all()
+    if (duplicates.length === 0) return false
+    transaction(this.db, () => {
+      for (const duplicate of duplicates) {
+        const titles = this.db
+          .prepare(
+            'SELECT id, group_key, alias_keys, match_status FROM title WHERE kind = ? AND tmdb_id = ? ORDER BY id'
+          )
+          .all(duplicate['kind'], duplicate['tmdb_id'])
+        // Ruční shoda má přednost, jinak nejstarší titul.
+        const target = titles.find((t) => t['match_status'] === 'manual') ?? titles[0]!
+        const keys = new Set(parseTags(target['alias_keys']))
+        for (const other of titles.filter((t) => t !== target)) {
+          keys.add(String(other['group_key']))
+          for (const key of parseTags(other['alias_keys'])) keys.add(key)
+          this.db.prepare('DELETE FROM title WHERE id = ?').run(other['id'])
+        }
+        keys.delete(String(target['group_key']))
+        this.db
+          .prepare('UPDATE title SET alias_keys = ? WHERE id = ?')
+          .run(JSON.stringify([...keys]), target['id'])
+      }
+    })
+    return true
   }
 
   fileDetails(fileId: number): FileDetails | null {

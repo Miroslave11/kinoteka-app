@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, safeStorage } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
@@ -8,6 +8,14 @@ import { broadcast } from './broadcast'
 import { CatalogRepository } from './catalog/CatalogRepository'
 import { openDatabase } from './db/database'
 import { runFfprobe } from './media/ffprobe'
+import { ImageCache } from './metadata/ImageCache'
+import {
+  handleMediaProtocol,
+  registerMediaScheme,
+  registerMetadataIpc
+} from './metadata/metadataIpc'
+import { MetadataService } from './metadata/MetadataService'
+import { TMDB_IMAGE_URL, TmdbClient } from './metadata/TmdbClient'
 import { ProbeService } from './media/ProbeService'
 import { ffprobeExecutablePath } from './mpv/binary'
 import { registerLibraryIpc } from './library/libraryIpc'
@@ -15,13 +23,19 @@ import { LibraryRepository } from './library/LibraryRepository'
 import { LibraryService } from './library/LibraryService'
 import { PlayerSession } from './player/PlayerSession'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
+import { SettingsRepository } from './settings/SettingsRepository'
 import { createMainWindowOptions } from './windowOptions'
 
 // S DirectComposition kreslí Chromium obsah oken nad všechna vnořená nativní okna,
 // takže by zakryl obraz, který mpv kreslí do okna aplikace (--wid).
 app.commandLine.appendSwitch('disable-direct-composition')
+registerMediaScheme()
 
 let session: PlayerSession | null = null
+
+/** fetch přes síť Chromia (net.fetch), který neumí objekt URL – převede ho na text. */
+const chromiumFetch: typeof fetch = (input, init) =>
+  net.fetch(input instanceof URL ? input.toString() : input, init)
 
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow(createMainWindowOptions(preloadPath()))
@@ -101,13 +115,40 @@ void app.whenReady().then(() => {
     console.warn(`Chybí ${ffprobe} – vlastnosti souborů se nezjistí (npm run fetch:ffmpeg).`)
   probe?.on('changed', () => broadcast(IpcChannel.LibraryChanged))
 
+  // Ve vývoji jde TMDB přesměrovat na lokální „falešný“ server (KINOTEKA_DEV_TMDB_URL).
+  const devTmdb = app.isPackaged ? undefined : process.env['KINOTEKA_DEV_TMDB_URL']
+  const settings = new SettingsRepository(db, {
+    available: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (plain) => safeStorage.encryptString(plain),
+    decrypt: (data) => safeStorage.decryptString(data)
+  })
+  const metadata = new MetadataService(
+    catalog,
+    settings,
+    // Síť přes Chromium (net.fetch): používá certifikáty a proxy Windows, takže funguje
+    // i za antivirem nebo firemní proxy, které prověřují HTTPS.
+    (credential) =>
+      new TmdbClient({ credential, baseUrl: devTmdb && `${devTmdb}/3`, fetchImpl: chromiumFetch })
+  )
+  metadata.on('changed', () => broadcast(IpcChannel.LibraryChanged))
+  handleMediaProtocol(
+    new ImageCache(
+      join(app.getPath('userData'), 'cache', 'tmdb'),
+      devTmdb ? `${devTmdb}/t/p` : TMDB_IMAGE_URL,
+      chromiumFetch
+    )
+  )
+
   // Katalog se přestaví dřív, než se změna knihovny ohlásí oknům (posluchači běží v pořadí registrace).
   library.on('changed', () => {
     catalog.rebuild()
     void probe?.run()
+    void metadata.run()
   })
   catalog.rebuild()
   void probe?.run()
+  void metadata.run()
+  registerMetadataIpc(metadata)
   ipcMain.handle(IpcChannel.CatalogListMovies, () => catalog.listMovies())
   ipcMain.handle(IpcChannel.CatalogListShows, () => catalog.listShows())
   ipcMain.handle(IpcChannel.CatalogFileDetails, (_event, id: unknown) =>

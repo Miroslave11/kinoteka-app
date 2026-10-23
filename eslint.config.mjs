@@ -9,6 +9,11 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
+    }
+  },
+  {
     files: ['src/main/**', 'src/preload/**', 'scripts/**', '*.config.*'],
     languageOptions: { globals: globals.node }
   },

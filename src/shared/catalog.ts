@@ -1,5 +1,6 @@
 import type { FolderKind } from './library'
 import type { MediaInfo, MediaSummary } from './mediaInfo'
+import type { MatchStatus, TitleMetadata } from './metadata'
 
 /** Soubor patřící k filmu nebo dílu. */
 export interface CatalogFile {
@@ -35,6 +36,8 @@ export interface MovieItem {
   /** Štítky ze všech souborů filmu („CZ dabing“, „1080p“…). */
   tags: string[]
   files: CatalogFile[]
+  metadata: TitleMetadata | null
+  matchStatus: MatchStatus
 }
 
 export interface EpisodeItem {
@@ -59,4 +62,6 @@ export interface ShowItem {
   tags: string[]
   seasons: SeasonItem[]
   episodeCount: number
+  metadata: TitleMetadata | null
+  matchStatus: MatchStatus
 }

@@ -1,15 +1,15 @@
-import { ArrowLeft, Info, Play } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
+import { Info, Play } from 'lucide-react'
+import { useParams } from 'react-router'
 import { formatSize } from '../../../shared/library'
 import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
-import { playableFile } from '../app/catalogData'
-import { paletteFor, placeholderStyle, useAmbientPalette } from '../app/palette'
+import { playableFile, type TitleItem } from '../app/catalogData'
+import { paletteFor, useAmbientPalette } from '../app/palette'
+import DetailHeader from '../components/DetailHeader'
 import MediaBadges from '../components/MediaBadges'
 
 export default function MovieDetailPage(): React.JSX.Element {
   const { id } = useParams()
-  const navigate = useNavigate()
   const { movies, loading, play, showDetails } = useApp()
   const movie = movies.find((m) => m.id === Number(id))
   useAmbientPalette(movie ? paletteFor(movie.name) : null)
@@ -22,49 +22,29 @@ export default function MovieDetailPage(): React.JSX.Element {
     )
   }
 
+  const title: TitleItem = { kind: 'movie', ...movie }
   const file = playableFile(movie.files)
   const first = file ?? movie.files[0]
-  const meta = [movie.year, first?.summary && formatTime(first.summary.durationSec)].filter(Boolean)
+  const runtime = first?.summary
+    ? formatTime(first.summary.durationSec)
+    : movie.metadata?.runtimeMin && `${movie.metadata.runtimeMin} min`
 
   return (
     <div className="detail-page">
-      <div className="d-back">
-        <div className="clip" />
-        <div className="shade" />
-      </div>
-      <button className="icon-btn back" onClick={() => navigate(-1)} title="Zpět">
-        <ArrowLeft size={20} />
-      </button>
-      <div className="detail">
-        <div className="poster detail-poster" style={placeholderStyle(movie.name)}>
-          <span className="poster-title">
-            {movie.name}
-            <small>{movie.year}</small>
-          </span>
-        </div>
-        <div className="d-info">
-          <div className="logo-title">{movie.name}</div>
-          <div className="meta">{meta.join(' · ') || 'rok a délka zatím neznámé'}</div>
-          <MediaBadges file={first} tags={movie.tags} />
-          <div className="actions">
-            <button
-              className="btn primary"
-              disabled={!file}
-              onClick={() => file && void play(file.id)}
-            >
-              <Play size={18} fill="currentColor" /> {file ? 'Přehrát' : 'Soubor nedostupný'}
-            </button>
-            {first && (
-              <button className="btn" onClick={() => showDetails(first.id)}>
-                <Info size={18} /> Vlastnosti souboru
-              </button>
-            )}
-          </div>
-          <p className="plot muted">
-            Popis, hodnocení ČSFD a herci přibudou s metadaty z TMDB a ČSFD.
-          </p>
-        </div>
-      </div>
+      <DetailHeader
+        title={title}
+        meta={[runtime]}
+        badges={<MediaBadges file={first} tags={movie.tags} />}
+      >
+        <button className="btn primary" disabled={!file} onClick={() => file && void play(file.id)}>
+          <Play size={18} fill="currentColor" /> {file ? 'Přehrát' : 'Soubor nedostupný'}
+        </button>
+        {first && (
+          <button className="btn" onClick={() => showDetails(first.id)}>
+            <Info size={18} /> Vlastnosti souboru
+          </button>
+        )}
+      </DetailHeader>
 
       {movie.files.length > 1 && (
         <section className="d-section card">

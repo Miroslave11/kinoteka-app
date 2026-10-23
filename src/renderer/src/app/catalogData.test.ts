@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { CatalogFile } from '../../../shared/catalog'
-import { DEFAULT_FILTERS, filterOptions, filterTitles, type TitleItem } from './catalogData'
+import type { TitleMetadata } from '../../../shared/metadata'
+import {
+  DEFAULT_FILTERS,
+  filterOptions,
+  filterTitles,
+  mergeSeasons,
+  type TitleItem
+} from './catalogData'
 
 const file = (overrides: Partial<CatalogFile> = {}): CatalogFile => ({
   id: 1,
@@ -20,7 +27,9 @@ const movie = (id: number, name: string, year: number | null, files: CatalogFile
   name,
   year,
   tags: [],
-  files
+  files,
+  metadata: null,
+  matchStatus: 'pending'
 })
 
 const titles: TitleItem[] = [
@@ -47,7 +56,9 @@ const titles: TitleItem[] = [
     alternativeNames: ['The Watcher'],
     tags: [],
     seasons: [],
-    episodeCount: 0
+    episodeCount: 0,
+    metadata: null,
+    matchStatus: 'pending'
   }
 ]
 
@@ -97,5 +108,52 @@ describe('filterOptions', () => {
       resolutions: ['4K', '1080p'],
       tags: ['CZ dabing', 'CZ titulky']
     })
+  })
+})
+
+describe('mergeSeasons', () => {
+  const episode = (n: number) => ({
+    id: n,
+    season: 1,
+    episode: n,
+    name: n === 2 ? 'Puzzle' : null,
+    files: [file({ id: n })]
+  })
+
+  it('spojí díly z disku s díly z TMDB a chybějící označí', () => {
+    const seasons = mergeSeasons({
+      id: 1,
+      name: 'Země gangů',
+      year: 2025,
+      alternativeNames: [],
+      tags: [],
+      episodeCount: 2,
+      seasons: [{ number: 1, episodes: [episode(2), episode(9)] }],
+      matchStatus: 'matched',
+      metadata: {
+        seasons: [
+          {
+            number: 1,
+            name: 'Série 1',
+            episodes: [1, 2, 3].map((n) => ({
+              number: n,
+              name: n === 2 ? null : `Epizoda ${n}`,
+              overview: null,
+              stillUrl: null,
+              airDate: null,
+              runtimeMin: null
+            }))
+          }
+        ]
+      } as unknown as TitleMetadata
+    })
+    expect(seasons).toHaveLength(1)
+    expect(seasons[0]!.episodes.map((e) => [e.episode, e.name, e.disk !== null])).toEqual([
+      [1, 'Epizoda 1', false],
+      [2, 'Puzzle', true],
+      [3, 'Epizoda 3', false],
+      // díl na disku, který TMDB nezná, zůstane
+      [9, null, true]
+    ])
   })
 })
