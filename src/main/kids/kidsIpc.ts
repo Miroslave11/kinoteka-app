@@ -3,12 +3,15 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { IpcChannel } from '../../shared/ipc'
 import {
+  DEFAULT_KIDS_SETTINGS,
+  parseKidsSettings,
   parseYoutubeUrl,
   type KidsDownloadResult,
   type KidsScanResult,
   type KidsStatus,
   type KidsTitle
 } from '../../shared/kids'
+import { broadcast } from '../broadcast'
 import type { SettingsRepository } from '../settings/SettingsRepository'
 import type { KidsDownloader } from './KidsDownloader'
 import type { KidsLibrary } from './KidsLibrary'
@@ -16,6 +19,7 @@ import type { KidsRepository } from './KidsRepository'
 import type { YtDlpTool } from './YtDlpTool'
 
 const FOLDER_SETTING = 'kids.folder'
+const SETTINGS_KEY = 'kids.settings'
 /** Domácí složka s videi (rozhodnuto v SCOPE-DETI.md); na jiném počítači Videa\Kids. */
 const HOME_VIDEOS = 'C:\\Mirek_data\\09_Videa'
 
@@ -48,6 +52,16 @@ export function registerKidsIpc({
     ytDlpVersion: await tool.version(),
     busy: downloader.busy
   }))
+
+  ipcMain.handle(IpcChannel.KidsGetSettings, () =>
+    parseKidsSettings(settings.get(SETTINGS_KEY) ?? DEFAULT_KIDS_SETTINGS)
+  )
+  ipcMain.handle(IpcChannel.KidsSaveSettings, (_event, value: unknown) => {
+    const saved = parseKidsSettings(value)
+    settings.set(SETTINGS_KEY, saved)
+    broadcast(IpcChannel.KidsChanged)
+    return saved
+  })
 
   ipcMain.handle(IpcChannel.KidsListTitles, (): KidsTitle[] => repository.list())
   ipcMain.handle(IpcChannel.KidsScan, (): Promise<KidsScanResult> => library.scan())

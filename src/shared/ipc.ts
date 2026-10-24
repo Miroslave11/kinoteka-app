@@ -62,6 +62,8 @@ export const IpcChannel = {
   KidsStatus: 'kids:status',
   KidsDownload: 'kids:download',
   KidsDownloadProgress: 'kids:download-progress',
+  KidsGetSettings: 'kids:get-settings',
+  KidsSaveSettings: 'kids:save-settings',
   KidsListTitles: 'kids:list-titles',
   KidsScan: 'kids:scan',
   KidsChanged: 'kids:changed',

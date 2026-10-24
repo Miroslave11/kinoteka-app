@@ -1,0 +1,558 @@
+/* ---------- Dětská část: motivy a rozvržení (podle docs/mockupy/deti.html) ---------- */
+
+.k-app {
+  --k-coral: #ff6b6b;
+  --k-sun: #ffc93c;
+  --k-mint: #2ec4a6;
+  --k-grape: #9b7bff;
+  --k-sky: #3fa9f5;
+
+  --k-ink: #1f2a44;
+  --k-soft: #5b6880;
+  --k-panel: rgb(255 255 255 / 0.82);
+  --k-panel-solid: #fff;
+  --k-line: rgb(31 42 68 / 0.1);
+  --k-accent: var(--k-coral);
+  --k-ring: #fff;
+  --k-shadow: 31 42 68;
+  --k-grad: linear-gradient(180deg, #7fd0ff 0%, #bfe9ff 55%, #e6f7ff 100%);
+  --k-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='260'%3E%3Cg fill='%23fff' opacity='.55'%3E%3Cellipse cx='70' cy='60' rx='46' ry='18'/%3E%3Cellipse cx='96' cy='48' rx='30' ry='22'/%3E%3Cellipse cx='300' cy='170' rx='56' ry='20'/%3E%3Cellipse cx='330' cy='156' rx='34' ry='26'/%3E%3C/g%3E%3Cg fill='%23fff' opacity='.7'%3E%3Ccircle cx='220' cy='40' r='3'/%3E%3Ccircle cx='380' cy='60' r='2'/%3E%3Ccircle cx='40' cy='200' r='2.5'/%3E%3C/g%3E%3C/svg%3E");
+
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--k-ink);
+  font-family: 'Nunito Variable', Nunito, system-ui, sans-serif;
+  font-size: 16px;
+  background: var(--k-pattern), var(--k-grad);
+  user-select: none;
+}
+
+.k-app[data-theme='louka'] {
+  --k-grad: linear-gradient(180deg, #bdeeff 0%, #dff7d0 45%, #c5ecaa 100%);
+  --k-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='240'%3E%3Cg opacity='.5'%3E%3Cg transform='translate(60 60)'%3E%3Ccircle r='7' cy='-10' fill='%23ff9fc0'/%3E%3Ccircle r='7' cy='10' fill='%23ff9fc0'/%3E%3Ccircle r='7' cx='-10' fill='%23ff9fc0'/%3E%3Ccircle r='7' cx='10' fill='%23ff9fc0'/%3E%3Ccircle r='6' fill='%23ffd23f'/%3E%3C/g%3E%3Cg transform='translate(220 170)'%3E%3Ccircle r='6' cy='-9' fill='%23b49bff'/%3E%3Ccircle r='6' cy='9' fill='%23b49bff'/%3E%3Ccircle r='6' cx='-9' fill='%23b49bff'/%3E%3Ccircle r='6' cx='9' fill='%23b49bff'/%3E%3Ccircle r='5' fill='%23fff3b0'/%3E%3C/g%3E%3Ccircle cx='200' cy='50' r='4' fill='%23fff'/%3E%3Ccircle cx='90' cy='190' r='4' fill='%23fff'/%3E%3C/g%3E%3C/svg%3E");
+  --k-accent: #ff7a59;
+}
+
+.k-app[data-theme='more'] {
+  --k-grad: linear-gradient(180deg, #8de3f5 0%, #b9f0fa 50%, #e3fbff 100%);
+  --k-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='260'%3E%3Cg fill='none' stroke='%23fff' stroke-width='3' opacity='.6'%3E%3Ccircle cx='50' cy='60' r='14'/%3E%3Ccircle cx='76' cy='92' r='7'/%3E%3Ccircle cx='250' cy='170' r='18'/%3E%3Ccircle cx='280' cy='130' r='8'/%3E%3Cpath d='M0 236 q40 -18 80 0 t80 0 t80 0 t80 0'/%3E%3C/g%3E%3C/svg%3E");
+  --k-accent: #ff8a3d;
+}
+
+.k-app[data-theme='vesmir'] {
+  --k-ink: #f5f3ff;
+  --k-soft: #c6c0f0;
+  --k-panel: rgb(255 255 255 / 0.1);
+  --k-panel-solid: #3a3388;
+  --k-line: rgb(255 255 255 / 0.14);
+  --k-accent: #ffc93c;
+  --k-ring: #ffe680;
+  --k-shadow: 0 0 0;
+  --k-grad: linear-gradient(180deg, #1d1b4f 0%, #2e2a78 55%, #4a3aa0 100%);
+  --k-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='280'%3E%3Cg fill='%23fff'%3E%3Ccircle cx='30' cy='40' r='1.6'/%3E%3Ccircle cx='120' cy='90' r='1.2'/%3E%3Ccircle cx='200' cy='30' r='2'/%3E%3Ccircle cx='320' cy='70' r='1.4'/%3E%3Ccircle cx='70' cy='200' r='1.8'/%3E%3Ccircle cx='260' cy='220' r='1.3'/%3E%3C/g%3E%3Cpath d='M300 170 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4z' fill='%23ffe680' opacity='.8'/%3E%3Ccircle cx='150' cy='190' r='14' fill='%23ff9fc0' opacity='.35'/%3E%3C/svg%3E");
+}
+
+.k-app[data-theme='jednorozci'] {
+  --k-accent: #ff4f9a;
+  --k-shadow: 176 90 170;
+  --k-grad: linear-gradient(
+    115deg,
+    #8fd6ff 0%,
+    #b9c8ff 30%,
+    #e2b8f5 55%,
+    #ffb3d6 78%,
+    #ff9cc9 100%
+  );
+  --k-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='380' height='300'%3E%3Cg fill='%23fff'%3E%3Ccircle cx='60' cy='70' r='34' opacity='.16'/%3E%3Ccircle cx='290' cy='210' r='46' opacity='.13'/%3E%3Ccircle cx='190' cy='40' r='18' opacity='.2'/%3E%3Ccircle cx='330' cy='60' r='9' opacity='.35'/%3E%3Ccircle cx='120' cy='250' r='12' opacity='.28'/%3E%3C/g%3E%3Cg fill='%23fff'%3E%3Cpath d='M230 120 l3 11 11 3 -11 3 -3 11 -3 -11 -11 -3 11 -3z'/%3E%3Cpath d='M40 180 l2 7 7 2 -7 2 -2 7 -2 -7 -7 -2 7 -2z' opacity='.9'/%3E%3Cpath d='M350 140 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z' opacity='.8'/%3E%3C/g%3E%3Cpath d='M150 160 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3z' fill='%23ffe27a'/%3E%3C/svg%3E");
+}
+
+.k-app h1,
+.k-app h2,
+.k-app h3,
+.k-brand,
+.k-pill,
+.k-big-btn,
+.k-title-name,
+.k-bubble b {
+  font-family: 'Fredoka Variable', Fredoka, 'Nunito Variable', sans-serif;
+}
+
+:where(.k-app) button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/* kopečky dole */
+.k-app::after {
+  content: '';
+  position: absolute;
+  left: -5%;
+  right: -5%;
+  bottom: -120px;
+  height: 220px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 100% at 25% 100%, rgb(255 255 255 / 0.55), transparent 70%),
+    radial-gradient(55% 90% at 80% 100%, rgb(255 255 255 / 0.45), transparent 70%);
+}
+
+.k-app[data-theme='vesmir']::after {
+  background: radial-gradient(60% 100% at 30% 100%, rgb(155 123 255 / 0.35), transparent 70%);
+}
+
+/* ---------- ozdoby motivu Jednorožci ---------- */
+.k-rainbow,
+.k-mascot {
+  display: none;
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.k-app[data-theme='jednorozci'] .k-rainbow,
+.k-app[data-theme='jednorozci'] .k-mascot {
+  display: block;
+}
+
+.k-rainbow {
+  left: -120px;
+  top: 190px;
+  width: 520px;
+  opacity: 0.35;
+}
+
+.k-mascot {
+  right: 24px;
+  top: -14px;
+  width: 260px;
+  height: 180px;
+  filter: drop-shadow(0 10px 16px rgb(176 90 170 / 0.25));
+}
+
+/* ---------- horní lišta ---------- */
+.k-topbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 32px 10px;
+}
+
+.k-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.k-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #ffc93c, #ff6b6b);
+  color: #fff;
+  box-shadow: 0 6px 0 rgb(0 0 0 / 0.08);
+  transform: rotate(-6deg);
+}
+
+.k-app[data-theme='jednorozci'] .k-logo {
+  background: conic-gradient(
+    from 200deg,
+    #ff6b6b,
+    #ffc93c,
+    #4ade80,
+    #3fa9f5,
+    #9b7bff,
+    #ff6fae,
+    #ff6b6b
+  );
+}
+
+.k-brand small {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: var(--k-grape);
+  color: #fff;
+  transform: rotate(3deg);
+}
+
+.k-pills {
+  display: flex;
+  gap: 10px;
+  margin-left: 22px;
+}
+
+.k-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  padding: 0 24px;
+  border-radius: 99px;
+  font-weight: 600;
+  font-size: 20px;
+  background: var(--k-panel);
+  box-shadow: 0 5px 0 rgb(var(--k-shadow) / 0.08);
+  text-decoration: none;
+  color: inherit;
+}
+
+.k-pill.on {
+  background: var(--k-accent);
+  color: #fff;
+  box-shadow: 0 5px 0 rgb(0 0 0 / 0.14);
+}
+
+.k-app[data-theme='jednorozci'] .k-pill.on {
+  background: linear-gradient(90deg, #ff6fae, #b07cff);
+}
+
+.k-parents {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 99px;
+  color: var(--k-soft) !important;
+  font-weight: 800;
+  font-size: 14px;
+  background: var(--k-panel) !important;
+}
+
+.k-round {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--k-panel-solid) !important;
+  box-shadow: 0 5px 0 rgb(var(--k-shadow) / 0.12);
+  color: var(--k-ink);
+}
+
+/* ---------- obsah ---------- */
+.k-scroll {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 32px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.k-hello {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.k-hello span {
+  color: var(--k-accent);
+}
+
+.k-row-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.k-row-h svg {
+  color: var(--k-accent);
+}
+
+/* kulaté tituly */
+.k-bubbles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px 26px;
+}
+
+.k-bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 150px;
+  transition: transform 0.2s;
+}
+
+.k-bubble:hover,
+.k-bubble:focus-visible {
+  transform: translateY(-6px) rotate(-2deg);
+  outline: none;
+}
+
+.k-face {
+  display: block;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 7px solid var(--k-ring);
+  background-size: cover;
+  background-position: center;
+  box-shadow:
+    0 8px 0 rgb(var(--k-shadow) / 0.1),
+    0 14px 30px rgb(var(--k-shadow) / 0.14);
+}
+
+.k-bubble b {
+  font-size: 19px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.15;
+}
+
+/* karty pohádek */
+.k-strip {
+  display: flex;
+  gap: 22px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 4px 14px;
+  margin: -4px -4px 0;
+}
+
+.k-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 26px 24px;
+}
+
+.k-card {
+  position: relative;
+  flex: none;
+  width: 300px;
+  text-align: left;
+  transition: transform 0.2s;
+}
+
+.k-grid .k-card {
+  width: auto;
+}
+
+.k-card.big {
+  width: 400px;
+}
+
+.k-card:hover,
+.k-card:focus-visible {
+  transform: scale(1.03) rotate(-1deg);
+  outline: none;
+}
+
+.k-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: 26px;
+  border: 6px solid var(--k-ring);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+  box-shadow:
+    0 7px 0 rgb(var(--k-shadow) / 0.1),
+    0 16px 34px rgb(var(--k-shadow) / 0.16);
+}
+
+.k-card b {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 12px 6px 0;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.k-card small {
+  display: block;
+  margin: 2px 6px 0;
+  color: var(--k-soft);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.k-play-dot {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--k-accent);
+  color: #fff;
+  box-shadow: 0 5px 0 rgb(0 0 0 / 0.15);
+}
+
+.k-time {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.92);
+  color: #1f2a44;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.k-seen {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--k-sun);
+  color: #fff;
+  box-shadow: 0 3px 0 rgb(0 0 0 / 0.12);
+}
+
+.k-bar {
+  position: absolute;
+  left: 14px;
+  right: 84px;
+  bottom: 30px;
+  height: 12px;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.7);
+}
+
+.k-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--k-accent);
+}
+
+/* detail titulu */
+.k-title-head {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.k-title-head .k-face {
+  width: 190px;
+  height: 190px;
+  border-width: 9px;
+}
+
+.k-title-name {
+  margin: 0;
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.k-title-sub {
+  margin-top: 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--k-soft);
+}
+
+.k-head-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 18px;
+  align-items: center;
+}
+
+.k-big-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 70px;
+  padding: 0 34px;
+  border-radius: 99px;
+  font-size: 26px;
+  font-weight: 600;
+  background: var(--k-accent) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 0 rgb(0 0 0 / 0.16);
+}
+
+.k-empty {
+  margin: 60px auto;
+  max-width: 560px;
+  padding: 34px;
+  border-radius: 30px;
+  background: var(--k-panel);
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.k-empty p {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--k-soft);
+}
+
+/* Obsah nad ozdobami (maskot, duha) */
+.k-hello,
+.k-row-h,
+.k-bubbles,
+.k-strip,
+.k-grid,
+.k-title-head {
+  position: relative;
+  z-index: 1;
+}
+
+/* Tenké zaoblené posuvníky v barvách motivu */
+.k-app ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.k-app ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.k-app ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 99px;
+  background: rgb(var(--k-shadow) / 0.22) padding-box;
+}
+
+.k-app ::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--k-shadow) / 0.38);
+}
+
+.k-app ::-webkit-scrollbar-button,
+.k-app ::-webkit-scrollbar-corner {
+  display: none;
+}
+.k-app[data-theme='vesmir'] ::-webkit-scrollbar-thumb {
+  background-color: rgb(255 255 255 / 0.25);
+}

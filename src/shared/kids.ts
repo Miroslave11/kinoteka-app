@@ -66,6 +66,30 @@ export interface KidsScanResult {
   errors: string[]
 }
 
+export const KIDS_THEMES = [
+  { id: 'obloha', label: 'Obloha' },
+  { id: 'louka', label: 'Louka' },
+  { id: 'more', label: 'Moře' },
+  { id: 'vesmir', label: 'Vesmír' },
+  { id: 'jednorozci', label: 'Jednorožci' }
+] as const
+
+export type KidsTheme = (typeof KIDS_THEMES)[number]['id']
+
+export interface KidsSettings {
+  theme: KidsTheme
+}
+
+export const DEFAULT_KIDS_SETTINGS: KidsSettings = { theme: 'obloha' }
+
+/** Ověří nastavení z okna; neznámé hodnoty nahradí výchozími. */
+export function parseKidsSettings(value: unknown): KidsSettings {
+  const input =
+    typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
+  const theme = KIDS_THEMES.find((t) => t.id === input['theme'])?.id
+  return { theme: theme ?? DEFAULT_KIDS_SETTINGS.theme }
+}
+
 export interface KidsStatus {
   /** Složka s dětskými videi. */
   folder: string
