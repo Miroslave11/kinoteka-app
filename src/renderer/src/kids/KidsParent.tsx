@@ -1,12 +1,12 @@
-import { Download, Home, List, Lock, Settings2 } from 'lucide-react'
+import { Download, Home, List, Lock } from 'lucide-react'
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router'
 import { useKids } from './KidsData'
 import KidsParentDownload from './KidsParentDownload'
-import KidsParentSettings from './KidsParentSettings'
 import KidsParentTitles from './KidsParentTitles'
 
 /**
- * Část Pro rodiče (za rodičovskou branou): stahování, správa titulů a nastavení.
+ * Část Pro rodiče (za rodičovskou branou): stahování a správa titulů. Nastavení dětské
+ * části je v hlavním Nastavení → Děti.
  * Bez otevřené brány přesměruje zpět k pohádkám.
  */
 export default function KidsParent(): React.JSX.Element {
@@ -30,9 +30,6 @@ export default function KidsParent(): React.JSX.Element {
           </NavLink>
           <NavLink to="/deti/rodice/tituly" className={tab}>
             <List size={18} /> Tituly
-          </NavLink>
-          <NavLink to="/deti/rodice/nastaveni" className={tab}>
-            <Settings2 size={18} /> Nastavení
           </NavLink>
         </nav>
         <div className="k-ptop-right">
@@ -58,7 +55,6 @@ export default function KidsParent(): React.JSX.Element {
         <Route path="/" element={<Navigate to="stahovani" replace />} />
         <Route path="/stahovani" element={<KidsParentDownload />} />
         <Route path="/tituly" element={<KidsParentTitles />} />
-        <Route path="/nastaveni" element={<KidsParentSettings />} />
       </Routes>
     </div>
   )

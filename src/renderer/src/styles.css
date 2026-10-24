@@ -2262,3 +2262,35 @@ p.info-chip {
 .update-banner .btn {
   flex: none;
 }
+
+/* Nastavení → Děti */
+.key-row .grow {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.field.kids-num {
+  width: 130px;
+}
+
+.kids-pin {
+  margin: 4px 0 12px;
+}
+
+.kids-left {
+  margin: 12px 0;
+}
+
+.s-stack .card .toggle-row + .muted.small {
+  margin: -4px 0 12px 28px;
+}
+
+.kids-pin + .actions {
+  margin-bottom: 14px;
+}
+
+.s-stack .card .form-grid + .toggle-row,
+.kids-left + .toggle-row {
+  margin-top: 14px;
+}

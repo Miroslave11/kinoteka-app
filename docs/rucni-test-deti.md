@@ -14,7 +14,7 @@ Složka s pohádkami: `C:\Mirek_data\09_Videa\Kids`.
 
 1. Postranní menu → **Děti**.
 2. Ověř kulaté tituly, řady „Nové pohádky“ a „Oblíbené“ a detail titulu po kliknutí.
-3. Pro rodiče → Nastavení: přepni všech 5 motivů. Obloha, Louka, Moře, Vesmír a Jednorožci se mají hned projevit.
+3. Nastavení → Děti (v dospělé části): přepni všech 5 motivů. Obloha, Louka, Moře, Vesmír a Jednorožci se mají hned projevit.
 
 ## D4 – Dětský přehrávač
 
