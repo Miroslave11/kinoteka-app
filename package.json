@@ -21,6 +21,7 @@
     "fetch:mpv": "node scripts/fetch-mpv.mjs",
     "fetch:ffmpeg": "node scripts/fetch-ffmpeg.mjs",
     "fetch:bin": "node scripts/fetch-mpv.mjs && node scripts/fetch-ffmpeg.mjs",
+    "icon": "electron scripts/build-icon.mjs",
     "dist": "npm run fetch:bin && npm run build && electron-builder --win --publish never"
   },
   "dependencies": {
