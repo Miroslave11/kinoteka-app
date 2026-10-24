@@ -178,26 +178,6 @@ option {
 }
 
 /* Vstup do dětské části – duhová položka menu. */
-.sidebar a.kids-nav {
-  margin-top: 10px;
-  color: #fff;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  background: linear-gradient(
-    90deg,
-    rgb(255 107 107 / 0.18),
-    rgb(255 201 60 / 0.14),
-    rgb(46 196 166 / 0.14),
-    rgb(63 169 245 / 0.16)
-  );
-}
-
-.kids-nav-mark {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  background: conic-gradient(#ff6b6b, #ffc93c, #2ec4a6, #3fa9f5, #9b7bff, #ff6b6b);
-}
-
 .sidebar a,
 .nav-disabled {
   display: flex;

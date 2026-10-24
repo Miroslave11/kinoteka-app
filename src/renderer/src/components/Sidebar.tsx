@@ -1,4 +1,4 @@
-import { BookOpen, Clapperboard, Home, Settings2, Tv } from 'lucide-react'
+import { BookOpen, Clapperboard, Home, Settings2, Smile, Tv } from 'lucide-react'
 import { NavLink } from 'react-router'
 import { useApp } from '../app/AppContext'
 
@@ -25,8 +25,8 @@ export default function Sidebar(): React.JSX.Element {
         <NavLink to="/denik" className={link}>
           <BookOpen size={18} /> Deník
         </NavLink>
-        <NavLink to="/deti" className="kids-nav">
-          <span className="kids-nav-mark" /> Děti
+        <NavLink to="/deti" className={link}>
+          <Smile size={18} /> Děti
         </NavLink>
       </nav>
 
