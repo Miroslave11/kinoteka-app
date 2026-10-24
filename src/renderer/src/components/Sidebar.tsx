@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BookOpen, Clapperboard, Home, Settings2, Smile, Tv } from 'lucide-react'
 import { NavLink } from 'react-router'
+import appIcon from '../../../../build/icon.svg'
 import { useApp } from '../app/AppContext'
 
 /** Kolik pohádek je ve složce Kids (obnoví se po skenu, stažení nebo úpravě titulů). */
@@ -26,7 +27,7 @@ export default function Sidebar(): React.JSX.Element {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark" />
+        <img className="brand-mark" src={appIcon} alt="" />
         Kinotéka
       </div>
       <nav>
