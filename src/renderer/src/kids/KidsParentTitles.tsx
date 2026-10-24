@@ -1,13 +1,147 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FolderOpen, Plus, Trash2, X } from 'lucide-react'
+import { FolderOpen, ImagePlus, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react'
 import {
   MAX_KEYWORDS,
   type KidsManageAction,
+  type KidsManageResult,
   type KidsTitle,
+  type KidsTmdbChoice,
+  type KidsTmdbResult,
+  type KidsTmdbStatus,
   type KidsVideo
 } from '../../../shared/kids'
 import { countOf } from '../../../shared/plural'
 import { imageStyle, minutes } from './KidsParts'
+
+/** Úprava z části Pro rodiče: akce správy titulů, nebo jiné volání s výsledkem (null = zrušeno). */
+type Run = (action: KidsManageAction | (() => Promise<KidsManageResult | null>)) => Promise<void>
+
+const TMDB_STATUS_TEXT: Record<KidsTmdbStatus, string> = {
+  pending: 'Hledám pořad na TMDB… (potřebuje klíč TMDB v Nastavení → Metadata)',
+  matched: 'Obrázky jsou z pořadu',
+  manual: 'Obrázky jsou z pořadu (vybráno ručně)',
+  none: 'Na TMDB se pořad nenašel – najdi ho ručně.',
+  off: 'Obrázky z TMDB jsou u titulu vypnuté.'
+}
+
+/** Pořad na TMDB, ze kterého jsou obrázky titulu – a ruční hledání jiného. */
+function TmdbMatch({
+  title,
+  run
+}: {
+  title: KidsTitle & { id: number }
+  run: Run
+}): React.JSX.Element {
+  const { kids } = window.kinoteka
+  const [query, setQuery] = useState<string | null>(null)
+  const [results, setResults] = useState<KidsTmdbResult[] | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const { tmdb } = title
+
+  const search = async (): Promise<void> => {
+    if (!query?.trim()) return
+    setSearching(true)
+    setMessage(null)
+    const result = await kids.searchTmdb(query)
+    setSearching(false)
+    if (!result.ok) return setMessage(result.message)
+    setResults(result.results)
+    if (result.results.length === 0) setMessage('Nic se nenašlo – zkus jiný název nebo odkaz.')
+  }
+  const choose = async (choice: KidsTmdbChoice): Promise<void> => {
+    await run(() => kids.chooseTmdb(title.id, choice))
+    setQuery(null)
+    setResults(null)
+  }
+
+  return (
+    <div className="k-tmdb">
+      <p className="k-hint">
+        {TMDB_STATUS_TEXT[tmdb.status]}
+        {tmdb.name && (tmdb.status === 'matched' || tmdb.status === 'manual') && (
+          <>
+            {' '}
+            <b>{tmdb.name}</b>
+            {tmdb.year && ` (${tmdb.year})`}
+          </>
+        )}
+      </p>
+      {query === null ? (
+        <div className="k-row">
+          <button className="k-btn" onClick={() => setQuery(tmdb.name ?? title.name)}>
+            <Search size={18} /> {tmdb.id ? 'Hledat jiný pořad' : 'Najít na TMDB'}
+          </button>
+          {tmdb.status !== 'off' && tmdb.status !== 'none' && (
+            <button className="k-btn" onClick={() => void choose(null)}>
+              Nepoužívat TMDB
+            </button>
+          )}
+          {(tmdb.status === 'off' || tmdb.status === 'none') && (
+            <button
+              className="k-btn"
+              onClick={() => void run({ kind: 'tmdb-retry', titleId: title.id })}
+            >
+              <RotateCcw size={18} /> Hledat znovu
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="k-tmdb-search">
+          <div className="k-row">
+            <input
+              className="k-field"
+              autoFocus
+              value={query}
+              maxLength={300}
+              placeholder="Název pořadu nebo odkaz z themoviedb.org"
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void search()
+                if (e.key === 'Escape') setQuery(null)
+              }}
+            />
+            <button
+              className="k-btn grape"
+              disabled={searching || !query.trim()}
+              onClick={() => void search()}
+            >
+              {searching ? 'Hledám…' : 'Hledat'}
+            </button>
+            <button className="k-btn" onClick={() => setQuery(null)}>
+              Zrušit
+            </button>
+          </div>
+          <p className="k-hint">
+            Zkus název česky i anglicky (třeba „Bing bunny“). Když se pořad nenajde, vyhledej ho na
+            themoviedb.org a vlož sem odkaz na jeho stránku.
+          </p>
+          {message && <p className="k-hint">{message}</p>}
+          {results && results.length > 0 && (
+            <div className="k-tmdb-results">
+              {results.map((r) => (
+                <button
+                  key={`${r.kind}-${r.id}`}
+                  onClick={() => void choose({ kind: r.kind, id: r.id })}
+                >
+                  <span className="k-tmdb-poster" style={imageStyle(r.posterUrl, r.name)} />
+                  <span>
+                    <b>{r.name}</b>
+                    <small>
+                      {[r.kind === 'tv' ? 'seriál' : 'film', r.year, r.originalName]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** Mazací tlačítko na dvě kliknutí – první se zeptá, druhé smaže. */
 function TrashButton({
@@ -50,7 +184,7 @@ function VideoRow({
   video: KidsVideo
   title: KidsTitle
   titles: KidsTitle[]
-  run: (action: KidsManageAction) => Promise<void>
+  run: Run
 }): React.JSX.Element {
   const targets = titles.filter((t) => t.id !== null && t.id !== title.id)
   return (
@@ -94,13 +228,16 @@ function TitleForm({
 }: {
   title: KidsTitle & { id: number }
   folder: string
-  run: (action: KidsManageAction) => Promise<void>
+  run: Run
 }): React.JSX.Element {
   const [name, setName] = useState(title.name)
   const [keyword, setKeyword] = useState('')
   useEffect(() => setName(title.name), [title.name])
 
-  const covers = title.videos.filter((v) => v.thumbnailUrl).slice(0, 11)
+  const covers = title.videos
+    .filter((v) => v.thumbnailUrl)
+    .slice(0, title.artwork.length > 0 ? 6 : 11)
+  const pickCover = (): Promise<void> => run(() => window.kinoteka.kids.pickCover(title.id))
   const setKeywords = (keywords: string[]): Promise<void> =>
     run({ kind: 'set-keywords', titleId: title.id, keywords })
   const addKeyword = (): void => {
@@ -132,31 +269,67 @@ function TitleForm({
         </button>
       </div>
 
-      {covers.length > 0 && (
-        <>
-          <label>Obrázek titulu</label>
-          <div className="k-covers">
-            {covers.map((video) => (
-              <button
-                key={video.id}
-                title={video.name}
-                className={
-                  (title.coverVideoId ?? title.videos[0]?.id) === video.id ? 'on' : undefined
-                }
-                style={imageStyle(video.thumbnailUrl, video.name)}
-                onClick={() =>
-                  void run({
-                    kind: 'set-cover',
-                    titleId: title.id,
-                    // První video je výchozí obrázek – není potřeba ho ukládat.
-                    videoId: video.id === title.videos[0]?.id ? null : video.id
-                  })
-                }
-              />
-            ))}
-          </div>
-        </>
-      )}
+      <label>Obrázek titulu</label>
+      <div className="k-covers">
+        {title.artwork.map((art, index) => (
+          <button
+            key={art.path}
+            title="Obrázek pořadu z TMDB"
+            className={
+              title.coverImage === art.path ||
+              (index === 0 && !title.coverImage && title.coverVideoId === null)
+                ? 'on'
+                : undefined
+            }
+            style={imageStyle(art.url, title.name)}
+            onClick={() =>
+              void run({ kind: 'set-cover-image', titleId: title.id, image: art.path })
+            }
+          />
+        ))}
+        {covers.map((video) => (
+          <button
+            key={video.id}
+            title={video.name}
+            className={
+              title.coverVideoId === video.id ||
+              (title.artwork.length === 0 &&
+                !title.coverImage &&
+                title.coverVideoId === null &&
+                video.id === title.videos[0]?.id)
+                ? 'on'
+                : undefined
+            }
+            style={imageStyle(video.thumbnailUrl, video.name)}
+            onClick={() =>
+              void run({
+                kind: 'set-cover',
+                titleId: title.id,
+                // Bez obrázků z TMDB je první video výchozí obrázek – není potřeba ho ukládat.
+                videoId:
+                  title.artwork.length === 0 && video.id === title.videos[0]?.id ? null : video.id
+              })
+            }
+          />
+        ))}
+        {title.coverImage === 'file' && (
+          <button
+            title="Vlastní obrázek"
+            className="on"
+            style={imageStyle(title.coverUrl, title.name)}
+          />
+        )}
+        <button
+          className="k-cover-add"
+          title="Vybrat vlastní obrázek ze souboru"
+          onClick={() => void pickCover()}
+        >
+          <ImagePlus size={24} />
+        </button>
+      </div>
+
+      <label>Pořad na TMDB</label>
+      <TmdbMatch title={title} run={run} />
 
       <label>
         Zařazovat videa, kde je
@@ -215,10 +388,10 @@ export default function KidsParentTitles(): React.JSX.Element {
     return kids.onChanged(() => void load())
   }, [kids, load])
 
-  const run = async (action: KidsManageAction): Promise<void> => {
+  const run: Run = async (action) => {
     setError(null)
-    const result = await kids.manage(action)
-    if (!result.ok) setError(result.message)
+    const result = typeof action === 'function' ? await action() : await kids.manage(action)
+    if (result && !result.ok) setError(result.message)
     await load()
   }
 

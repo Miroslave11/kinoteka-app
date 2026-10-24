@@ -1,4 +1,5 @@
-import type { KidsTitle, KidsVideo } from '../../shared/kids'
+import { basename } from 'node:path'
+import type { KidsTitle, KidsTmdbMatch, KidsTmdbStatus, KidsVideo } from '../../shared/kids'
 import {
   canResume,
   progressOutcome,
@@ -7,6 +8,7 @@ import {
 } from '../../shared/playback'
 import type { Database } from '../db/database'
 import type { StoredFile } from '../library/scanner'
+import { imageUrl } from '../metadata/mapping'
 import { cleanVideoName, type TitleKeywords } from './classify'
 
 type Row = Record<string, unknown>
@@ -29,6 +31,11 @@ export interface StoredTitle {
   folder: string
   keywords: string[]
   coverVideoId: number | null
+  /** „tmdb:/abc.jpg“ nebo „file:<cesta>“; null = nevybráno. */
+  coverImage: string | null
+  tmdb: KidsTmdbMatch
+  /** Cesty obrázků pořadu na TMDB, nejvhodnější první. */
+  artwork: string[]
 }
 
 /** Soubor videa v databázi (pro přesun a mazání). */
@@ -57,6 +64,31 @@ function parseKeywords(value: unknown): string[] {
   }
 }
 
+const TMDB_STATUSES: readonly KidsTmdbStatus[] = ['pending', 'matched', 'manual', 'none', 'off']
+
+const storedTitle = (row: Row): StoredTitle => ({
+  id: Number(row['id']),
+  folder: String(row['folder']),
+  keywords: parseKeywords(row['keywords']),
+  coverVideoId: row['cover_video_id'] === null ? null : Number(row['cover_video_id']),
+  coverImage: (row['cover_image'] as string | null) ?? null,
+  tmdb: {
+    status: TMDB_STATUSES.find((s) => s === row['tmdb_status']) ?? 'pending',
+    kind: row['tmdb_kind'] === 'tv' || row['tmdb_kind'] === 'movie' ? row['tmdb_kind'] : null,
+    id: row['tmdb_id'] === null ? null : Number(row['tmdb_id']),
+    name: (row['tmdb_name'] as string | null) ?? null,
+    year: row['tmdb_year'] === null ? null : Number(row['tmdb_year'])
+  },
+  artwork: parseKeywords(row['artwork'])
+})
+
+/** Obrázek z TMDB v kolečku – stačí střední velikost. */
+export const artworkUrl = (path: string): string | null => imageUrl('w780', path)
+
+/** Vlastní obrázek titulu; „?v=“ podle jména souboru, aby se po výměně nenačetl starý z cache. */
+const customCoverUrl = (titleId: number, file: string): string =>
+  `kinoteka-media://kids/title/${titleId}?v=${encodeURIComponent(basename(file))}`
+
 const thumbnailUrl = (row: Row): string | null =>
   row['thumbnail']
     ? `kinoteka-media://kids/video/${Number(row['id'])}?v=${Number(row['mtime_ms'])}`
@@ -67,15 +99,7 @@ export class KidsRepository {
   constructor(private readonly db: Database) {}
 
   titles(): StoredTitle[] {
-    return this.db
-      .prepare('SELECT id, folder, keywords, cover_video_id FROM kids_title ORDER BY folder')
-      .all()
-      .map((row) => ({
-        id: Number(row['id']),
-        folder: String(row['folder']),
-        keywords: parseKeywords(row['keywords']),
-        coverVideoId: row['cover_video_id'] === null ? null : Number(row['cover_video_id'])
-      }))
+    return this.db.prepare('SELECT * FROM kids_title ORDER BY folder').all().map(storedTitle)
   }
 
   title(id: number): StoredTitle | null {
@@ -85,6 +109,13 @@ export class KidsRepository {
   /** Nový název titulu = nový název podsložky (složku přejmenuje knihovna). */
   renameTitle(id: number, folder: string): void {
     this.db.prepare('UPDATE kids_title SET folder = ? WHERE id = ?').run(folder, id)
+    // Pořad vybraný rodičem zůstane, automaticky nalezený se podle nového názvu hledá znovu.
+    this.db
+      .prepare(
+        `UPDATE kids_title SET tmdb_status = 'pending'
+         WHERE id = ? AND tmdb_status IN ('matched', 'none')`
+      )
+      .run(id)
   }
 
   setKeywords(id: number, keywords: readonly string[]): void {
@@ -93,9 +124,55 @@ export class KidsRepository {
       .run(JSON.stringify(keywords), id)
   }
 
-  /** Obrázek titulu podle vybraného videa; null = obrázek prvního videa. */
+  /** Obrázek titulu podle vybraného videa; null = vybrat automaticky. */
   setCover(id: number, videoId: number | null): void {
-    this.db.prepare('UPDATE kids_title SET cover_video_id = ? WHERE id = ?').run(videoId, id)
+    this.db
+      .prepare('UPDATE kids_title SET cover_video_id = ?, cover_image = NULL WHERE id = ?')
+      .run(videoId, id)
+  }
+
+  /** Obrázek titulu z TMDB („tmdb:/abc.jpg“) nebo ze souboru („file:<cesta>“). */
+  setCoverImage(id: number, image: string): void {
+    this.db
+      .prepare('UPDATE kids_title SET cover_image = ?, cover_video_id = NULL WHERE id = ?')
+      .run(image, id)
+  }
+
+  /** Vlastní obrázek titulu na disku; null = titul ho nemá. */
+  customCoverPath(id: number): string | null {
+    const image = this.title(id)?.coverImage
+    return image?.startsWith('file:') ? image.slice('file:'.length) : null
+  }
+
+  /** Výsledek hledání na TMDB (pořad a jeho obrázky). */
+  setTmdb(id: number, match: KidsTmdbMatch, artwork: readonly string[]): void {
+    this.db
+      .prepare(
+        `UPDATE kids_title SET tmdb_status = ?, tmdb_kind = ?, tmdb_id = ?, tmdb_name = ?,
+           tmdb_year = ?, artwork = ? WHERE id = ?`
+      )
+      .run(match.status, match.kind, match.id, match.name, match.year, JSON.stringify(artwork), id)
+  }
+
+  /** Pořad se dohledá znovu podle názvu. */
+  resetTmdb(id: number): void {
+    this.db.prepare(`UPDATE kids_title SET tmdb_status = 'pending' WHERE id = ?`).run(id)
+  }
+
+  /** Tituly, ke kterým se ještě nehledal pořad na TMDB. */
+  titlesNeedingArtwork(): StoredTitle[] {
+    return this.titles().filter((t) => t.tmdb.status === 'pending')
+  }
+
+  /** Kanály videí titulu, nejčastější první (další možnost, jak pořad najít). */
+  titleChannels(id: number): string[] {
+    return this.db
+      .prepare(
+        `SELECT channel FROM kids_video WHERE title_id = ? AND channel IS NOT NULL
+         GROUP BY channel ORDER BY COUNT(*) DESC`
+      )
+      .all(id)
+      .map((row) => String(row['channel']))
   }
 
   /** Smaže titul i záznamy jeho videí (soubory zahodí knihovna). */
@@ -252,7 +329,7 @@ export class KidsRepository {
   /**
    * Tituly s videi (nejnověji přidané video první); videa, která se nepodařilo zařadit,
    * jsou na konci jako titul „Ostatní“. Obrázek titulu = vybraný rodičem, jinak obrázek
-   * nejstaršího videa. Prázdné tituly (bez videí) jen pro správu titulů (`includeEmpty`).
+   * pořadu z TMDB, jinak obrázek nejstaršího videa. Prázdné tituly (bez videí) jen pro správu titulů (`includeEmpty`).
    */
   list({ includeEmpty = false }: { includeEmpty?: boolean } = {}): KidsTitle[] {
     const titles = this.titles()
@@ -309,12 +386,32 @@ export class KidsRepository {
       .map((t) => {
         const own = videos.get(t.id) ?? []
         const cover = own.find((v) => v.id === t.coverVideoId && v.thumbnailUrl)
+        const artwork = t.tmdb.status === 'off' ? [] : t.artwork
+        const tmdbImage = t.coverImage?.startsWith('tmdb:')
+          ? t.coverImage.slice('tmdb:'.length)
+          : null
+        const chosen = t.coverImage?.startsWith('file:')
+          ? { image: 'file', url: customCoverUrl(t.id, t.coverImage) }
+          : tmdbImage && artworkUrl(tmdbImage)
+            ? { image: tmdbImage, url: artworkUrl(tmdbImage)! }
+            : null
         return {
           id: t.id,
           name: t.folder,
           keywords: t.keywords,
-          coverUrl: cover?.thumbnailUrl ?? covers.get(t.id) ?? null,
+          coverUrl:
+            chosen?.url ??
+            cover?.thumbnailUrl ??
+            (artwork[0] ? artworkUrl(artwork[0]) : null) ??
+            covers.get(t.id) ??
+            null,
           coverVideoId: cover ? t.coverVideoId : null,
+          coverImage: chosen?.image ?? null,
+          artwork: artwork.flatMap((path) => {
+            const url = artworkUrl(path)
+            return url ? [{ path, url }] : []
+          }),
+          tmdb: t.tmdb,
           videos: own,
           favorite: favorites.title.has(t.id)
         }
@@ -328,6 +425,9 @@ export class KidsRepository {
         keywords: [],
         coverUrl: covers.get(null) ?? null,
         coverVideoId: null,
+        coverImage: null,
+        artwork: [],
+        tmdb: { status: 'off', kind: null, id: null, name: null, year: null },
         videos: loose,
         favorite: false
       })

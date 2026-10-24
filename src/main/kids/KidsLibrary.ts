@@ -163,6 +163,19 @@ export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
         repo.setCover(action.titleId, action.videoId)
         return null
       }
+      case 'set-cover-image': {
+        const title = repo.title(action.titleId)
+        if (!title) return 'Titul už neexistuje.'
+        if (!title.artwork.includes(action.image)) return 'Obrázek už k titulu nepatří.'
+        repo.setCoverImage(title.id, `tmdb:${action.image}`)
+        return null
+      }
+      case 'tmdb-retry': {
+        if (!repo.title(action.titleId)) return 'Titul už neexistuje.'
+        // Dohledá se na pozadí (KidsArtwork po ohlášení změny).
+        repo.resetTmdb(action.titleId)
+        return null
+      }
       case 'trash-title': {
         const title = repo.title(action.titleId)
         if (!title) return null

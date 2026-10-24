@@ -126,7 +126,8 @@ export class MetadataService extends EventEmitter<MetadataServiceEvents> {
     await this.run()
   }
 
-  private client(): TmdbApi | null {
+  /** Klient TMDB se zadaným klíčem; null = klíč není (i pro obrázky dětské části). */
+  client(): TmdbApi | null {
     const key = this.settings.getSecret(KEY_SETTING)
     return key ? this.createClient(key) : null
   }

@@ -24,6 +24,7 @@ import { DeletionService } from './deletion/DeletionService'
 import { registerJournalIpc } from './journal/journalIpc'
 import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
+import { KidsArtwork } from './kids/KidsArtwork'
 import { KidsDownloader } from './kids/KidsDownloader'
 import { KidsDownloadQueue } from './kids/KidsDownloadQueue'
 import { kidsFolder, KIDS_SETTINGS_KEY, registerKidsIpc } from './kids/kidsIpc'
@@ -478,11 +479,25 @@ void app.whenReady().then(() => {
   )
   const clipsDir = join(app.getPath('userData'), 'cache', 'clips')
   kidsRepository = new KidsRepository(db)
+  // Obrázky pohádek z TMDB (pořad podle názvu titulu) a vlastní obrázky titulů.
+  const kidsArtwork = new KidsArtwork(kidsRepository, {
+    client: () => metadata.client(),
+    coverDir: join(app.getPath('userData'), 'cache', 'kids', 'tituly')
+  })
+  kidsArtwork.on('changed', () => broadcast(IpcChannel.KidsChanged))
   kidsTracker = new KidsTracker(kidsRepository, () => broadcast(IpcChannel.KidsChanged))
   kidsGuard = new KidsGuard(settings)
   // „Spouštět Kinotéku rovnou v dětském režimu“: okno se otevře zamčené v části Děti.
   if (kidsSettings().startInKids) kidsGuard.enter()
-  handleMediaProtocol(images, clipsDir, (id) => kidsRepository.thumbnailPath(id), chromiumFetch)
+  handleMediaProtocol(
+    images,
+    clipsDir,
+    {
+      video: (id) => kidsRepository.thumbnailPath(id),
+      title: (id) => kidsRepository.customCoverPath(id)
+    },
+    chromiumFetch
+  )
 
   // Barvy z plakátů a klipy na pozadí – potřebují ffmpeg.
   const ffmpeg = binaryPath('ffmpeg', 'ffmpeg.exe')
@@ -503,6 +518,8 @@ void app.whenReady().then(() => {
   // Nová shoda na TMDB = nové IMDb ID (hodnocení) a nový plakát (barvy).
   metadata.on('changed', () => {
     broadcast(IpcChannel.LibraryChanged)
+    // Nově zadaný klíč TMDB = obrázky pro pohádky, které ještě žádné nemají.
+    void kidsArtwork.run()
     void imdb.run()
     void previews?.run()
   })
@@ -579,7 +596,10 @@ void app.whenReady().then(() => {
     trash: (path) => shell.trashItem(path),
     downloadingInto: (folder): boolean => kidsQueue.isDownloadingInto(folder)
   })
-  kidsLibrary.on('changed', () => broadcast(IpcChannel.KidsChanged))
+  kidsLibrary.on('changed', () => {
+    broadcast(IpcChannel.KidsChanged)
+    void kidsArtwork.run()
+  })
   const kidsQueue = new KidsDownloadQueue({
     downloader: kidsDownloader,
     repository: kidsRepository,
@@ -593,9 +613,11 @@ void app.whenReady().then(() => {
     queue: kidsQueue,
     library: kidsLibrary,
     repository: kidsRepository,
+    artwork: kidsArtwork,
     guard: kidsGuard,
     play: playKids
   })
+  void kidsArtwork.run()
   void kidsLibrary.scan().catch((error: Error) => console.warn(`Složka Kids: ${error.message}`))
   ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))
   ipcMain.handle(IpcChannel.SubtitlesSaveSettings, (_event, value: unknown) =>

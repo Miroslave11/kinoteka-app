@@ -23,6 +23,8 @@ import type {
   KidsDownloadRequest,
   KidsManageAction,
   KidsManageResult,
+  KidsTmdbChoice,
+  KidsTmdbResult,
   KidsPreviewResult,
   KidsQueueItem,
   KidsMode,
@@ -220,6 +222,14 @@ export interface KinotekaApi {
     manageTitles(): Promise<{ folder: string; titles: KidsTitle[] }>
     /** Přejmenování, obrázek, klíčová slova, přesun a mazání do Koše (jen rodiče). */
     manage(action: KidsManageAction): Promise<KidsManageResult>
+    /** Hledání pořadu na TMDB podle názvu nebo odkazu z themoviedb.org (jen rodiče). */
+    searchTmdb(
+      query: string
+    ): Promise<{ ok: true; results: KidsTmdbResult[] } | { ok: false; message: string }>
+    /** Ruční výběr pořadu na TMDB; null = obrázky z TMDB u titulu nepoužívat. */
+    chooseTmdb(titleId: number, choice: KidsTmdbChoice): Promise<KidsManageResult>
+    /** Vlastní obrázek titulu vybraný v dialogu; null = výběr zrušen. */
+    pickCover(titleId: number): Promise<KidsManageResult | null>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>

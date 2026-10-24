@@ -3,6 +3,8 @@ import {
   cleanKeywords,
   parseDownloadRequest,
   parseManageAction,
+  parseTmdbChoice,
+  parseTmdbLink,
   parseYoutubeLink,
   parseYoutubeUrl
 } from './kids'
@@ -117,5 +119,46 @@ describe('parseManageAction', () => {
 
   it('nejvýš 20 klíčových slov', () => {
     expect(cleanKeywords(Array.from({ length: 30 }, (_, i) => `slovo ${i}`))).toHaveLength(20)
+  })
+})
+
+describe('pořad na TMDB', () => {
+  it('odkaz z themoviedb.org', () => {
+    expect(parseTmdbLink('https://www.themoviedb.org/tv/69501-bing')).toEqual({
+      kind: 'tv',
+      id: 69501
+    })
+    expect(parseTmdbLink(' https://www.themoviedb.org/movie/109445?language=cs-CZ ')).toEqual({
+      kind: 'movie',
+      id: 109445
+    })
+    expect(parseTmdbLink('https://www.themoviedb.org/cs-CZ/tv/12225/images')).toEqual({
+      kind: 'tv',
+      id: 12225
+    })
+    expect(parseTmdbLink('Prasátko Peppa')).toBeNull()
+    expect(parseTmdbLink('https://example.com/tv/12')).toBeNull()
+  })
+
+  it('ruční výběr z okna', () => {
+    expect(parseTmdbChoice(null)).toBeNull()
+    expect(parseTmdbChoice({ kind: 'tv', id: 3, extra: 1 })).toEqual({ kind: 'tv', id: 3 })
+    expect(parseTmdbChoice({ kind: 'person', id: 3 })).toBeUndefined()
+    expect(parseTmdbChoice({ kind: 'tv', id: -1 })).toBeUndefined()
+    expect(parseTmdbChoice('tv')).toBeUndefined()
+  })
+
+  it('obrázek titulu z TMDB jen jako cesta na TMDB', () => {
+    expect(parseManageAction({ kind: 'set-cover-image', titleId: 2, image: '/abc.jpg' })).toEqual({
+      kind: 'set-cover-image',
+      titleId: 2,
+      image: '/abc.jpg'
+    })
+    for (const image of ['../x.jpg', '/a/../b.jpg', 'C:\\x.jpg', '/x.exe', 7])
+      expect(parseManageAction({ kind: 'set-cover-image', titleId: 2, image })).toBeNull()
+    expect(parseManageAction({ kind: 'tmdb-retry', titleId: 2 })).toEqual({
+      kind: 'tmdb-retry',
+      titleId: 2
+    })
   })
 })
