@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { openDatabase, type Database } from '../db/database'
-import { CatalogRepository } from './CatalogRepository'
+import { CatalogRepository, episodeNameFromFile } from './CatalogRepository'
 
 let db: Database
 let catalog: CatalogRepository
@@ -51,6 +51,64 @@ describe('CatalogRepository', () => {
       [1, null],
       [2, 'Puzzle']
     ])
+  })
+
+  it('kurz s lekcemi je seriál seřazený po lekcích a na TMDB se nedohledává', () => {
+    addFile('AI kurz/Lekce 02 - Video 1 - Kontext je král.mp4')
+    addFile('AI kurz/Lekce 01 - Video 2 - Diktování.mp4')
+    addFile('AI kurz/Lekce 01 - Video 1 - Úvod.mp4')
+    addFile('Prázdnota (2020) cz dabing.mkv')
+    catalog.rebuild()
+
+    expect(catalog.listMovies().map((m) => m.name)).toEqual(['Prázdnota'])
+    const [course] = catalog.listShows()
+    expect(course).toMatchObject({ name: 'AI kurz', episodeCount: 3, matchStatus: 'course' })
+    expect(
+      course!.seasons.map((s) => [s.number, s.episodes.map((e) => [e.episode, e.name])])
+    ).toEqual([
+      [
+        1,
+        [
+          [1, 'Úvod'],
+          [2, 'Diktování']
+        ]
+      ],
+      [2, [[1, 'Kontext je král']]]
+    ])
+    const waiting = catalog.titlesNeedingMetadata().map((t) => t.id)
+    expect(waiting).not.toContain(course!.id)
+    // Opakované sestavení stav nezmění.
+    catalog.rebuild()
+    expect(catalog.listShows()[0]!.matchStatus).toBe('course')
+  })
+
+  it('celou složku zařadí ručně jako jeden seriál, díly podle pořadí názvů', () => {
+    const second = addFile('Fotokurz/2 - Kompozice.mp4')
+    addFile('Fotokurz/10 - Závěr.mp4')
+    addFile('Fotokurz/1 - Úvod.mp4')
+    addFile('Jiná složka/Film (2020).mkv')
+    catalog.rebuild()
+    expect(catalog.fileDetails(second)?.folderFileCount).toBe(3)
+
+    expect(
+      catalog.classifyFolder(second, { title: 'Kurz fotografie', year: null, season: 1 })
+    ).toBe(3)
+    catalog.rebuild()
+
+    const [show] = catalog.listShows()
+    expect(show!.name).toBe('Kurz fotografie')
+    expect(show!.seasons[0]!.episodes.map((e) => [e.episode, e.name])).toEqual([
+      [1, 'Úvod'],
+      [2, 'Kompozice'],
+      [3, 'Závěr']
+    ])
+    expect(catalog.listMovies().map((m) => m.name)).toEqual(['Film'])
+  })
+
+  it('název dílu ze jména souboru bez čísla na začátku', () => {
+    expect(episodeNameFromFile('Kurz/03 - Úvod do Pythonu.mp4')).toBe('Úvod do Pythonu')
+    expect(episodeNameFromFile('Kurz/07_Funkce_a_tridy.mkv')).toBe('Funkce a tridy')
+    expect(episodeNameFromFile('Kurz/12.mp4')).toBeNull()
   })
 
   it('při opakovaném sestavení zachová id titulů a dílů', () => {

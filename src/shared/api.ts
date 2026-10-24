@@ -126,6 +126,14 @@ export interface KinotekaApi {
       fileId: number,
       classification: FileClassification | null
     ): Promise<ClassificationResult | null>
+    /**
+     * Celou složku souboru zařadí jako jeden seriál (kurz); díly podle pořadí názvů souborů.
+     * Použije se název, rok a série ze zařazení dílu.
+     */
+    classifyFolder(
+      fileId: number,
+      classification: FileClassification
+    ): Promise<ClassificationResult | null>
   }
   metadata: {
     keyStatus(): Promise<TmdbKeyStatus>

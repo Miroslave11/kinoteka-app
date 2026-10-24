@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Check, RotateCcw } from 'lucide-react'
 import type { ClassificationResult, FileClassification } from '../../../shared/classification'
+import { countOf } from '../../../shared/plural'
 
 const toNumber = (value: string): number | null => {
   const number = Number.parseInt(value, 10)
@@ -15,6 +16,7 @@ export default function ClassifyForm({
   fileId,
   current,
   manual,
+  folderFileCount,
   showNames,
   onCancel,
   onSaved
@@ -22,6 +24,8 @@ export default function ClassifyForm({
   fileId: number
   current: FileClassification
   manual: boolean
+  /** Video soubory ve stejné složce – nabídne zařazení celé složky (kurz). */
+  folderFileCount: number
   /** Seriály v knihovně – nabídka u pole „Seriál“. */
   showNames: string[]
   onCancel: () => void
@@ -35,13 +39,19 @@ export default function ClassifyForm({
   const [episodeTitle, setEpisodeTitle] = useState(
     current.kind === 'episode' ? (current.episodeTitle ?? '') : ''
   )
+  const [wholeFolder, setWholeFolder] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const folder = kind === 'episode' && wholeFolder
 
   const save = async (classification: FileClassification | null): Promise<void> => {
     setBusy(true)
     setError(null)
-    const result = await window.kinoteka.catalog.classify(fileId, classification)
+    const { catalog } = window.kinoteka
+    const result =
+      folder && classification
+        ? await catalog.classifyFolder(fileId, classification)
+        : await catalog.classify(fileId, classification)
     setBusy(false)
     if (classification && !result) setError('Zařazení se nepodařilo uložit, zkontroluj údaje.')
     else onSaved(result)
@@ -58,7 +68,8 @@ export default function ClassifyForm({
       return
     }
     const seasonNumber = toNumber(season)
-    const episodeNumber = toNumber(episode)
+    // U celé složky se díly očíslují podle pořadí souborů.
+    const episodeNumber = folder ? 1 : toNumber(episode)
     if (seasonNumber === null || episodeNumber === null || seasonNumber < 0 || episodeNumber < 0) {
       return setError('Sérii a díl zadej jako čísla.')
     }
@@ -117,7 +128,7 @@ export default function ClassifyForm({
         />
         {kind === 'episode' && (
           <>
-            <label htmlFor="classify-season">Série a díl</label>
+            <label htmlFor="classify-season">{folder ? 'Série' : 'Série a díl'}</label>
             <span className="pair">
               <input
                 id="classify-season"
@@ -127,25 +138,42 @@ export default function ClassifyForm({
                 value={season}
                 onChange={(event) => setSeason(event.target.value)}
               />
-              <input
-                className="field narrow"
-                inputMode="numeric"
-                aria-label="Díl"
-                value={episode}
-                onChange={(event) => setEpisode(event.target.value)}
-              />
+              {!folder && (
+                <input
+                  className="field narrow"
+                  inputMode="numeric"
+                  aria-label="Díl"
+                  value={episode}
+                  onChange={(event) => setEpisode(event.target.value)}
+                />
+              )}
             </span>
-            <label htmlFor="classify-episode-title">Název dílu</label>
-            <input
-              id="classify-episode-title"
-              className="field"
-              placeholder="nepovinný"
-              value={episodeTitle}
-              onChange={(event) => setEpisodeTitle(event.target.value)}
-            />
+            {!folder && (
+              <>
+                <label htmlFor="classify-episode-title">Název dílu</label>
+                <input
+                  id="classify-episode-title"
+                  className="field"
+                  placeholder="nepovinný"
+                  value={episodeTitle}
+                  onChange={(event) => setEpisodeTitle(event.target.value)}
+                />
+              </>
+            )}
           </>
         )}
       </div>
+      {kind === 'episode' && folderFileCount > 1 && (
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={wholeFolder}
+            onChange={() => setWholeFolder(!wholeFolder)}
+          />
+          Zařadit stejně celou složku ({countOf(folderFileCount, 'soubor', 'soubory', 'souborů')}) –
+          třeba kurz. Díly se očíslují podle pořadí názvů souborů.
+        </label>
+      )}
       <datalist id="classify-shows">
         {showNames.map((name) => (
           <option key={name} value={name} />

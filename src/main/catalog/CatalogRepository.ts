@@ -69,6 +69,17 @@ const toFile = (row: Row): CatalogFile => {
   }
 }
 
+/** „03 - Úvod do Pythonu.mp4“ → „Úvod do Pythonu“ (název dílu při zařazení celé složky). */
+export function episodeNameFromFile(relativePath: string): string | null {
+  const name = basename(relativePath.replace(/\\/g, '/'))
+    .replace(/\.[^.]+$/, '')
+    .replace(/[._]/g, ' ')
+    .replace(/^\s*\d{1,4}\s*[-–—.):]*\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return name || null
+}
+
 const unionTags = (files: CatalogFile[]): string[] => [...new Set(files.flatMap((f) => f.tags))]
 
 const MATCH_STATUSES: MatchStatus[] = [
@@ -77,7 +88,8 @@ const MATCH_STATUSES: MatchStatus[] = [
   'manual',
   'unmatched',
   'error',
-  'disabled'
+  'disabled',
+  'course'
 ]
 
 function metadataOf(row: Row): {
@@ -231,6 +243,10 @@ export class CatalogRepository {
         'INSERT INTO episode (title_id, season, episode, name) VALUES (?, ?, ?, ?)'
       )
       const updateEpisode = this.db.prepare('UPDATE episode SET name = ? WHERE id = ?')
+      // Kurz se na TMDB nehledá – nenašel by se, nebo by se spároval s cizím seriálem.
+      const markCourse = this.db.prepare(
+        "UPDATE title SET match_status = 'course' WHERE id = ? AND match_status IN ('pending', 'unmatched')"
+      )
 
       this.db.exec('UPDATE media_file SET title_id = NULL, episode_id = NULL')
 
@@ -248,6 +264,7 @@ export class CatalogRepository {
           show.alternativeNames,
           show.year
         )
+        if (show.course) markCourse.run(id)
         for (const episode of show.episodes) {
           const found = selectEpisode.get(id, episode.season, episode.episode)
           let episodeId: number
@@ -622,6 +639,49 @@ export class CatalogRepository {
       )
   }
 
+  /** Video soubory ve stejné složce jako daný soubor (včetně něj), seřazené podle názvu. */
+  folderFiles(fileId: number): { id: number; relativePath: string }[] {
+    const file = this.db
+      .prepare('SELECT folder_id, relative_path FROM media_file WHERE id = ?')
+      .get(fileId)
+    if (!file) return []
+    // „Kurz\Lekce 1.mp4“ → „Kurz“, soubor přímo ve složce knihovny → „“
+    const dirOf = (path: string): string => path.slice(0, Math.max(0, path.search(/[\\/][^\\/]*$/)))
+    const dir = dirOf(String(file['relative_path']))
+    return this.db
+      .prepare('SELECT id, relative_path FROM media_file WHERE folder_id = ?')
+      .all(file['folder_id'])
+      .map((row) => ({ id: Number(row['id']), relativePath: String(row['relative_path']) }))
+      .filter((row) => dirOf(row.relativePath) === dir)
+      .sort((a, b) =>
+        a.relativePath.localeCompare(b.relativePath, 'cs', { numeric: true, sensitivity: 'base' })
+      )
+  }
+
+  /**
+   * Celou složku zařadí jako jeden seriál (typicky kurz): díly se očíslují podle pořadí
+   * názvů souborů, název dílu je název souboru bez čísla na začátku. Vrací počet souborů.
+   */
+  classifyFolder(
+    fileId: number,
+    show: { title: string; year: number | null; season: number }
+  ): number {
+    const files = this.folderFiles(fileId)
+    transaction(this.db, () => {
+      files.forEach((file, index) =>
+        this.setClassification(file.id, {
+          kind: 'episode',
+          title: show.title,
+          year: show.year,
+          season: show.season,
+          episode: index + 1,
+          episodeTitle: episodeNameFromFile(file.relativePath)
+        })
+      )
+    })
+    return files.length
+  }
+
   /** Titul, ke kterému soubor patří (po přestavbě katalogu). */
   titleOfFile(fileId: number): ClassificationResult | null {
     const row = this.db
@@ -652,7 +712,8 @@ export class CatalogRepository {
       info,
       error,
       pending: !info && !error,
-      classification: this.classification(fileId)
+      classification: this.classification(fileId),
+      folderFileCount: this.folderFiles(fileId).length
     }
   }
 

@@ -614,6 +614,13 @@ void app.whenReady().then(() => {
     library.catalogChanged()
     return catalog.titleOfFile(id as number)
   })
+  ipcMain.handle(IpcChannel.CatalogClassifyFolder, (_event, id: unknown, value: unknown) => {
+    const classification = parseClassification(value)
+    if (!Number.isInteger(id) || classification?.kind !== 'episode') return null
+    catalog.classifyFolder(id as number, classification)
+    library.catalogChanged()
+    return catalog.titleOfFile(id as number)
+  })
   ipcMain.handle(IpcChannel.CatalogFileDetails, (_event, id: unknown) =>
     Number.isInteger(id) ? catalog.fileDetails(id as number) : null
   )

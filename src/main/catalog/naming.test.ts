@@ -137,6 +137,52 @@ describe('parseMediaPath – seriály', () => {
   ])('%s', (path, expected) => check(path, { kind: 'episode', ...expected }))
 })
 
+describe('parseMediaPath – kurzy', () => {
+  it.each<[string, Expected]>([
+    [
+      'AI FIrst kurz/Lekce 01 - Video 2 - Diktování a Handy.mp4',
+      {
+        kind: 'episode',
+        title: 'AI FIrst kurz',
+        season: 1,
+        episode: 2,
+        episodeTitle: 'Diktování a Handy',
+        course: true
+      }
+    ],
+    [
+      // „web“ jinde znamená štítek WEB – u kurzu zůstane v názvu videa
+      'AI FIrst kurz/Lekce 05 - Video 3 - Budujeme větší web from scratch.mp4',
+      { season: 5, episode: 3, episodeTitle: 'Budujeme větší web from scratch', tags: [] }
+    ],
+    [
+      'AI FIrst kurz/Lekce 10 - Video 2 - Aplikace za 60 000+ Kč — část 1 z 2.mp4',
+      { season: 10, episode: 2, episodeTitle: 'Aplikace za 60 000+ Kč — část 1 z 2' }
+    ],
+    [
+      'Python/Lesson 4 - Loops.mkv',
+      {
+        kind: 'episode',
+        title: 'Python',
+        season: 1,
+        episode: 4,
+        episodeTitle: 'Loops',
+        course: true
+      }
+    ],
+    [
+      'Kurz fotografie - Modul 2 - Lekce 3 - Světlo.mp4',
+      { title: 'Kurz fotografie', season: 2, episode: 3, episodeTitle: 'Světlo', course: true }
+    ]
+  ])('%s', check)
+
+  it('filmy s „Kapitola“ a běžné seriály kurzem nejsou', () => {
+    check('To Kapitola 2 (2019) CZ dabing.mkv', { kind: 'movie', course: false })
+    check('John Wick Kapitola 4 (2023).mkv', { kind: 'movie', course: false })
+    check('Vidím Vás S01E02.mkv', { kind: 'episode', course: false })
+  })
+})
+
 describe('normalizeTitle', () => {
   it('sjednotí diakritiku, velikost písmen i oddělovače', () => {
     expect(normalizeTitle('Vidím Vás')).toBe('vidim vas')

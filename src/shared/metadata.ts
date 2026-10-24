@@ -76,7 +76,9 @@ export interface MetadataEpisode {
  * error     – chyba sítě nebo TMDB, zkusí se znovu
  * disabled  – chybí klíč TMDB
  */
-export type MatchStatus = 'pending' | 'matched' | 'manual' | 'unmatched' | 'error' | 'disabled'
+/** `course` = vzdělávací kurz, na TMDB se nedohledává (lze ručně přes Opravit shodu). */
+export type MatchStatus =
+  'pending' | 'matched' | 'manual' | 'unmatched' | 'error' | 'disabled' | 'course'
 
 /** Výsledek vyhledávání pro dialog „Opravit shodu“. */
 export interface MetadataSearchResult {
