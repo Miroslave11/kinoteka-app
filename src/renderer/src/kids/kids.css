@@ -560,3 +560,425 @@
 .k-heart.is-on {
   color: #ff4f7a;
 }
+
+/* ---------- zbývající čas, limit ---------- */
+.k-time-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 10px 18px;
+  border-radius: 99px;
+  background: var(--k-panel-solid);
+  font-weight: 900;
+  color: var(--k-grape);
+}
+
+.k-time-left + .k-parents {
+  margin-left: 0;
+}
+
+.k-limit svg {
+  color: var(--k-grape);
+}
+
+/* ---------- rodičovská brána ---------- */
+.k-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgb(20 24 48 / 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.k-gate {
+  width: 440px;
+  padding: 34px 38px 24px;
+  border-radius: 34px;
+  background: #fff;
+  color: #1f2a44;
+  text-align: center;
+  box-shadow: 0 30px 70px rgb(0 0 0 / 0.3);
+}
+
+.k-gate-lock {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 12px;
+  border-radius: 24px;
+  display: grid;
+  place-items: center;
+  background: #efeaff;
+  color: var(--k-grape);
+}
+
+.k-gate h2 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+}
+
+.k-gate p {
+  margin: 6px 0 0;
+  color: #66718a;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.k-gate-value {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  min-height: 44px;
+  margin: 18px 0 14px;
+  align-items: center;
+}
+
+.k-gate-value i {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid #c9c2f0;
+}
+
+.k-gate-value i.f {
+  background: var(--k-grape);
+  border-color: var(--k-grape);
+}
+
+.k-gate-value span {
+  min-width: 120px;
+  padding: 6px 16px;
+  border-radius: 14px;
+  background: #f3f1fb;
+  font-family: 'Fredoka Variable', Fredoka, sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.k-gate-error {
+  color: #e5484d !important;
+  margin: -4px 0 10px !important;
+}
+
+.k-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.k-keys button {
+  height: 66px;
+  border-radius: 20px;
+  background: #f3f1fb;
+  font-family: 'Fredoka Variable', Fredoka, sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+  color: #1f2a44;
+  box-shadow: 0 4px 0 #e0dbf3;
+  display: grid;
+  place-items: center;
+}
+
+.k-keys button.ghost {
+  background: none;
+  box-shadow: none;
+  color: #66718a;
+}
+
+.k-keys button.ok {
+  background: var(--k-grape);
+  color: #fff;
+  box-shadow: 0 4px 0 rgb(0 0 0 / 0.15);
+}
+
+.k-keys button:disabled {
+  opacity: 0.4;
+}
+
+.k-gate-cancel {
+  margin-top: 14px;
+  color: #66718a;
+  font-weight: 800;
+}
+
+/* ---------- část Pro rodiče ---------- */
+.k-parent {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.k-ptop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+}
+
+.k-ptop h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.k-ptop h2 svg {
+  color: var(--k-grape);
+}
+
+.k-tabs {
+  display: flex;
+  gap: 6px;
+  margin-left: 20px;
+  padding: 6px;
+  border-radius: 99px;
+  background: var(--k-panel);
+}
+
+.k-tabs a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 99px;
+  font-weight: 800;
+  color: var(--k-soft);
+  text-decoration: none;
+}
+
+.k-tabs a.on {
+  background: var(--k-panel-solid);
+  color: var(--k-ink);
+  box-shadow: 0 3px 0 rgb(var(--k-shadow) / 0.08);
+}
+
+.k-ptop-right {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.k-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 99px;
+  font-weight: 800 !important;
+  background: var(--k-panel-solid) !important;
+  color: var(--k-ink) !important;
+  box-shadow: 0 3px 0 rgb(var(--k-shadow) / 0.1);
+  white-space: nowrap;
+}
+
+.k-btn.primary {
+  background: var(--k-accent) !important;
+  color: #fff !important;
+}
+
+.k-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.k-panel {
+  border-radius: 28px;
+  background: var(--k-panel-solid);
+  padding: 24px 26px;
+  box-shadow:
+    0 6px 0 rgb(var(--k-shadow) / 0.06),
+    0 18px 40px rgb(var(--k-shadow) / 0.08);
+  font-weight: 700;
+}
+
+.k-app[data-theme='vesmir'] .k-panel {
+  background: rgb(34 30 92 / 0.92);
+  border: 1px solid var(--k-line);
+}
+
+.k-settings {
+  max-width: 1080px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.k-setrow {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--k-line);
+}
+
+.k-setrow:last-child {
+  border-bottom: 0;
+}
+
+.k-setrow label {
+  font-weight: 900;
+}
+
+.k-setrow label small {
+  display: block;
+  margin-top: 2px;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--k-soft);
+}
+
+.k-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.k-field {
+  flex: 1 1 200px;
+  min-width: 0;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 2px solid var(--k-line);
+  background: rgb(127 140 170 / 0.06);
+  color: var(--k-ink);
+  font: inherit;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.k-field.small {
+  flex: none;
+  width: 150px;
+  min-width: 0;
+}
+
+.k-field.tiny {
+  flex: none;
+  width: 80px;
+  min-width: 0;
+}
+
+.k-ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  color: var(--k-mint);
+}
+
+.k-muted {
+  color: var(--k-soft);
+  font-weight: 800;
+}
+
+.k-notice {
+  margin: 8px 0 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgb(155 123 255 / 0.12);
+  font-weight: 800;
+}
+
+.k-seg {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 16px;
+  background: rgb(127 140 170 / 0.1);
+  gap: 4px;
+}
+
+.k-seg button {
+  padding: 9px 14px;
+  border-radius: 12px;
+  font-weight: 800;
+  color: var(--k-soft);
+}
+
+.k-seg button.on {
+  background: var(--k-panel-solid);
+  color: var(--k-ink);
+  box-shadow: 0 2px 0 rgb(var(--k-shadow) / 0.08);
+}
+
+.k-toggle {
+  position: relative;
+  width: 58px;
+  height: 32px;
+  border-radius: 99px;
+  background: var(--k-mint) !important;
+}
+
+.k-toggle::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.k-toggle.off {
+  background: rgb(127 140 170 / 0.35) !important;
+}
+
+.k-toggle.off::after {
+  right: auto;
+  left: 4px;
+}
+
+.k-themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.k-themes button {
+  width: 96px;
+  font-weight: 800;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Náhled motivu – malý vzorek se stejným pozadím jako celé okno. */
+.k-themes i.k-app {
+  position: static;
+  display: block;
+  height: 62px;
+  margin-bottom: 6px;
+  border-radius: 18px;
+  border: 4px solid transparent;
+  background-size: auto, cover;
+}
+
+.k-themes i.k-app::after {
+  display: none;
+}
+
+.k-themes button.on i {
+  border-color: var(--k-grape);
+}
+
+.k-spin {
+  animation: k-spin 1s linear infinite;
+}
+
+@keyframes k-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

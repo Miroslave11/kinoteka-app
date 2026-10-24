@@ -843,3 +843,27 @@ button {
   font-weight: 600;
   cursor: pointer;
 }
+
+.ko-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 10px 18px;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.92);
+  color: #1f2a44;
+  font-weight: 900;
+}
+
+.ko-limit {
+  color: #3a3388;
+  text-align: center;
+}
+
+.ko-limit p {
+  margin: -8px 0 0;
+  color: #5b6880;
+  font-weight: 800;
+  font-size: 18px;
+}

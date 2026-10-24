@@ -37,6 +37,10 @@ export interface KidsPlayerInfo {
   /** Po konci se další pohádka spustí sama. */
   autoplayNext: boolean
   favorite: boolean
+  /** Zbývající čas pohádek dnes v sekundách; null = bez limitu. */
+  timeLeftSec: number | null
+  /** Čas pohádek došel – přehrávač ukáže „Pohádky pro dnešek skončily“. */
+  limitReached: boolean
 }
 
 export interface AudioOutputInfo {

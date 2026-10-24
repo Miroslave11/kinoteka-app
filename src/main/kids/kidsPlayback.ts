@@ -19,7 +19,7 @@ export interface KidsPlayItem {
 export function kidsPlayItem(
   repository: KidsRepository,
   videoId: number,
-  autoplayNext: boolean
+  options: { autoplayNext: boolean; timeLeftSec: number | null }
 ): KidsPlayItem | null {
   const queue = repository.queue(videoId)
   const index = queue.findIndex((video) => video.id === videoId)
@@ -45,8 +45,10 @@ export function kidsPlayItem(
             thumbnailUrl: next.thumbnail ? `kinoteka-media://kids/video/${next.id}` : null
           }
         : null,
-      autoplayNext,
-      favorite: repository.isFavorite('video', videoId)
+      autoplayNext: options.autoplayNext,
+      favorite: repository.isFavorite('video', videoId),
+      timeLeftSec: options.timeLeftSec,
+      limitReached: options.timeLeftSec === 0
     }
   }
 }
@@ -106,5 +108,44 @@ export class KidsTracker {
       this.watched = true
       this.onChanged()
     }
+  }
+}
+
+/**
+ * Měří, jak dlouho se pohádky opravdu sledují (pro denní limit): počítá se jen čas,
+ * kdy se obraz hýbe, a do nastavení se zapisuje po kouscích.
+ */
+export class PlayTimeMeter {
+  private lastWall: number | null = null
+  private lastPosition = 0
+  private pending = 0
+
+  constructor(
+    private readonly flush: (seconds: number) => void,
+    private readonly now: () => number = Date.now,
+    private readonly flushEverySec = 5
+  ) {}
+
+  update(position: number): void {
+    const wall = this.now()
+    // Pauza nebo posun zpět se nepočítá; výpadek událostí nanejvýš 2 s.
+    if (this.lastWall !== null && position > this.lastPosition)
+      this.pending += Math.min(2, (wall - this.lastWall) / 1000)
+    this.lastWall = wall
+    this.lastPosition = position
+    if (this.pending >= this.flushEverySec) this.stop()
+  }
+
+  /** Konec přehrávání – zapíše zbytek. */
+  stop(): void {
+    if (this.pending > 0) this.flush(this.pending)
+    this.pending = 0
+  }
+
+  /** Další pohádka – pozice začíná znovu od nuly. */
+  restart(): void {
+    this.stop()
+    this.lastWall = null
+    this.lastPosition = 0
   }
 }

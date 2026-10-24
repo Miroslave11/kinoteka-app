@@ -1,19 +1,24 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { IpcChannel } from '../../shared/ipc'
 import {
   DEFAULT_KIDS_SETTINGS,
+  isValidPin,
   parseKidsSettings,
   parseYoutubeUrl,
+  type KidsChallenge,
   type KidsDownloadResult,
+  type KidsMode,
   type KidsScanResult,
+  type KidsSettings,
   type KidsStatus,
   type KidsTitle
 } from '../../shared/kids'
 import { broadcast } from '../broadcast'
 import type { SettingsRepository } from '../settings/SettingsRepository'
 import type { KidsDownloader } from './KidsDownloader'
+import type { KidsGuard } from './KidsGuard'
 import type { KidsLibrary } from './KidsLibrary'
 import type { KidsRepository } from './KidsRepository'
 import type { YtDlpTool } from './YtDlpTool'
@@ -36,6 +41,7 @@ export interface KidsIpcDeps {
   downloader: KidsDownloader
   library: KidsLibrary
   repository: KidsRepository
+  guard: KidsGuard
   /** Spustí pohádku v dětském přehrávači. */
   play: (host: BrowserWindow | null, videoId: number) => Promise<unknown>
 }
@@ -46,22 +52,70 @@ export function registerKidsIpc({
   downloader,
   library,
   repository,
+  guard,
   play
 }: KidsIpcDeps): void {
+  const loadSettings = (): KidsSettings =>
+    parseKidsSettings(settings.get(KIDS_SETTINGS_KEY) ?? DEFAULT_KIDS_SETTINGS)
+  /** Změny (nastavení, stahování, mazání) jen mimo dětský režim, nebo za rodičovskou branou. */
+  const forParent = <T>(work: () => T, denied: T): T => (guard.parentAccess() ? work() : denied)
+
   ipcMain.handle(IpcChannel.KidsStatus, async (): Promise<KidsStatus> => ({
     folder: kidsFolder(settings),
     ytDlpVersion: await tool.version(),
     busy: downloader.busy
   }))
 
-  ipcMain.handle(IpcChannel.KidsGetSettings, () =>
-    parseKidsSettings(settings.get(KIDS_SETTINGS_KEY) ?? DEFAULT_KIDS_SETTINGS)
+  ipcMain.handle(IpcChannel.KidsGetSettings, () => loadSettings())
+  ipcMain.handle(IpcChannel.KidsSaveSettings, (_event, value: unknown) =>
+    forParent(() => {
+      const saved = parseKidsSettings(value)
+      settings.set(KIDS_SETTINGS_KEY, saved)
+      broadcast(IpcChannel.KidsChanged)
+      return saved
+    }, loadSettings())
   )
-  ipcMain.handle(IpcChannel.KidsSaveSettings, (_event, value: unknown) => {
-    const saved = parseKidsSettings(value)
-    settings.set(KIDS_SETTINGS_KEY, saved)
-    broadcast(IpcChannel.KidsChanged)
-    return saved
+
+  // ---------- dětský režim a rodičovská brána ----------
+  ipcMain.handle(IpcChannel.KidsMode, (): KidsMode => guard.mode(loadSettings().timeLimitMin))
+  ipcMain.handle(IpcChannel.KidsEnter, () => guard.enter())
+  ipcMain.handle(IpcChannel.KidsChallenge, (): KidsChallenge => guard.challenge())
+  ipcMain.handle(IpcChannel.KidsUnlock, (_event, answer: unknown) => guard.unlock(answer))
+  ipcMain.handle(IpcChannel.KidsLeaveParent, () => guard.leaveParent())
+  ipcMain.handle(IpcChannel.KidsExit, () => guard.exit())
+  ipcMain.handle(IpcChannel.KidsSetPin, (_event, pin: unknown) =>
+    pin === null || isValidPin(pin) ? guard.setPin(pin) : false
+  )
+  ipcMain.handle(IpcChannel.KidsResetPlayTime, () => {
+    const done = guard.resetPlayTime()
+    if (done) broadcast(IpcChannel.KidsChanged)
+    return done
+  })
+
+  ipcMain.handle(IpcChannel.KidsPickFolder, async (event) => {
+    if (!guard.parentAccess()) return null
+    const host = BrowserWindow.fromWebContents(event.sender)
+    const options = {
+      title: 'Složka s pohádkami',
+      defaultPath: kidsFolder(settings),
+      properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[]
+    }
+    const picked = host
+      ? await dialog.showOpenDialog(host, options)
+      : await dialog.showOpenDialog(options)
+    const folder = picked.filePaths[0]
+    if (picked.canceled || !folder) return null
+    settings.set(FOLDER_SETTING, folder)
+    await library.scan()
+    return folder
+  })
+
+  ipcMain.handle(IpcChannel.KidsCheckYtDlp, async () => {
+    try {
+      return { ok: true, version: await tool.checkNow() }
+    } catch (error) {
+      return { ok: false, message: `Aktualizaci nejde zkontrolovat: ${(error as Error).message}` }
+    }
   })
 
   ipcMain.handle(IpcChannel.KidsListTitles, (): KidsTitle[] => repository.list())
