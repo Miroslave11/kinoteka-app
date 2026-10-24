@@ -14,7 +14,7 @@ Dětská část – pohádky pro děti s vlastním vzhledem, rodičovskou bráno
 - Pro rodiče → Stáhnout z YouTube: náhled odkazu, návrh titulu, kvalita 1080p/720p, celý playlist (nejvýš 200 videí), fronta s průběhem a rušením. Nástroj yt-dlp se stáhne při prvním použití.
 - Pro rodiče → Tituly: přejmenování titulu i složky, obrázek titulu, klíčová slova pro zařazení, přesun videa do jiného titulu a mazání do Koše.
 - V menu je položka Děti s počtem pohádek.
-- Rodičovskou bránu jde v Nastavení pro rodiče úplně vypnout (dokud dítě neovládá počítač) – Pro rodiče, stahování i odchod pak fungují bez PINu.
+- Celé nastavení dětské části je v hlavním Nastavení → Děti. Rodičovskou bránu tam jde úplně vypnout (dokud dítě neovládá počítač) – Pro rodiče, stahování i odchod pak fungují bez PINu.
 - Stahování z YouTube zvládne i videa s dlouhým názvem (název souboru se zkrátí, aby cesta nepřekročila limit Windows).
 
 ### Knihovna
