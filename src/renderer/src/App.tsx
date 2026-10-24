@@ -4,6 +4,7 @@ import { AppProvider, useApp } from './app/AppContext'
 import FileDetailsDialog from './components/FileDetailsDialog'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
+import KidsApp from './kids/KidsApp'
 import BrowsePage from './pages/BrowsePage'
 import HomePage from './pages/HomePage'
 import JournalPage from './pages/JournalPage'
@@ -25,6 +26,15 @@ export default function App(): React.JSX.Element {
 function Shell(): React.JSX.Element {
   const location = useLocation()
   const { error, setError, detailsFileId, showDetails } = useApp()
+
+  // Dětský režim má vlastní celé okno – bez menu a zkratek dospělé části.
+  if (location.pathname === '/deti' || location.pathname.startsWith('/deti/')) {
+    return (
+      <Routes location={location}>
+        <Route path="/deti/*" element={<KidsApp />} />
+      </Routes>
+    )
+  }
 
   return (
     <div className="app">

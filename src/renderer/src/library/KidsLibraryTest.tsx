@@ -2,7 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, Play, RefreshCw } from 'lucide-react'
 import { countOf } from '../../../shared/plural'
 import { formatTime } from '../../../shared/player'
-import type { KidsScanResult, KidsTitle } from '../../../shared/kids'
+import { Link } from 'react-router'
+import {
+  KIDS_THEMES,
+  type KidsScanResult,
+  type KidsSettings,
+  type KidsTheme,
+  type KidsTitle
+} from '../../../shared/kids'
 import { placeholderStyle } from '../app/palette'
 
 /**
@@ -22,6 +29,12 @@ export default function KidsLibraryTest(): React.JSX.Element {
     return kids.onChanged(reload)
   }, [kids, reload])
 
+  const [settings, setSettings] = useState<KidsSettings | null>(null)
+  useEffect(() => void kids.getSettings().then(setSettings), [kids])
+  const chooseTheme = async (theme: KidsTheme): Promise<void> => {
+    if (settings) setSettings(await kids.saveSettings({ ...settings, theme }))
+  }
+
   const rescan = async (): Promise<void> => {
     setScanning(true)
     setScan(await kids.scan())
@@ -38,6 +51,21 @@ export default function KidsLibraryTest(): React.JSX.Element {
         playlistu nebo názvu z YouTube a přesune je do podsložky titulu.
       </p>
       <div className="actions">
+        <Link className="btn sm primary" to="/deti">
+          Otevřít dětský režim
+        </Link>
+        <select
+          className="field"
+          value={settings?.theme ?? ''}
+          onChange={(event) => void chooseTheme(event.target.value as KidsTheme)}
+          title="Motiv dětské části"
+        >
+          {KIDS_THEMES.map((theme) => (
+            <option key={theme.id} value={theme.id}>
+              Motiv: {theme.label}
+            </option>
+          ))}
+        </select>
         <button className="btn sm" disabled={scanning} onClick={() => void rescan()}>
           <RefreshCw size={15} className={scanning ? 'spin' : ''} /> Prohledat složku
         </button>

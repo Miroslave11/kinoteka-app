@@ -25,6 +25,9 @@ export default function Sidebar(): React.JSX.Element {
         <NavLink to="/denik" className={link}>
           <BookOpen size={18} /> Deník
         </NavLink>
+        <NavLink to="/deti" className="kids-nav">
+          <span className="kids-nav-mark" /> Děti
+        </NavLink>
       </nav>
 
       <div className="side-sep">Knihovny</div>

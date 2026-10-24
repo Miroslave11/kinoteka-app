@@ -22,6 +22,7 @@ import type {
   KidsDownloadProgress,
   KidsDownloadResult,
   KidsScanResult,
+  KidsSettings,
   KidsStatus,
   KidsTitle
 } from './kids'
@@ -151,6 +152,9 @@ export interface KinotekaApi {
     /** Stáhne video z YouTube do složky s dětskými videi (průběh hlásí `onProgress`). */
     download(url: string): Promise<KidsDownloadResult>
     onProgress(listener: (progress: KidsDownloadProgress) => void): () => void
+    getSettings(): Promise<KidsSettings>
+    /** Uloží nastavení dětské části a vrátí ověřenou podobu. */
+    saveSettings(value: KidsSettings): Promise<KidsSettings>
     /** Tituly (podsložky) s videi; videa, která nejde zařadit, jsou v titulu „Ostatní“. */
     listTitles(): Promise<KidsTitle[]>
     /** Projde složku, nová videa zařadí do titulů. */
