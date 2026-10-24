@@ -159,6 +159,44 @@ describe('KidsDownloader', () => {
     expect(spawnImpl.mock.calls[0]![1]).toEqual(['--version'])
   })
 
+  it('zrušený náhled ukončí yt-dlp; při zavření aplikace se ukončí všechny běžící', async () => {
+    const children: (EventEmitter & { kill: ReturnType<typeof vi.fn> })[] = []
+    const spawnImpl = vi.fn((exe: string) => {
+      if (exe === 'taskkill') return new EventEmitter()
+      const child = Object.assign(new EventEmitter(), {
+        pid: 100 + children.length,
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        kill: vi.fn()
+      })
+      children.push(child)
+      return child
+    })
+    const kids = downloader(spawnImpl as never)
+    const killed = (pid: number): boolean =>
+      spawnImpl.mock.calls.some(
+        (call) => call[0] === 'taskkill' && (call as unknown[])[1]?.toString().includes(String(pid))
+      ) ||
+      children.find((c) => (c as unknown as { pid: number }).pid === pid)!.kill.mock.calls.length >
+        0
+
+    const controller = new AbortController()
+    const first = kids.info('https://youtu.be/aaaaaaaaaaa', false, undefined, controller.signal)
+    const second = kids.info('https://youtu.be/bbbbbbbbbbb', false)
+    const secondDone = second.catch((error: Error) => error.message)
+    await vi.waitFor(() => expect(children).toHaveLength(2))
+
+    controller.abort()
+    await expect(first).rejects.toThrow('Náhled byl zrušen.')
+    expect(killed(100)).toBe(true)
+    expect(killed(101)).toBe(false)
+
+    kids.stopAll()
+    expect(killed(101)).toBe(true)
+    children[1]!.emit('close', 1)
+    await secondDone
+  })
+
   it('příprava předem bez internetu nic nerozbije a příště se zkusí znovu', async () => {
     const spawnImpl = fakeYtDlp([], 0)
     const tool = vi.fn(async () => {
