@@ -178,6 +178,9 @@ async function startPlayback(
     onNext: () => {
       if (session === started) playNext(started)
     },
+    onStop: () => {
+      if (session === started) tracker.discard()
+    },
     onAudioTrackChosen: (track) => {
       const current = tracker.current
       if (session !== started || !current) return
