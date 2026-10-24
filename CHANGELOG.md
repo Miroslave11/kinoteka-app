@@ -1,5 +1,17 @@
 # Změny
 
+## 1.1.2 – 2026-10-24
+
+### Přehrávání
+
+- Nové tlačítko ■ Zastavit v přehrávači: zavře film a zapomene, kde jste skončili, takže příště začne od začátku. Zápis v deníku zůstane. Křížek a Esc dál uloží pozici jako dosud.
+
+### Děti
+
+- Hlasitost v dětském přehrávači: velké tlačítko pro ztlumení a posuvník, na klávesnici šipky nahoru a dolů.
+- Náhled odkazu z YouTube je hotový během chvilky i na pomalejším počítači. yt-dlp se připraví hned po otevření stahování a dlouhé čekání má časový limit.
+- Nový náhled zruší ten předchozí a při zavření Kinotéky se ukončí i rozběhnuté stahování. Na pozadí tak nezůstávají běžet procesy yt-dlp, které zpomalovaly počítač.
+
 ## 1.1.1 – 2026-10-24
 
 ### Děti
