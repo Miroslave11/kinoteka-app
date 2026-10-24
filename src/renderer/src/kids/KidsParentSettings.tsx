@@ -75,40 +75,56 @@ export default function KidsParentSettings(): React.JSX.Element {
 
       <div className="k-setrow">
         <label>
-          PIN pro rodiče<small>Bez PINu se brána ptá příkladem pro dospělé</small>
+          Rodičovská brána
+          <small>
+            vypnuto = Pro rodiče, stahování i odchod bez PINu (dokud dítě neovládá počítač)
+          </small>
         </label>
-        <div className="k-row">
-          {mode.hasPin && (
-            <span className="k-ok">
-              <Check size={18} /> Nastavený
-            </span>
-          )}
-          <input
-            className="k-field small"
-            type="password"
-            inputMode="numeric"
-            placeholder={mode.hasPin ? 'Nový PIN' : 'PIN (4–8 číslic)'}
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-          />
-          <input
-            className="k-field small"
-            type="password"
-            inputMode="numeric"
-            placeholder="Znovu"
-            value={pinAgain}
-            onChange={(e) => setPinAgain(e.target.value.replace(/\D/g, '').slice(0, 8))}
-          />
-          <button className="k-btn" disabled={!pin} onClick={() => void savePin(pin)}>
-            Uložit PIN
-          </button>
-          {mode.hasPin && (
-            <button className="k-btn" onClick={() => void savePin(null)}>
-              Zrušit PIN
-            </button>
-          )}
-        </div>
+        <button
+          className={`k-toggle ${settings.parentGate ? '' : 'off'}`}
+          aria-pressed={settings.parentGate}
+          onClick={() => void save({ parentGate: !settings.parentGate })}
+        />
       </div>
+
+      {settings.parentGate && (
+        <div className="k-setrow">
+          <label>
+            PIN pro rodiče<small>Bez PINu se brána ptá příkladem pro dospělé</small>
+          </label>
+          <div className="k-row">
+            {mode.hasPin && (
+              <span className="k-ok">
+                <Check size={18} /> Nastavený
+              </span>
+            )}
+            <input
+              className="k-field small"
+              type="password"
+              inputMode="numeric"
+              placeholder={mode.hasPin ? 'Nový PIN' : 'PIN (4–8 číslic)'}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            />
+            <input
+              className="k-field small"
+              type="password"
+              inputMode="numeric"
+              placeholder="Znovu"
+              value={pinAgain}
+              onChange={(e) => setPinAgain(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            />
+            <button className="k-btn" disabled={!pin} onClick={() => void savePin(pin)}>
+              Uložit PIN
+            </button>
+            {mode.hasPin && (
+              <button className="k-btn" onClick={() => void savePin(null)}>
+                Zrušit PIN
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {notice && <p className="k-notice">{notice}</p>}
 
       <div className="k-setrow">
@@ -179,17 +195,19 @@ export default function KidsParentSettings(): React.JSX.Element {
         </div>
       </div>
 
-      <div className="k-setrow">
-        <label>
-          Odchod z dětského režimu jen za branou
-          <small>vypnuto = tlačítko Odejít vedle Pro rodiče funguje bez PINu</small>
-        </label>
-        <button
-          className={`k-toggle ${settings.protectExit ? '' : 'off'}`}
-          aria-pressed={settings.protectExit}
-          onClick={() => void save({ protectExit: !settings.protectExit })}
-        />
-      </div>
+      {settings.parentGate && (
+        <div className="k-setrow">
+          <label>
+            Odchod z dětského režimu jen za branou
+            <small>vypnuto = tlačítko Odejít vedle Pro rodiče funguje bez PINu</small>
+          </label>
+          <button
+            className={`k-toggle ${settings.protectExit ? '' : 'off'}`}
+            aria-pressed={settings.protectExit}
+            onClick={() => void save({ protectExit: !settings.protectExit })}
+          />
+        </div>
+      )}
 
       <div className="k-setrow">
         <label>Spouštět Kinotéku rovnou v dětském režimu</label>

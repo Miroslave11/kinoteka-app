@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { openDatabase } from '../db/database'
 import { SettingsRepository } from '../settings/SettingsRepository'
-import { KidsGuard } from './KidsGuard'
+import { KIDS_SETTINGS_KEY, KidsGuard } from './KidsGuard'
 
 let settings: SettingsRepository
 let now: Date
@@ -28,6 +28,21 @@ describe('KidsGuard', () => {
     expect(guard.parentAccess()).toBe(false)
     expect(guard.exit()).toBe(false)
     expect(guard.setPin('1234')).toBe(false)
+  })
+
+  it('vypnutá brána: Pro rodiče, změny i odchod bez PINu; po zapnutí zůstane otevřeno', () => {
+    guard.setPin('2580')
+    settings.set(KIDS_SETTINGS_KEY, { parentGate: false })
+    guard.enter()
+    expect(guard.parentAccess()).toBe(true)
+    expect(guard.mode(null)).toMatchObject({ locked: true, parent: true })
+    expect(guard.resetPlayTime()).toBe(true)
+    settings.set(KIDS_SETTINGS_KEY, { parentGate: true })
+    expect(guard.parentAccess()).toBe(false)
+    guard.keepParentOpen()
+    expect(guard.parentAccess()).toBe(true)
+    settings.set(KIDS_SETTINGS_KEY, { parentGate: false })
+    expect(guard.exit()).toBe(true)
   })
 
   it('nechráněný odchod jde i bez brány', () => {

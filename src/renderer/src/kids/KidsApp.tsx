@@ -73,7 +73,7 @@ function KidsShell(): React.JSX.Element {
               </span>
             )}
           <ParentsButton onClick={openParents} />
-          {!settings.protectExit && (
+          {(!settings.protectExit || !settings.parentGate) && (
             <button
               className="k-parents k-exit"
               title="Zpět do Kinotéky pro dospělé"

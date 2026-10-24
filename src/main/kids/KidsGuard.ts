@@ -1,6 +1,8 @@
 import { randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto'
 import {
+  DEFAULT_KIDS_SETTINGS,
   isValidPin,
+  parseKidsSettings,
   type KidsChallenge,
   type KidsMode,
   type KidsUnlockResult
@@ -12,6 +14,9 @@ const SETTING = {
   pin: 'kids.pin',
   usage: 'kids.usage'
 } as const
+
+/** Nastavení dětské části (`KidsSettings`) v tabulce nastavení. */
+export const KIDS_SETTINGS_KEY = 'kids.settings'
 
 /** Jak dlouho zůstane část Pro rodiče otevřená bez dalšího zadání PINu. */
 const PARENT_SESSION_MS = 15 * 60 * 1000
@@ -55,9 +60,23 @@ export class KidsGuard {
     return this.settings.get<StoredPin>(SETTING.pin) !== undefined
   }
 
-  /** Smí se měnit nastavení, stahovat a mazat? Mimo dětský režim ano, v něm jen za branou. */
+  /** Rodiče bránu vypnuli (dítě ještě neovládá počítač) – Pro rodiče i odchod bez PINu. */
+  private get gateOff(): boolean {
+    return !parseKidsSettings(this.settings.get(KIDS_SETTINGS_KEY) ?? DEFAULT_KIDS_SETTINGS)
+      .parentGate
+  }
+
+  /**
+   * Smí se měnit nastavení, stahovat a mazat? Mimo dětský režim ano, v něm jen za branou
+   * (nebo vždy, když je brána vypnutá).
+   */
   parentAccess(): boolean {
-    return !this.locked || this.now().getTime() < this.parentUntil
+    return !this.locked || this.gateOff || this.now().getTime() < this.parentUntil
+  }
+
+  /** Bránu rodič právě zapnul – část Pro rodiče, ve které je, zůstane otevřená. */
+  keepParentOpen(): void {
+    if (this.locked) this.parentUntil = this.now().getTime() + PARENT_SESSION_MS
   }
 
   mode(timeLimitMin: number | null): KidsMode {

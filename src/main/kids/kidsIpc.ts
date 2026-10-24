@@ -23,13 +23,13 @@ import { broadcast } from '../broadcast'
 import type { SettingsRepository } from '../settings/SettingsRepository'
 import type { KidsDownloader } from './KidsDownloader'
 import type { KidsDownloadQueue } from './KidsDownloadQueue'
-import type { KidsGuard } from './KidsGuard'
+import { KIDS_SETTINGS_KEY, type KidsGuard } from './KidsGuard'
 import type { KidsLibrary } from './KidsLibrary'
 import type { KidsRepository } from './KidsRepository'
 import type { YtDlpTool } from './YtDlpTool'
 
 const FOLDER_SETTING = 'kids.folder'
-export const KIDS_SETTINGS_KEY = 'kids.settings'
+export { KIDS_SETTINGS_KEY }
 /** Domácí složka s videi (rozhodnuto v SCOPE-DETI.md); na jiném počítači Videa\Kids. */
 const HOME_VIDEOS = 'C:\\Mirek_data\\09_Videa'
 
@@ -77,7 +77,9 @@ export function registerKidsIpc({
   ipcMain.handle(IpcChannel.KidsSaveSettings, (_event, value: unknown) =>
     forParent(() => {
       const saved = parseKidsSettings(value)
+      const gateTurnedOn = saved.parentGate && !loadSettings().parentGate
       settings.set(KIDS_SETTINGS_KEY, saved)
+      if (gateTurnedOn) guard.keepParentOpen()
       broadcast(IpcChannel.KidsChanged)
       return saved
     }, loadSettings())
