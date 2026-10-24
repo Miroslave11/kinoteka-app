@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { CatalogRepository } from '../catalog/CatalogRepository'
 import { openDatabase, type Database } from '../db/database'
-import { PlaybackRepository } from './PlaybackRepository'
+import { PlaybackRepository, watchKey } from './PlaybackRepository'
 
 let db: Database
 let catalog: CatalogRepository
@@ -83,6 +83,17 @@ describe('PlaybackRepository', () => {
     playback.record(titleId, null, 600, 6000)
     expect(playback.record(titleId, null, 20, 6000)).toBe('clear')
     expect(playback.progress(titleId, null)).toBeNull()
+  })
+
+  it('Zastavit: rozkoukání zapomene, deník nechá', () => {
+    const file = addFile('Den odhalení (2026).mkv')
+    catalog.rebuild()
+    const { titleId } = playback.itemForFile(file)!
+    playback.record(titleId, null, 5800, 6000)
+    playback.record(titleId, null, 2400, 6000)
+    playback.clearProgress(titleId, null)
+    expect(playback.progress(titleId, null)).toBeNull()
+    expect(playback.watchStates().get(watchKey(titleId, null))?.watchCount).toBe(1)
   })
 
   it('pozice dílů se ukládají zvlášť a katalog je ukáže u dílů', () => {

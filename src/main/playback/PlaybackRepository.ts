@@ -137,6 +137,13 @@ export class PlaybackRepository {
     return outcome
   }
 
+  /** Zapomene rozkoukání filmu nebo dílu (tlačítko Zastavit). */
+  clearProgress(titleId: number, episodeId: number | null): void {
+    this.db
+      .prepare('DELETE FROM playback_progress WHERE title_id = ? AND episode_id IS ?')
+      .run(titleId, episodeId)
+  }
+
   /** Zapamatovaná volba stopy pro film nebo celý seriál. */
   trackPreference(titleId: number, kind: 'audio' | 'sub'): TrackPreference | null {
     const row = this.db

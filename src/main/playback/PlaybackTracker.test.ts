@@ -16,20 +16,22 @@ const item: PlaybackItem = {
 function setup(): {
   tracker: PlaybackTracker
   record: ReturnType<typeof vi.fn>
+  clearProgress: ReturnType<typeof vi.fn>
   changed: ReturnType<typeof vi.fn>
   clock: { now: number }
 } {
   const record = vi.fn((_t: number, _e: number | null, position: number, duration: number) =>
     progressOutcome(position, duration)
   )
+  const clearProgress = vi.fn()
   const changed = vi.fn()
   const clock = { now: 0 }
   const tracker = new PlaybackTracker(
-    { record } as unknown as PlaybackRepository,
+    { record, clearProgress } as unknown as PlaybackRepository,
     changed,
     () => clock.now
   )
-  return { tracker, record, changed, clock }
+  return { tracker, record, clearProgress, changed, clock }
 }
 
 describe('PlaybackTracker', () => {
@@ -45,6 +47,23 @@ describe('PlaybackTracker', () => {
     clock.now = SAVE_INTERVAL_MS + 5_000
     tracker.update(620, 6000)
     expect(record).toHaveBeenCalledTimes(1)
+  })
+
+  it('Zastavit: smaže rozkoukání a při zavření už nic neuloží', () => {
+    const { tracker, record, clearProgress, changed, clock } = setup()
+    tracker.start(item)
+    clock.now = SAVE_INTERVAL_MS
+    tracker.update(615, 6000)
+    expect(record).toHaveBeenCalledTimes(1)
+    tracker.discard()
+    expect(clearProgress).toHaveBeenCalledWith(7, null)
+    expect(changed).toHaveBeenCalled()
+    // mpv ještě pošle pozici a pak se přehrávač zavře – nic dalšího se nezapíše.
+    clock.now = 2 * SAVE_INTERVAL_MS
+    tracker.update(630, 6000)
+    tracker.finish()
+    expect(record).toHaveBeenCalledTimes(1)
+    expect(tracker.current).toBeNull()
   })
 
   it('během přehrávání rozkoukání nemaže (první sekundy po spuštění)', () => {

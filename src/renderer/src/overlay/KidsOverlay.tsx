@@ -10,7 +10,9 @@ import {
   Play,
   RotateCcw,
   SkipBack,
-  SkipForward
+  SkipForward,
+  Volume2,
+  VolumeX
 } from 'lucide-react'
 import type { KidsPlayerInfo, PlayerCommand, PlayerState } from '../../../shared/player'
 import { useIdle } from './useIdle'
@@ -66,7 +68,11 @@ export default function KidsOverlay({
               ? { type: 'seek-relative', seconds: -10 }
               : event.key === 'ArrowRight'
                 ? { type: 'seek-relative', seconds: 10 }
-                : null
+                : event.key === 'ArrowUp'
+                  ? { type: 'set-volume', volume: state.volume + 5 }
+                  : event.key === 'ArrowDown'
+                    ? { type: 'set-volume', volume: state.volume - 5 }
+                    : null
       if (command) {
         event.preventDefault()
         send(command)
@@ -74,9 +80,12 @@ export default function KidsOverlay({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [wake])
+  }, [wake, state.volume])
 
   const ratio = state.duration > 0 ? Math.min(1, state.position / state.duration) : 0
+  // Při passthrough ovládá hlasitost receiver.
+  const passthrough = state.audio?.passthrough === true
+  const volume = state.muted ? 0 : Math.round(state.volume)
   const stop = (event: React.MouseEvent): void => event.stopPropagation()
 
   return (
@@ -168,6 +177,33 @@ export default function KidsOverlay({
           <b style={{ left: `${ratio * 100}%` }} />
         </div>
         <div className="ko-controls">
+          <div
+            className={`ko-volume ${passthrough ? 'is-disabled' : ''}`}
+            title={passthrough ? 'Hlasitost ovládá receiver.' : 'Hlasitost'}
+          >
+            <button
+              className="ko-round"
+              title={volume === 0 ? 'Zapnout zvuk' : 'Vypnout zvuk'}
+              disabled={passthrough}
+              onClick={() => send({ type: 'toggle-mute' })}
+            >
+              {volume === 0 ? (
+                <VolumeX size={34} strokeWidth={2.6} />
+              ) : (
+                <Volume2 size={34} strokeWidth={2.6} />
+              )}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={volume}
+              disabled={passthrough}
+              style={{ '--v': `${volume}%` } as React.CSSProperties}
+              onChange={(event) => send({ type: 'set-volume', volume: Number(event.target.value) })}
+              aria-label="Hlasitost"
+            />
+          </div>
           <button
             className="ko-round"
             title="Předchozí pohádka"

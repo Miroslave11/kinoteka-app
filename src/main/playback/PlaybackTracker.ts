@@ -55,6 +55,17 @@ export class PlaybackTracker {
     this.onChanged()
   }
 
+  /**
+   * Tlačítko Zastavit: rozkoukání se smaže (i dřívější) a nic se neuloží – příště
+   * se začne od začátku. Zhlédnutí, které se už zapsalo do deníku, zůstane.
+   */
+  discard(): void {
+    if (!this.item) return
+    this.repository.clearProgress(this.item.titleId, this.item.episodeId)
+    this.item = null
+    this.onChanged()
+  }
+
   private save(): void {
     if (!this.item) return
     const outcome = this.repository.record(

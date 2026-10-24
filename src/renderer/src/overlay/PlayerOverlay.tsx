@@ -10,6 +10,7 @@ import {
   RotateCcw,
   RotateCw,
   SkipForward,
+  Square,
   Volume2,
   VolumeX
 } from 'lucide-react'
@@ -237,6 +238,13 @@ export default function PlayerOverlay(): React.JSX.Element {
               onClick={() => send({ type: 'seek-relative', seconds: -10 })}
             >
               <RotateCcw size={20} />
+            </button>
+            <button
+              className="icon-btn"
+              title="Zastavit – příště od začátku"
+              onClick={() => send({ type: 'stop' })}
+            >
+              <Square size={18} fill="currentColor" />
             </button>
             <button
               className="big-btn"

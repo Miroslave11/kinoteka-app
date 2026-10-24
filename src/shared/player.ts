@@ -87,6 +87,8 @@ export type PlayerCommand =
   | { type: 'toggle-fullscreen' }
   | { type: 'escape' }
   | { type: 'close' }
+  /** Zastavit: zavřít a zapomenout rozkoukání (příště od začátku). */
+  | { type: 'stop' }
   | { type: 'play-next' }
   /** Dětský přehrávač: předchozí pohádka a srdíčko. */
   | { type: 'play-previous' }
@@ -120,6 +122,7 @@ export function parsePlayerCommand(value: unknown): PlayerCommand | null {
     case 'toggle-fullscreen':
     case 'escape':
     case 'close':
+    case 'stop':
     case 'play-next':
     case 'play-previous':
     case 'toggle-favorite':

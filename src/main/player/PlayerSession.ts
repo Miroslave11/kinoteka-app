@@ -81,6 +81,8 @@ export interface PlayerSessionOptions {
   logFile?: string
   /** Pozice a délka právě hraného souboru (několikrát za sekundu). */
   onProgress?: (position: number, duration: number) => void
+  /** Tlačítko Zastavit – volající zapomene rozkoukání, pak se přehrávač zavře. */
+  onStop?: () => void
   /** Uživatel chce další díl – volající pak zavolá `load()`. */
   onNext?: () => void
   /** Pohádka z dětské části: dětské ovládání, předchozí pohádka a srdíčko. */
@@ -249,6 +251,9 @@ export class PlayerSession {
           ? this.videoWindow.setFullScreen(false)
           : this.close()
       case 'close':
+        return this.close()
+      case 'stop':
+        this.options.onStop?.()
         return this.close()
       case 'play-next':
         return this.options.onNext?.()
