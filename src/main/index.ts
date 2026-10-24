@@ -32,6 +32,7 @@ import { KidsGuard } from './kids/KidsGuard'
 import { KidsTracker, kidsPlayItem, PlayTimeMeter, type KidsPlayItem } from './kids/kidsPlayback'
 import { KidsLibrary } from './kids/KidsLibrary'
 import { KidsRepository } from './kids/KidsRepository'
+import { fetchOembed } from './kids/oembed'
 import { YtDlpTool } from './kids/YtDlpTool'
 import { openDatabase } from './db/database'
 import { makeClip, posterPixels, videoThumbnail } from './media/ffmpeg'
@@ -604,7 +605,8 @@ void app.whenReady().then(() => {
     downloader: kidsDownloader,
     repository: kidsRepository,
     folder: () => kidsFolder(settings),
-    scan: () => kidsLibrary.scan()
+    scan: () => kidsLibrary.scan(),
+    quickInfo: (videoId) => fetchOembed(chromiumFetch, videoId)
   })
   registerKidsIpc({
     settings,

@@ -5,6 +5,7 @@ import {
   parseYoutubeLink,
   youtubeThumbnailUrl,
   type KidsPreview,
+  type KidsPreviewStage,
   type KidsQuality,
   type KidsQueueItem
 } from '../../../shared/kids'
@@ -13,6 +14,12 @@ import { formatTime } from '../../../shared/player'
 import { useKids } from './KidsData'
 
 const NEW_TITLE = '__novy__'
+
+const STAGE_TEXT: Record<KidsPreviewStage, string> = {
+  quick: 'Zjišťuji údaje o videu…',
+  tool: 'Připravuji yt-dlp…',
+  info: 'Načítám přes yt-dlp…'
+}
 
 function queueText(item: KidsQueueItem): string {
   switch (item.status) {
@@ -45,6 +52,7 @@ export default function KidsParentDownload(): React.JSX.Element {
   const { titles } = useKids()
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
+  const [stage, setStage] = useState<KidsPreviewStage | null>(null)
   const [preview, setPreview] = useState<KidsPreview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [target, setTarget] = useState('')
@@ -59,11 +67,18 @@ export default function KidsParentDownload(): React.JSX.Element {
     return kids.onQueueChanged(setQueue)
   }, [kids])
 
+  // yt-dlp se připraví hned při otevření – první náhled pak nečeká na stažení a prověření.
+  useEffect(() => {
+    void kids.warmUp()
+    return kids.onPreviewStage(setStage)
+  }, [kids])
+
   const existing = titles.filter((t) => t.id !== null).map((t) => t.name)
   const valid = parseYoutubeLink(url) !== null
 
   const load = async (): Promise<void> => {
     setLoading(true)
+    setStage(null)
     setPreview(null)
     setError(null)
     setNotice(null)
@@ -121,7 +136,7 @@ export default function KidsParentDownload(): React.JSX.Element {
             />
           </span>
           <button className="k-btn grape" disabled={!valid || loading} onClick={() => void load()}>
-            {loading ? 'Načítám…' : 'Načíst'}
+            {loading ? (stage ? STAGE_TEXT[stage] : 'Načítám…') : 'Načíst'}
           </button>
         </div>
         <p className="k-hint">

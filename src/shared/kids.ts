@@ -302,6 +302,9 @@ export interface KidsPreview {
   alreadyIn: string | null
 }
 
+/** Co právě dělá náhled odkazu: rychlé údaje (oEmbed), příprava yt-dlp, načítání přes yt-dlp. */
+export type KidsPreviewStage = 'quick' | 'tool' | 'info'
+
 export type KidsPreviewResult = { ok: true; preview: KidsPreview } | { ok: false; message: string }
 
 export interface KidsDownloadRequest {

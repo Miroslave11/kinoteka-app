@@ -138,12 +138,18 @@ export function registerKidsIpc({
   const denied = { ok: false as const, message: 'Stahovat můžou jen rodiče.' }
   ipcMain.handle(
     IpcChannel.KidsPreview,
-    async (_event, value: unknown): Promise<KidsPreviewResult> => {
+    async (event, value: unknown): Promise<KidsPreviewResult> => {
       if (!guard.parentAccess()) return denied
       const link = typeof value === 'string' ? parseYoutubeLink(value) : null
       if (!link) return { ok: false, message: 'Tohle není odkaz na video ani playlist z YouTube.' }
-      return queue.preview(link)
+      // Co se právě děje (na pomalém počítači trvá yt-dlp i minutu) – text na tlačítku.
+      return queue.preview(link, (stage) => {
+        if (!event.sender.isDestroyed()) event.sender.send(IpcChannel.KidsPreviewStage, stage)
+      })
     }
+  )
+  ipcMain.handle(IpcChannel.KidsWarmUp, () =>
+    forParent(() => downloader.warmUp(), Promise.resolve())
   )
   ipcMain.handle(IpcChannel.KidsEnqueue, async (_event, value: unknown) => {
     if (!guard.parentAccess()) return denied

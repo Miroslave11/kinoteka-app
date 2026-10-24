@@ -90,6 +90,8 @@ const api: KinotekaApi = {
   kids: {
     status: () => ipcRenderer.invoke(IpcChannel.KidsStatus),
     preview: (url) => ipcRenderer.invoke(IpcChannel.KidsPreview, url),
+    onPreviewStage: (listener) => subscribe(IpcChannel.KidsPreviewStage, listener),
+    warmUp: () => ipcRenderer.invoke(IpcChannel.KidsWarmUp),
     enqueue: (request) => ipcRenderer.invoke(IpcChannel.KidsEnqueue, request),
     queue: () => ipcRenderer.invoke(IpcChannel.KidsQueue),
     removeFromQueue: (id) => ipcRenderer.invoke(IpcChannel.KidsQueueRemove, id),
