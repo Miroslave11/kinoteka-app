@@ -1336,3 +1336,75 @@
     grid-template-columns: 70px minmax(0, 1fr) 56px 170px auto;
   }
 }
+
+/* Obrázek titulu: vlastní obrázek ze souboru, pořad na TMDB a ruční hledání. */
+.k-covers button.k-cover-add {
+  display: grid;
+  place-items: center;
+  border: 3px dashed var(--k-line);
+  color: var(--k-soft);
+  background: transparent;
+  cursor: pointer;
+}
+
+.k-covers button.k-cover-add:hover {
+  border-color: var(--k-grape);
+  color: var(--k-grape);
+}
+
+.k-tmdb {
+  display: grid;
+  gap: 8px;
+}
+
+.k-tmdb .k-hint {
+  margin: 0;
+}
+
+.k-tmdb .k-row {
+  flex-wrap: wrap;
+}
+
+.k-tmdb-search {
+  display: grid;
+  gap: 8px;
+}
+
+.k-tmdb-results {
+  display: grid;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.k-tmdb-results button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--k-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.k-tmdb-results button:hover {
+  background: rgb(155 123 255 / 0.15);
+}
+
+.k-tmdb-results small {
+  display: block;
+  color: var(--k-soft);
+  font-weight: 700;
+}
+
+.k-tmdb-poster {
+  flex: none;
+  width: 40px;
+  height: 60px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+}

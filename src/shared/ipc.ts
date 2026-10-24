@@ -92,5 +92,8 @@ export const IpcChannel = {
   KidsCheckYtDlp: 'kids:check-yt-dlp',
   KidsOpenFolder: 'kids:open-folder',
   KidsManageTitles: 'kids:manage-titles',
-  KidsManage: 'kids:manage'
+  KidsManage: 'kids:manage',
+  KidsSearchTmdb: 'kids:search-tmdb',
+  KidsChooseTmdb: 'kids:choose-tmdb',
+  KidsPickCover: 'kids:pick-cover'
 } as const

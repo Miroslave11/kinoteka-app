@@ -115,7 +115,10 @@ const api: KinotekaApi = {
     checkYtDlp: () => ipcRenderer.invoke(IpcChannel.KidsCheckYtDlp),
     openFolder: () => ipcRenderer.invoke(IpcChannel.KidsOpenFolder),
     manageTitles: () => ipcRenderer.invoke(IpcChannel.KidsManageTitles),
-    manage: (action) => ipcRenderer.invoke(IpcChannel.KidsManage, action)
+    manage: (action) => ipcRenderer.invoke(IpcChannel.KidsManage, action),
+    searchTmdb: (query) => ipcRenderer.invoke(IpcChannel.KidsSearchTmdb, query),
+    chooseTmdb: (titleId, choice) => ipcRenderer.invoke(IpcChannel.KidsChooseTmdb, titleId, choice),
+    pickCover: (titleId) => ipcRenderer.invoke(IpcChannel.KidsPickCover, titleId)
   },
   library: {
     listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),

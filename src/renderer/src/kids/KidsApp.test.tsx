@@ -28,6 +28,9 @@ const TITLES: KidsTitle[] = [
     keywords: [],
     coverUrl: null,
     coverVideoId: null,
+    coverImage: null,
+    artwork: [],
+    tmdb: { status: 'none', kind: null, id: null, name: null, year: null },
     favorite: false,
     videos: [
       video(2, 1, 'Bláto', '2026-10-24T10:00:00Z'),
@@ -40,6 +43,9 @@ const TITLES: KidsTitle[] = [
     keywords: [],
     coverUrl: null,
     coverVideoId: null,
+    coverImage: null,
+    artwork: [],
+    tmdb: { status: 'none', kind: null, id: null, name: null, year: null },
     favorite: false,
     videos: [video(3, 2, 'Krtek a autíčko', '2026-10-22T10:00:00Z')]
   }

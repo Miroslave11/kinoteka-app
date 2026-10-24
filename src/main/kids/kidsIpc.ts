@@ -8,6 +8,7 @@ import {
   parseKidsSettings,
   parseDownloadRequest,
   parseManageAction,
+  parseTmdbChoice,
   parseYoutubeLink,
   type KidsChallenge,
   type KidsManageResult,
@@ -21,6 +22,7 @@ import {
 } from '../../shared/kids'
 import { broadcast } from '../broadcast'
 import type { SettingsRepository } from '../settings/SettingsRepository'
+import type { KidsArtwork } from './KidsArtwork'
 import type { KidsDownloader } from './KidsDownloader'
 import type { KidsDownloadQueue } from './KidsDownloadQueue'
 import { KIDS_SETTINGS_KEY, type KidsGuard } from './KidsGuard'
@@ -47,6 +49,7 @@ export interface KidsIpcDeps {
   queue: KidsDownloadQueue
   library: KidsLibrary
   repository: KidsRepository
+  artwork: KidsArtwork
   guard: KidsGuard
   /** Spustí pohádku v dětském přehrávači. */
   play: (host: BrowserWindow | null, videoId: number) => Promise<unknown>
@@ -59,6 +62,7 @@ export function registerKidsIpc({
   queue,
   library,
   repository,
+  artwork,
   guard,
   play
 }: KidsIpcDeps): void {
@@ -186,6 +190,46 @@ export function registerKidsIpc({
       if (!guard.parentAccess()) return { ok: false, message: 'Upravovat můžou jen rodiče.' }
       const action = parseManageAction(value)
       return action ? library.manage(action) : { ok: false, message: 'Neplatný požadavek.' }
+    }
+  )
+
+  ipcMain.handle(IpcChannel.KidsSearchTmdb, async (_event, query: unknown) => {
+    if (!guard.parentAccess()) return { ok: false, message: 'Upravovat můžou jen rodiče.' }
+    if (typeof query !== 'string' || !query.trim() || query.length > 300)
+      return { ok: false, message: 'Napiš název pořadu.' }
+    try {
+      return { ok: true, results: await artwork.search(query.trim()) }
+    } catch (error) {
+      return { ok: false, message: (error as Error).message }
+    }
+  })
+  ipcMain.handle(
+    IpcChannel.KidsChooseTmdb,
+    async (_event, titleId: unknown, value: unknown): Promise<KidsManageResult> => {
+      if (!guard.parentAccess()) return { ok: false, message: 'Upravovat můžou jen rodiče.' }
+      const choice = parseTmdbChoice(value)
+      if (!Number.isInteger(titleId) || choice === undefined)
+        return { ok: false, message: 'Neplatný požadavek.' }
+      return artwork.choose(titleId as number, choice)
+    }
+  )
+  ipcMain.handle(
+    IpcChannel.KidsPickCover,
+    async (event, titleId: unknown): Promise<KidsManageResult | null> => {
+      if (!guard.parentAccess()) return { ok: false, message: 'Upravovat můžou jen rodiče.' }
+      if (!Number.isInteger(titleId)) return { ok: false, message: 'Neplatný požadavek.' }
+      const host = BrowserWindow.fromWebContents(event.sender)
+      const options = {
+        title: 'Obrázek titulu',
+        filters: [{ name: 'Obrázky', extensions: ['jpg', 'jpeg', 'png', 'webp'] }],
+        properties: ['openFile'] as 'openFile'[]
+      }
+      const picked = host
+        ? await dialog.showOpenDialog(host, options)
+        : await dialog.showOpenDialog(options)
+      const file = picked.filePaths[0]
+      if (picked.canceled || !file) return null
+      return artwork.setCustomCover(titleId as number, file)
     }
   )
 

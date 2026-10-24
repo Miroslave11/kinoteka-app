@@ -78,13 +78,17 @@ const IMAGE_TYPES: Record<string, string> = {
   '.webp': 'image/webp'
 }
 
-/** Obrázek dětského videa podle id – cestu zná jen hlavní proces. */
-async function serveKidsImage(
-  kidsThumbnail: (videoId: number) => string | null,
-  pathname: string
-): Promise<Response> {
-  const match = /^\/video\/(\d+)$/.exec(pathname)
-  const file = match ? kidsThumbnail(Number(match[1])) : null
+/** Cesty k obrázkům dětské části – zná je jen hlavní proces, okno posílá jen id. */
+export interface KidsImages {
+  video: (videoId: number) => string | null
+  /** Vlastní obrázek titulu vybraný rodičem. */
+  title: (titleId: number) => string | null
+}
+
+/** Obrázek dětského videa nebo titulu podle id. */
+async function serveKidsImage(kidsImages: KidsImages, pathname: string): Promise<Response> {
+  const match = /^\/(video|title)\/(\d+)$/.exec(pathname)
+  const file = match ? kidsImages[match[1] as 'video' | 'title'](Number(match[2])) : null
   const type = file && IMAGE_TYPES[extname(file).toLowerCase()]
   if (!file || !type) return new Response(null, { status: 404 })
   try {
@@ -123,12 +127,13 @@ async function serveYoutubeThumbnail(fetchImpl: typeof fetch, pathname: string):
  * kinoteka-media://tmdb/w500/abc.jpg → obrázek z cache (případně stažený z TMDB)
  * kinoteka-media://clips/12-0.mp4   → klip na pozadí
  * kinoteka-media://kids/video/7     → obrázek dětského videa
+ * kinoteka-media://kids/title/3     → vlastní obrázek dětského titulu
  * kinoteka-media://ytthumb/<id>     → náhled videa z YouTube (před stažením)
  */
 export function handleMediaProtocol(
   images: ImageCache,
   clipsDir: string,
-  kidsThumbnail: (videoId: number) => string | null,
+  kidsImages: KidsImages,
   fetchImpl: typeof fetch
 ): void {
   protocol.handle(MEDIA_SCHEME, async (request) => {
@@ -136,7 +141,7 @@ export function handleMediaProtocol(
     if (url.hostname === 'clips') {
       return serveClip(clipsDir, url.pathname.slice(1), request.headers.get('Range'))
     }
-    if (url.hostname === 'kids') return serveKidsImage(kidsThumbnail, url.pathname)
+    if (url.hostname === 'kids') return serveKidsImage(kidsImages, url.pathname)
     if (url.hostname === 'ytthumb') return serveYoutubeThumbnail(fetchImpl, url.pathname)
     if (url.hostname !== 'tmdb') return new Response(null, { status: 404 })
     const image = await images.get(url.pathname)

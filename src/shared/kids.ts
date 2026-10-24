@@ -60,12 +60,81 @@ export interface KidsTitle {
   name: string
   keywords: string[]
   coverUrl: string | null
-  /** Obrázek titulu vybraný rodičem; null = obrázek prvního videa. */
+  /** Obrázek titulu z videa vybraný rodičem; null = nevybráno. */
   coverVideoId: number | null
+  /**
+   * Jiný obrázek vybraný rodičem: cesta obrázku z TMDB („/abc.jpg“), nebo „file“ = vlastní
+   * obrázek ze souboru; null = nevybráno. Nic nevybráno = první obrázek z TMDB, jinak první video.
+   */
+  coverImage: string | null
+  /** Obrázky pořadu z TMDB, nejvhodnější do kolečka první. */
+  artwork: KidsArtwork[]
+  /** Pořad na TMDB, podle kterého se obrázky hledají. */
+  tmdb: KidsTmdbMatch
   /** Pohádky v pořadí, jak přibyly (= pořadí přehrávání „další pohádka“). */
   videos: KidsVideo[]
   favorite: boolean
 }
+
+/** Obrázek pořadu z TMDB. */
+export interface KidsArtwork {
+  /** Cesta na TMDB („/abc.jpg“) – tou se obrázek vybírá. */
+  path: string
+  url: string
+}
+
+/**
+ * pending – ještě se nehledalo (nebo chybí klíč TMDB)
+ * matched – nalezeno automaticky
+ * manual  – vybral rodič
+ * none    – nic se nenašlo
+ * off     – rodič obrázky z TMDB vypnul
+ */
+export type KidsTmdbStatus = 'pending' | 'matched' | 'manual' | 'none' | 'off'
+
+export interface KidsTmdbMatch {
+  status: KidsTmdbStatus
+  kind: 'tv' | 'movie' | null
+  id: number | null
+  name: string | null
+  year: number | null
+}
+
+/** Výsledek hledání pořadu na TMDB (ruční výběr). */
+export interface KidsTmdbResult {
+  kind: 'tv' | 'movie'
+  id: number
+  name: string
+  originalName: string | null
+  year: number | null
+  posterUrl: string | null
+}
+
+/** Ruční výběr pořadu: z výsledků hledání, nebo null = obrázky z TMDB nepoužívat. */
+export type KidsTmdbChoice = { kind: 'tv' | 'movie'; id: number } | null
+
+/** Odkaz na pořad z themoviedb.org („…/tv/69501-bing“) → druh a TMDB ID. */
+export function parseTmdbLink(text: string): { kind: 'tv' | 'movie'; id: number } | null {
+  const match = /themoviedb\.org\/(?:[a-z]{2}(?:-[A-Z]{2})?\/)?(tv|movie)\/(\d{1,9})(?:\D|$)/.exec(
+    text.trim()
+  )
+  return match ? { kind: match[1] as 'tv' | 'movie', id: Number(match[2]) } : null
+}
+
+/** Ověří ruční výběr pořadu z okna. */
+export function parseTmdbChoice(value: unknown): KidsTmdbChoice | undefined {
+  if (value === null) return null
+  if (typeof value !== 'object') return undefined
+  const input = value as Record<string, unknown>
+  const id = input['id']
+  if ((input['kind'] !== 'tv' && input['kind'] !== 'movie') || !Number.isInteger(id))
+    return undefined
+  return (id as number) > 0 ? { kind: input['kind'], id: id as number } : undefined
+}
+
+/** Cesta obrázku na TMDB – nic jiného (ochrana proti „../“). */
+export const isTmdbImagePath = (value: unknown): value is string =>
+  typeof value === 'string' && /^\/[\w-]+\.(jpg|jpeg|png|webp)$/i.test(value)
 
 export interface KidsScanResult {
   titles: number
@@ -289,8 +358,12 @@ export type KidsManageAction =
   | { kind: 'create-title'; name: string }
   | { kind: 'rename-title'; titleId: number; name: string }
   | { kind: 'set-keywords'; titleId: number; keywords: string[] }
-  /** videoId null = obrázek prvního videa. */
+  /** videoId null = obrázek vybraný automaticky (z TMDB, jinak z prvního videa). */
   | { kind: 'set-cover'; titleId: number; videoId: number | null }
+  /** Obrázek pořadu z TMDB (cesta z `artwork` titulu). */
+  | { kind: 'set-cover-image'; titleId: number; image: string }
+  /** Znovu dohledat pořad na TMDB podle názvu (zruší ruční výběr). */
+  | { kind: 'tmdb-retry'; titleId: number }
   | { kind: 'trash-title'; titleId: number }
   | { kind: 'move-video'; videoId: number; titleId: number }
   | { kind: 'trash-video'; videoId: number }
@@ -334,6 +407,12 @@ export function parseManageAction(value: unknown): KidsManageAction | null {
       return titleId && (videoId || input['videoId'] === null)
         ? { kind: 'set-cover', titleId, videoId }
         : null
+    case 'set-cover-image':
+      return titleId && isTmdbImagePath(input['image'])
+        ? { kind: 'set-cover-image', titleId, image: input['image'] }
+        : null
+    case 'tmdb-retry':
+      return titleId ? { kind: 'tmdb-retry', titleId } : null
     case 'trash-title':
       return titleId ? { kind: 'trash-title', titleId } : null
     case 'move-video':

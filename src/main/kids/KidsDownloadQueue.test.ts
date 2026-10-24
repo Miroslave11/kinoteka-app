@@ -61,7 +61,10 @@ function setup(options: { have?: string[]; titles?: string[] } = {}) {
           id: i + 1,
           folder,
           keywords: [],
-          coverVideoId: null
+          coverVideoId: null,
+          coverImage: null,
+          tmdb: { status: 'none' as const, kind: null, id: null, name: null, year: null },
+          artwork: []
         }))
     },
     folder: () => root,

@@ -251,5 +251,20 @@ export const MIGRATIONS: readonly string[] = [
   // 15 – dětská část: obrázek titulu vybraný rodičem
   `
   ALTER TABLE kids_title ADD COLUMN cover_video_id INTEGER REFERENCES kids_video (id) ON DELETE SET NULL;
+  `,
+
+  // 16 – dětská část: pořad na TMDB a jeho obrázky (aby šel titul poznat na první pohled)
+  `
+  -- pending = ještě nehledáno, matched = nalezeno, manual = vybráno rodičem,
+  -- none = nic nenalezeno, off = rodič obrázky z TMDB vypnul
+  ALTER TABLE kids_title ADD COLUMN tmdb_status TEXT NOT NULL DEFAULT 'pending';
+  ALTER TABLE kids_title ADD COLUMN tmdb_kind TEXT;
+  ALTER TABLE kids_title ADD COLUMN tmdb_id INTEGER;
+  ALTER TABLE kids_title ADD COLUMN tmdb_name TEXT;
+  ALTER TABLE kids_title ADD COLUMN tmdb_year INTEGER;
+  -- obrázky pořadu z TMDB (JSON pole cest „/abc.jpg“), nejvhodnější do kolečka první
+  ALTER TABLE kids_title ADD COLUMN artwork TEXT NOT NULL DEFAULT '[]';
+  -- obrázek vybraný rodičem: „tmdb:/abc.jpg“ nebo „file:<cesta>“ (přednost před cover_video_id)
+  ALTER TABLE kids_title ADD COLUMN cover_image TEXT;
   `
 ]
