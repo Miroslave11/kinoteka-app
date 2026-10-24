@@ -64,6 +64,42 @@ describe('mapShow', () => {
     ])
   })
 
+  it('stav vysílání a příští ohlášený díl', () => {
+    expect(
+      mapShow(
+        {
+          ...SHOW_VIDIM_VAS,
+          status: 'Returning Series',
+          next_episode_to_air: {
+            air_date: '2026-10-31',
+            season_number: 2,
+            episode_number: 5,
+            name: 'Návrat'
+          }
+        },
+        []
+      ).airing
+    ).toEqual({
+      status: 'running',
+      nextEpisode: { season: 2, episode: 5, name: 'Návrat', airDate: '2026-10-31' }
+    })
+    expect(mapShow({ ...SHOW_VIDIM_VAS, status: 'Ended' }, []).airing).toEqual({
+      status: 'ended',
+      nextEpisode: null
+    })
+    expect(mapShow({ ...SHOW_VIDIM_VAS, status: 'Canceled' }, []).airing?.status).toBe('canceled')
+    // Díl bez data se nepočítá.
+    expect(
+      mapShow(
+        {
+          ...SHOW_VIDIM_VAS,
+          next_episode_to_air: { air_date: null, season_number: 3, episode_number: 1 }
+        },
+        []
+      ).airing
+    ).toEqual({ status: 'running', nextEpisode: null })
+  })
+
   it('série k načtení bez speciálů', () => {
     expect(seasonNumbers(SHOW_VIDIM_VAS)).toEqual([1])
   })

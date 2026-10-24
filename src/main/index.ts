@@ -383,6 +383,8 @@ void app.whenReady().then(() => {
   catalog.rebuild()
   void probe?.run()
   void metadata.run()
+  // Běžící seriály se obnovují jednou denně (termíny nových dílů) – i když aplikace běží dlouho.
+  setInterval(() => void metadata.run(), 60 * 60 * 1000).unref()
   registerMetadataIpc(metadata)
   registerImdbIpc(imdb)
   registerJournalIpc(new JournalRepository(db), () => broadcast(IpcChannel.LibraryChanged))

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Check, CircleCheck, Info, Play, Trash2 } from 'lucide-react'
+import { CalendarClock, Check, CircleCheck, Info, Play, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
+import { airDateText, localDate, upcomingOf, upcomingText } from '../../../shared/airing'
 import { canResume, episodeCode, progressRatio, remainingText } from '../../../shared/playback'
 import { formatTime } from '../../../shared/player'
 import { useApp } from '../app/AppContext'
@@ -56,6 +57,8 @@ export default function ShowDetailPage(): React.JSX.Element {
   const onDisk = (season?.episodes ?? []).flatMap((e) => (e.disk ? [e.disk] : []))
   const unwatched = onDisk.filter((e) => e.watch.watchCount === 0)
   const seasonEpisodes = (unwatched.length > 0 ? unwatched : onDisk).map((e) => e.id)
+  const today = localDate()
+  const upcoming = upcomingOf(show.metadata, today)
 
   return (
     <div className="detail-page">
@@ -87,6 +90,12 @@ export default function ShowDetailPage(): React.JSX.Element {
       {show.alternativeNames.length > 0 && (
         <p className="d-section info-chip">
           Soubory seskupené z různých názvů: {[show.name, ...show.alternativeNames].join(' / ')}
+        </p>
+      )}
+
+      {upcoming && (
+        <p className="d-section info-chip airing">
+          <CalendarClock size={15} /> {upcomingText(upcoming, today)}
         </p>
       )}
 
@@ -129,6 +138,7 @@ export default function ShowDetailPage(): React.JSX.Element {
             key={`${episode.season}x${episode.episode}`}
             titleId={show.id}
             showName={show.name}
+            today={today}
             onDelete={(fileIds) =>
               askDelete(
                 `Smazat díl ${episodeCode(episode.season, episode.episode)}${episode.name ? ` „${episode.name}“` : ''}?`,
@@ -167,11 +177,13 @@ export default function ShowDetailPage(): React.JSX.Element {
 function EpisodeRow({
   titleId,
   showName,
+  today,
   episode,
   onDelete
 }: {
   titleId: number
   showName: string
+  today: string
   episode: EpisodeView
   onDelete: (fileIds: number[]) => void
 }): React.JSX.Element {
@@ -181,9 +193,12 @@ function EpisodeRow({
   const first = file ?? files[0]
   const watch = episode.disk?.watch
   const progress = watch && canResume(watch.progress) ? watch.progress : null
+  const airsLater = !episode.disk && episode.airDate !== null && episode.airDate >= today
 
   return (
-    <div className={`ep ${episode.disk ? (file ? '' : 'is-unavailable') : 'is-missing'}`}>
+    <div
+      className={`ep ${episode.disk ? (file ? '' : 'is-unavailable') : `is-missing ${airsLater ? 'is-upcoming' : ''}`}`}
+    >
       <button
         className="ep-still"
         style={placeholderStyle(`${showName} ${episode.season}x${episode.episode}`)}
@@ -213,6 +228,8 @@ function EpisodeRow({
             <MediaBadges file={first} tags={first?.tags ?? []} />
             <small className="mono">{files.map((f) => f.fileName).join(' · ')}</small>
           </>
+        ) : airsLater && episode.airDate ? (
+          <small className="accent">Vyjde {airDateText(episode.airDate, today)}</small>
         ) : (
           <small>Tento díl na disku není.</small>
         )}

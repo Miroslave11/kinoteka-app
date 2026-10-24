@@ -163,4 +163,70 @@ describe('MetadataService – obnova údajů', () => {
       metadata: { tmdbId: 9001, imdbId: 'tt0000001' }
     })
   })
+
+  it('běžící seriál obnoví jednou denně, skončený ne; výpadek sítě shodu nezmění', async () => {
+    addFile('Vidím Vás S01E01.mkv')
+    addFile('Prázdnota (2020).mkv')
+    catalog.rebuild()
+    const next = { air_date: '2026-10-31', season_number: 1, episode_number: 4, name: 'Nový' }
+    const api = fakeApi({
+      tv: vi.fn(async () => ({ ...SHOW_VIDIM_VAS, status: 'Returning Series' }))
+    })
+    const metadata = service(api)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-10-24T08:00:00Z'))
+      await metadata.run()
+      expect(catalog.listShows()[0]!.metadata?.airing).toEqual({
+        status: 'running',
+        nextEpisode: null
+      })
+
+      // Do druhého dne se nic nenačítá.
+      vi.mocked(api.tv).mockClear()
+      vi.setSystemTime(new Date('2026-10-25T07:00:00Z'))
+      await metadata.run()
+      expect(api.tv).not.toHaveBeenCalled()
+
+      // Po dni jen seriál (film ne) – a nově ohlášený díl.
+      vi.mocked(api.tv).mockImplementation(async () => ({
+        ...SHOW_VIDIM_VAS,
+        status: 'Returning Series',
+        next_episode_to_air: next
+      }))
+      vi.setSystemTime(new Date('2026-10-25T09:00:00Z'))
+      await metadata.run()
+      expect(api.movie).toHaveBeenCalledTimes(1)
+      expect(catalog.listShows()[0]!.metadata?.airing?.nextEpisode).toMatchObject({ episode: 4 })
+
+      // Výpadek sítě: shoda i údaje zůstanou, zkusí se za hodinu.
+      vi.mocked(api.tv).mockImplementation(async () => {
+        throw new TmdbError('TMDB není dostupné: ENOTFOUND')
+      })
+      vi.setSystemTime(new Date('2026-10-26T10:00:00Z'))
+      await metadata.run()
+      expect(catalog.listShows()[0]).toMatchObject({
+        matchStatus: 'matched',
+        metadata: { airing: { nextEpisode: { episode: 4 } } }
+      })
+      vi.mocked(api.tv).mockClear()
+      vi.setSystemTime(new Date('2026-10-26T10:30:00Z'))
+      await metadata.run()
+      expect(api.tv).not.toHaveBeenCalled()
+      vi.setSystemTime(new Date('2026-10-26T11:01:00Z'))
+      await metadata.run()
+      expect(api.tv).toHaveBeenCalled()
+
+      // Skončený seriál se už neobnovuje.
+      vi.mocked(api.tv).mockImplementation(async () => ({ ...SHOW_VIDIM_VAS, status: 'Ended' }))
+      vi.setSystemTime(new Date('2026-10-28T10:00:00Z'))
+      await metadata.run()
+      vi.mocked(api.tv).mockClear()
+      vi.setSystemTime(new Date('2026-11-28T10:00:00Z'))
+      await metadata.run()
+      expect(api.tv).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

@@ -3,6 +3,7 @@ import type {
   MetadataSeason,
   MetadataSearchResult,
   Person,
+  ShowAiring,
   TitleMetadata
 } from '../../shared/metadata'
 
@@ -143,7 +144,25 @@ export function mapShow(json: Json, seasons: Json[]): TitleMetadata {
     .map((p) => String(p['name'] ?? ''))
     .filter(Boolean)
   metadata.seasons = seasons.map(mapSeason).sort((a, b) => a.number - b.number)
+  metadata.airing = mapAiring(json)
   return metadata
+}
+
+/** Stav vysílání: „Ended“ a „Canceled“ jsou konečné, ostatní (Returning Series, Planned…) běží. */
+function mapAiring(json: Json): ShowAiring {
+  const status =
+    json['status'] === 'Ended' ? 'ended' : json['status'] === 'Canceled' ? 'canceled' : 'running'
+  const next = obj(json['next_episode_to_air'])
+  const airDate = str(next['air_date'])
+  const season = num(next['season_number'])
+  const episode = num(next['episode_number'])
+  return {
+    status,
+    nextEpisode:
+      airDate && /^\d{4}-\d{2}-\d{2}$/.test(airDate) && season !== null && episode !== null
+        ? { season, episode, name: str(next['name']), airDate }
+        : null
+  }
 }
 
 export function mapSeason(json: Json): MetadataSeason {

@@ -122,9 +122,16 @@ function toMetadataRequest(row: Row): MetadataRequest {
     year: (row['year'] as number | null) ?? null,
     alternativeNames: parseTags(row['alternative_names']),
     tmdbId: (row['tmdb_id'] as number | null) ?? null,
-    status: (row['match_status'] as MatchStatus) ?? 'pending'
+    status: (row['match_status'] as MatchStatus) ?? 'pending',
+    background:
+      (row['match_status'] === 'matched' || row['match_status'] === 'manual') &&
+      row['metadata_updated_at'] !== null
   }
 }
+
+/** Jak často se obnovují údaje běžících seriálů a za jak dlouho se opakuje nepovedené hledání. */
+const AIRING_REFRESH_MS = 24 * 60 * 60 * 1000
+const REFRESH_RETRY_MS = 60 * 60 * 1000
 
 /** Co potřebuje služba metadat k dohledání titulu. */
 export interface MetadataRequest {
@@ -136,6 +143,8 @@ export interface MetadataRequest {
   /** Už známé TMDB ID – pak se jen znovu načtou údaje, bez nového vyhledávání. */
   tmdbId: number | null
   status: MatchStatus
+  /** Pravidelná obnova spárovaného titulu (ne nové hledání ani „Znovu načíst údaje“). */
+  background: boolean
 }
 
 /**
@@ -361,22 +370,34 @@ export class CatalogRepository {
   // ---------- metadata ----------
 
   /**
-   * Tituly, které čekají na dohledání, chybné (po hodině znovu) a spárované s vynuceným
-   * obnovením údajů (metadata_updated_at = NULL).
+   * Tituly, které čekají na dohledání, chybné (po hodině znovu), spárované s vynuceným
+   * obnovením údajů (metadata_updated_at = NULL) a běžící seriály s údaji staršími než den
+   * (kvůli termínům nových dílů; i seriály s údaji bez stavu vysílání).
    */
   titlesNeedingMetadata(now = new Date()): MetadataRequest[] {
-    const retryBefore = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
+    const retryBefore = new Date(now.getTime() - REFRESH_RETRY_MS).toISOString()
+    const dayAgo = new Date(now.getTime() - AIRING_REFRESH_MS).toISOString()
     return this.db
       .prepare(
         `SELECT * FROM title
          WHERE match_status = 'pending'
             OR (match_status = 'error' AND (metadata_updated_at IS NULL OR metadata_updated_at < ?))
             OR (match_status IN ('matched', 'manual') AND tmdb_id IS NOT NULL
-                AND metadata_updated_at IS NULL)
+                AND (metadata_updated_at IS NULL
+                     OR (kind = 'show' AND metadata_updated_at < ?
+                         AND coalesce(json_extract(metadata, '$.airing.status'), 'running') = 'running')))
          ORDER BY id`
       )
-      .all(retryBefore)
+      .all(retryBefore, dayAgo)
       .map(toMetadataRequest)
+  }
+
+  /** Obnova běžícího seriálu na pozadí selhala (třeba bez sítě) – zkusí se za hodinu, shoda zůstane. */
+  postponeRefresh(id: number, now = new Date()): void {
+    const retryAt = new Date(now.getTime() - AIRING_REFRESH_MS + REFRESH_RETRY_MS)
+    this.db
+      .prepare('UPDATE title SET metadata_updated_at = ? WHERE id = ?')
+      .run(retryAt.toISOString(), id)
   }
 
   titleForMetadata(id: number): MetadataRequest | undefined {

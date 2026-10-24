@@ -20,6 +20,9 @@ interface PosterProps {
   /** Najetí myší přebarví prostředí podle titulu (Domů). */
   tintOnHover?: boolean
   onHoverEnd?: () => void
+  /** Místo roku a počtu dílů (např. termín dalšího dílu); `noteTitle` jako nápověda. */
+  note?: string
+  noteTitle?: string
 }
 
 export const titlePath = (title: TitleItem): string =>
@@ -49,7 +52,13 @@ function posterWatch(title: TitleItem): { watched: string | null; progress: numb
 }
 
 /** Plakát z TMDB (nebo zástupný přechod) s názvem; klik otevře detail. */
-export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps): React.JSX.Element {
+export default function Poster({
+  title,
+  tintOnHover,
+  onHoverEnd,
+  note,
+  noteTitle
+}: PosterProps): React.JSX.Element {
   const navigate = useNavigate()
   const files = filesOf(title)
   const summary = (playableFile(files) ?? files[0])?.summary
@@ -101,16 +110,22 @@ export default function Poster({ title, tintOnHover, onHoverEnd }: PosterProps):
       </span>
       <span className="cap">
         <b>{name}</b>
-        <span>
-          {year ?? 'rok neznámý'}
-          {title.kind === 'show' && ` · ${subtitle}`}
-          {title.imdb && <ImdbBadge imdb={title.imdb} compact />}
-          {title.myRating && (
-            <span className="my-stars" title={`Moje hodnocení ${title.myRating} z 5`}>
-              ★ {title.myRating}
-            </span>
-          )}
-        </span>
+        {note ? (
+          <span className="accent" title={noteTitle}>
+            {note}
+          </span>
+        ) : (
+          <span>
+            {year ?? 'rok neznámý'}
+            {title.kind === 'show' && ` · ${subtitle}`}
+            {title.imdb && <ImdbBadge imdb={title.imdb} compact />}
+            {title.myRating && (
+              <span className="my-stars" title={`Moje hodnocení ${title.myRating} z 5`}>
+                ★ {title.myRating}
+              </span>
+            )}
+          </span>
+        )}
       </span>
     </button>
   )

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
+import { localDate, upcomingOf, upcomingShort, upcomingText } from '../../../shared/airing'
 import { useApp } from '../app/AppContext'
 import { addedAt, continueWatching, type TitleItem } from '../app/catalogData'
 import { applyPalette, titlePalette, useAmbientPalette } from '../app/palette'
@@ -20,6 +21,20 @@ export default function HomePage(): React.JSX.Element {
     [titles]
   )
   const continuing = useMemo(() => continueWatching(titles), [titles])
+  const today = localDate()
+  // Seriály s ohlášeným dalším dílem nebo novou sérií, nejbližší první.
+  const comingSoon = useMemo(
+    () =>
+      titles
+        .flatMap((title) => {
+          const upcoming = title.kind === 'show' ? upcomingOf(title.metadata, today) : null
+          return upcoming?.kind === 'episode' || upcoming?.kind === 'season'
+            ? [{ title, upcoming, episode: upcoming.episode }]
+            : []
+        })
+        .sort((a, b) => a.episode.airDate.localeCompare(b.episode.airDate)),
+    [titles, today]
+  )
   const heroTitles = recent.slice(0, HERO_COUNT)
   const heroTitle = heroTitles[heroIndex % Math.max(1, heroTitles.length)]
   useAmbientPalette(heroTitle ? titlePalette(heroTitle) : null)
@@ -87,6 +102,23 @@ export default function HomePage(): React.JSX.Element {
             <div className="strip">
               {continuing.map((item) => (
                 <ContinueCard key={item.key} item={item} onHoverEnd={restorePalette} />
+              ))}
+            </div>
+          </section>
+        )}
+        {comingSoon.length > 0 && (
+          <section className="row">
+            <h3>Brzy vyjde</h3>
+            <div className="strip">
+              {comingSoon.map(({ title, upcoming, episode }) => (
+                <Poster
+                  key={`${title.kind}-${title.id}`}
+                  title={title}
+                  tintOnHover
+                  onHoverEnd={restorePalette}
+                  note={upcomingShort(episode, today)}
+                  noteTitle={upcomingText(upcoming, today)}
+                />
               ))}
             </div>
           </section>
