@@ -134,10 +134,23 @@ describe('KidsApp', () => {
     fireEvent.click(await screen.findByText('Odejít'))
     await vi.waitFor(() => expect(api.kids.exit).toHaveBeenCalled())
     cleanup()
-    api.kids.getSettings!.mockResolvedValue({ theme: 'obloha', protectExit: true })
+    api.kids.getSettings!.mockResolvedValue({
+      theme: 'obloha',
+      protectExit: true,
+      parentGate: true
+    })
     renderAt('/deti')
     await screen.findAllByText('Krteček')
     expect(screen.queryByText('Odejít')).toBeNull()
+    // Vypnutá brána: Odejít je vidět vždy.
+    cleanup()
+    api.kids.getSettings!.mockResolvedValue({
+      theme: 'obloha',
+      protectExit: true,
+      parentGate: false
+    })
+    renderAt('/deti')
+    expect(await screen.findByText('Odejít')).toBeTruthy()
   })
 
   it('denní limit vyčerpán – místo pohádek měsíček, nic se nepřehraje', async () => {

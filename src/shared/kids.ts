@@ -96,6 +96,8 @@ export interface KidsSettings {
   startInKids: boolean
   /** Odchod z dětského režimu jen přes rodičovskou bránu; jinak tlačítkem Odejít. */
   protectExit: boolean
+  /** Rodičovská brána (PIN nebo příklad); vypnuto = část Pro rodiče i odchod volně. */
+  parentGate: boolean
 }
 
 export const DEFAULT_KIDS_SETTINGS: KidsSettings = {
@@ -103,7 +105,8 @@ export const DEFAULT_KIDS_SETTINGS: KidsSettings = {
   autoplayNext: true,
   timeLimitMin: null,
   startInKids: false,
-  protectExit: false
+  protectExit: false,
+  parentGate: true
 }
 
 /** Nejdelší denní limit, který jde nastavit (10 hodin). */
@@ -114,7 +117,7 @@ export function parseKidsSettings(value: unknown): KidsSettings {
   const input =
     typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
   const theme = KIDS_THEMES.find((t) => t.id === input['theme'])?.id
-  const bool = (key: 'autoplayNext' | 'startInKids' | 'protectExit'): boolean =>
+  const bool = (key: 'autoplayNext' | 'startInKids' | 'protectExit' | 'parentGate'): boolean =>
     typeof input[key] === 'boolean' ? input[key] : DEFAULT_KIDS_SETTINGS[key]
   const limit = input['timeLimitMin']
   return {
@@ -125,7 +128,8 @@ export function parseKidsSettings(value: unknown): KidsSettings {
         ? (limit as number)
         : null,
     startInKids: bool('startInKids'),
-    protectExit: bool('protectExit')
+    protectExit: bool('protectExit'),
+    parentGate: bool('parentGate')
   }
 }
 
