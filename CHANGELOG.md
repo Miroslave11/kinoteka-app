@@ -1,5 +1,12 @@
 # Změny
 
+## 1.1.1 – 2026-10-24
+
+### Děti
+
+- Kulaté obrázky titulů jsou z TMDB: ke každé pohádce se podle názvu složky (případně klíčových slov nebo kanálu videí) dohledá pořad a do kolečka se dá jeho obrázek s postavičkami, takže jde titul poznat na první pohled. Bez klíče TMDB nebo když se pořad nenajde, zůstane obrázek z dílu.
+- Pro rodiče → Tituly: obrázek titulu jde vybrat z obrázků pořadu na TMDB, z dílů, nebo vlastní ze souboru. Řádek „Pořad na TMDB“ ukazuje, ke kterému pořadu titul patří; jiný pořad jde najít podle názvu nebo vložením odkazu z themoviedb.org (třeba Bing se najde jako „Bing bunny“), případně TMDB u titulu vypnout.
+
 ## 1.1.0 – 2026-10-24
 
 Dětská část – pohádky pro děti s vlastním vzhledem, rodičovskou bránou a stahováním z YouTube. Rozsah: [SCOPE-DETI.md](SCOPE-DETI.md).
