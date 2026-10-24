@@ -94,13 +94,16 @@ export interface KidsSettings {
   timeLimitMin: number | null
   /** Kinotéka se spustí rovnou v dětském režimu. */
   startInKids: boolean
+  /** Odchod z dětského režimu jen přes rodičovskou bránu; jinak tlačítkem Odejít. */
+  protectExit: boolean
 }
 
 export const DEFAULT_KIDS_SETTINGS: KidsSettings = {
   theme: 'obloha',
   autoplayNext: true,
   timeLimitMin: null,
-  startInKids: false
+  startInKids: false,
+  protectExit: false
 }
 
 /** Nejdelší denní limit, který jde nastavit (10 hodin). */
@@ -111,7 +114,7 @@ export function parseKidsSettings(value: unknown): KidsSettings {
   const input =
     typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
   const theme = KIDS_THEMES.find((t) => t.id === input['theme'])?.id
-  const bool = (key: 'autoplayNext' | 'startInKids'): boolean =>
+  const bool = (key: 'autoplayNext' | 'startInKids' | 'protectExit'): boolean =>
     typeof input[key] === 'boolean' ? input[key] : DEFAULT_KIDS_SETTINGS[key]
   const limit = input['timeLimitMin']
   return {
@@ -121,7 +124,8 @@ export function parseKidsSettings(value: unknown): KidsSettings {
       Number.isInteger(limit) && (limit as number) > 0 && (limit as number) <= MAX_TIME_LIMIT_MIN
         ? (limit as number)
         : null,
-    startInKids: bool('startInKids')
+    startInKids: bool('startInKids'),
+    protectExit: bool('protectExit')
   }
 }
 

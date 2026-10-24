@@ -89,7 +89,7 @@ export function registerKidsIpc({
   ipcMain.handle(IpcChannel.KidsChallenge, (): KidsChallenge => guard.challenge())
   ipcMain.handle(IpcChannel.KidsUnlock, (_event, answer: unknown) => guard.unlock(answer))
   ipcMain.handle(IpcChannel.KidsLeaveParent, () => guard.leaveParent())
-  ipcMain.handle(IpcChannel.KidsExit, () => guard.exit())
+  ipcMain.handle(IpcChannel.KidsExit, () => guard.exit(loadSettings().protectExit))
   ipcMain.handle(IpcChannel.KidsSetPin, (_event, pin: unknown) =>
     pin === null || isValidPin(pin) ? guard.setPin(pin) : false
   )

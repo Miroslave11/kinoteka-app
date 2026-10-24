@@ -75,9 +75,9 @@ export class KidsGuard {
     this.parentUntil = 0
   }
 
-  /** Odchod z dětského režimu – jen za branou. */
-  exit(): boolean {
-    if (!this.parentAccess()) return false
+  /** Odchod z dětského režimu – za branou, nebo volně, když ho rodiče nechrání. */
+  exit(gateRequired = true): boolean {
+    if (gateRequired && !this.parentAccess()) return false
     this.settings.set(SETTING.locked, false)
     this.parentUntil = 0
     return true

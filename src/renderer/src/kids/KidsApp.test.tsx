@@ -128,6 +128,18 @@ describe('KidsApp', () => {
     await vi.waitFor(() => expect(api.kids.unlock).toHaveBeenLastCalledWith('2580'))
   })
 
+  it('tlačítko Odejít bez brány; když rodiče odchod chrání, chybí', async () => {
+    api.kids.exit = vi.fn(async () => true)
+    renderAt('/deti')
+    fireEvent.click(await screen.findByText('Odejít'))
+    await vi.waitFor(() => expect(api.kids.exit).toHaveBeenCalled())
+    cleanup()
+    api.kids.getSettings!.mockResolvedValue({ theme: 'obloha', protectExit: true })
+    renderAt('/deti')
+    await screen.findAllByText('Krteček')
+    expect(screen.queryByText('Odejít')).toBeNull()
+  })
+
   it('denní limit vyčerpán – místo pohádek měsíček, nic se nepřehraje', async () => {
     api.kids.mode!.mockResolvedValue({ locked: true, parent: false, hasPin: false, timeLeftSec: 0 })
     renderAt('/deti')

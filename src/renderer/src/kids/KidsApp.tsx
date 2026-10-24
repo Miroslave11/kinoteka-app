@@ -2,7 +2,7 @@ import '@fontsource-variable/fredoka'
 import '@fontsource-variable/nunito'
 import './kids.css'
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Clock, Heart, Home, Moon, Star } from 'lucide-react'
+import { ArrowLeft, Clock, Heart, Home, LogOut, Moon, Star } from 'lucide-react'
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { KidsDataProvider, useKids } from './KidsData'
 import KidsFavoritesPage from './KidsFavoritesPage'
@@ -73,6 +73,19 @@ function KidsShell(): React.JSX.Element {
               </span>
             )}
           <ParentsButton onClick={openParents} />
+          {!settings.protectExit && (
+            <button
+              className="k-parents k-exit"
+              title="Zpět do Kinotéky pro dospělé"
+              onClick={() =>
+                void window.kinoteka.kids.exit().then((done) => {
+                  if (done) navigate('/')
+                })
+              }
+            >
+              <LogOut size={18} /> Odejít
+            </button>
+          )}
         </header>
       )}
       <main className="k-scroll">

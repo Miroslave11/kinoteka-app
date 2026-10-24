@@ -30,6 +30,12 @@ describe('KidsGuard', () => {
     expect(guard.setPin('1234')).toBe(false)
   })
 
+  it('nechráněný odchod jde i bez brány', () => {
+    guard.enter()
+    expect(guard.exit(false)).toBe(true)
+    expect(guard.locked).toBe(false)
+  })
+
   it('bez PINu příklad pro dospělé; správná odpověď otevře část Pro rodiče', () => {
     guard.enter()
     const challenge = guard.challenge()
