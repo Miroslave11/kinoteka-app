@@ -18,6 +18,8 @@ export interface ParsedName {
   episodeTitle: string | null
   /** Čitelné štítky: „CZ dabing“, „CZ titulky“, „1080p“, „5.1“, „WEBRip“… */
   tags: string[]
+  /** Lekce vzdělávacího kurzu („Lekce 05 - Video 3“) – seriál bez dohledávání na TMDB. */
+  course: boolean
 }
 
 const L = '(?<![\\p{L}\\p{N}])'
@@ -52,9 +54,33 @@ interface EpisodeMatch {
   season: number | null
   episode: number
   episodeEnd: number | null
+  course?: boolean
 }
 
+/**
+ * Označení části kurzu: „Lekce 5“, „Lesson 5“, „Modul 2“… Bez „Kapitola“ a „Chapter“ –
+ * ty bývají v názvech filmů („To Kapitola 2“, „John Wick: Kapitola 4“).
+ */
+const COURSE_PART = '(?:lekce|lekcia|lesson|modul|module|sekce|section)'
+/** Video v lekci: „Video 3“, „Díl 3“, „Part 3“, „Lekce 3“ (v modulu)… */
+const COURSE_ITEM = '(?:video|díl|dil|part|lekce|lekcia|lesson|lecture|epizoda|episode)'
+
 const EPISODE_PATTERNS: ((s: string) => EpisodeMatch | null)[] = [
+  // Kurzy: „Lekce 05 - Video 3“ (lekce = série, video = díl), samotná „Lekce 5“ = díl 5
+  (s) => {
+    const m = re(
+      `${L}${COURSE_PART}\\s?(\\d{1,3})${R}(?:\\s?[-–—.,:]?\\s?${COURSE_ITEM}\\s?(\\d{1,3})${R})?`
+    ).exec(s)
+    if (!m) return null
+    return {
+      index: m.index,
+      length: m[0].length,
+      season: m[2] ? Number(m[1]) : null,
+      episode: Number(m[2] ?? m[1]),
+      episodeEnd: null,
+      course: true
+    }
+  },
   // S01E02, S1E2, S01 E02, S01E01E02, S01E01-E02, S01E01-02
   (s) => {
     const m = re(`${L}S(\\d{1,2})\\s?E(\\d{1,3})(?:-?E(\\d{1,3})|-(\\d{1,3}))?${R}`).exec(s)
@@ -367,12 +393,16 @@ export function parseMediaPath(relativePath: string): ParsedName {
       episode: null,
       episodeEnd: null,
       episodeTitle: null,
-      tags: labelTags([...movie.tags, ...tagTokens])
+      tags: labelTags([...movie.tags, ...tagTokens]),
+      course: false
     }
   }
 
   const before = splitTitleAndTags(text.slice(0, match.index), true)
   const after = splitTitleAndTags(text.slice(match.index + match.length), true)
+  // Názvy lekcí („Budujeme větší web from scratch“) obsahují slova, která jinde znamenají
+  // štítky (web, HD…) – u kurzu se název videa nechá celý.
+  const episodeTitle = match.course ? trimTitle(text.slice(match.index + match.length)) : after.text
 
   let title = before.text
   if (!title && folderTitle)
@@ -387,8 +417,9 @@ export function parseMediaPath(relativePath: string): ParsedName {
     season: match.season ?? folderSeason ?? 1,
     episode: match.episode,
     episodeEnd: match.episodeEnd,
-    episodeTitle: after.text ? capitalize(after.text) : null,
-    tags: labelTags([...before.tags, ...after.tags, ...tagTokens])
+    episodeTitle: episodeTitle ? capitalize(episodeTitle) : null,
+    tags: labelTags([...before.tags, ...(match.course ? [] : after.tags), ...tagTokens]),
+    course: match.course ?? false
   }
 }
 

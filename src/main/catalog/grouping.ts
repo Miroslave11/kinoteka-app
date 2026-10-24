@@ -32,6 +32,8 @@ export interface ShowGroup {
   alternativeNames: string[]
   year: number | null
   episodes: EpisodeGroup[]
+  /** Vzdělávací kurz (lekce) – na TMDB se nedohledává. */
+  course: boolean
 }
 
 export interface Grouping {
@@ -195,7 +197,8 @@ export function groupMediaFiles(
       name,
       alternativeNames: [...alternatives.values()],
       year: mostFrequent(group.map((file) => file.name.year).filter((y) => y !== null)) ?? null,
-      episodes: [...episodes.values()].sort((a, b) => a.season - b.season || a.episode - b.episode)
+      episodes: [...episodes.values()].sort((a, b) => a.season - b.season || a.episode - b.episode),
+      course: group.some((file) => file.name.course)
     }
   })
 

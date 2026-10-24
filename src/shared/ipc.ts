@@ -24,6 +24,7 @@ export const IpcChannel = {
   CatalogListShows: 'catalog:list-shows',
   CatalogFileDetails: 'catalog:file-details',
   CatalogClassify: 'catalog:classify',
+  CatalogClassifyFolder: 'catalog:classify-folder',
 
   MetadataKeyStatus: 'metadata:key-status',
   MetadataSaveKey: 'metadata:save-key',

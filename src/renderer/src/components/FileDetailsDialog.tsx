@@ -154,6 +154,7 @@ export default function FileDetailsDialog({ fileId, onClose }: Props): React.JSX
             fileId={fileId}
             current={details.classification.current}
             manual={details.classification.manual}
+            folderFileCount={details.folderFileCount}
             showNames={[...new Set(shows.map((show) => show.name))].sort((a, b) =>
               a.localeCompare(b, 'cs')
             )}

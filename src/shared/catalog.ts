@@ -32,6 +32,8 @@ export interface FileDetails {
   pending: boolean
   /** Kam soubor patří; null = zatím nezařazený. */
   classification: ClassificationInfo | null
+  /** Kolik video souborů je ve stejné složce (pro zařazení celé složky jako seriálu). */
+  folderFileCount: number
 }
 
 export interface MovieItem {
