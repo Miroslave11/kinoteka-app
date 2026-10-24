@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
+import { DEFAULT_KIDS_SETTINGS, parseKidsSettings } from '../shared/kids'
 import { VIDEO_EXTENSIONS } from '../shared/library'
 import { parseClassification } from '../shared/classification'
 import { parseFileIds } from '../shared/deletion'
@@ -24,7 +25,8 @@ import { registerJournalIpc } from './journal/journalIpc'
 import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
 import { KidsDownloader } from './kids/KidsDownloader'
-import { kidsFolder, registerKidsIpc } from './kids/kidsIpc'
+import { kidsFolder, KIDS_SETTINGS_KEY, registerKidsIpc } from './kids/kidsIpc'
+import { KidsTracker, kidsPlayItem, type KidsPlayItem } from './kids/kidsPlayback'
 import { KidsLibrary } from './kids/KidsLibrary'
 import { KidsRepository } from './kids/KidsRepository'
 import { YtDlpTool } from './kids/YtDlpTool'
@@ -223,6 +225,88 @@ async function play(
   }
 }
 
+/** Právě hraná pohádka z dětské části (sousedé v titulu pro „předchozí / další“). */
+let kidsCurrent: KidsPlayItem | null = null
+let kidsTracker: KidsTracker
+let kidsRepository: KidsRepository
+
+const kidsAutoplay = (): boolean =>
+  parseKidsSettings(settings.get(KIDS_SETTINGS_KEY) ?? DEFAULT_KIDS_SETTINGS).autoplayNext
+
+/**
+ * Pohádka z dětské části: přehrávač s dětským ovládáním, pozice se ukládá do dětské
+ * historie (ne do deníku), rozkoukaná pohádka pokračuje bez ptaní.
+ */
+async function playKids(host: BrowserWindow | null, videoId: number): Promise<OpenFileResult> {
+  const item = kidsPlayItem(kidsRepository, videoId, kidsAutoplay())
+  if (!item) return { ok: false, reason: 'error', message: 'Pohádka už ve složce není.' }
+  if (!host) return { ok: false, reason: 'error', message: 'Okno aplikace nebylo nalezeno.' }
+  try {
+    session?.close()
+    let started: PlayerSession | undefined = undefined
+    started = await PlayerSession.start({
+      mainWindow: host,
+      file: item.path,
+      title: item.title,
+      startSec: item.startSec,
+      next: null,
+      kids: item.info,
+      audio: audioLaunchOptions(loadAudioSettings(settings)),
+      tracks: trackChoicesFor(item.path),
+      subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
+      logFile: join(app.getPath('logs'), 'mpv.log'),
+      onProgress: (position, duration) => {
+        if (session === started) kidsTracker.update(position, duration)
+      },
+      onNext: () => {
+        if (session === started && kidsCurrent?.nextId) loadKids(started, kidsCurrent.nextId)
+      },
+      onPrevious: () => {
+        if (session === started && kidsCurrent?.previousId)
+          loadKids(started, kidsCurrent.previousId)
+      },
+      onToggleFavorite: () => {
+        if (session !== started || !kidsCurrent) return
+        const favorite = !kidsRepository.isFavorite('video', kidsCurrent.videoId)
+        kidsRepository.setFavorite('video', kidsCurrent.videoId, favorite)
+        started.updateKids({ favorite })
+        broadcast(IpcChannel.KidsChanged)
+      },
+      onEnd: (info) => {
+        if (session === started) {
+          session = null
+          kidsCurrent = null
+          kidsTracker.finish()
+        }
+        if (!host.isDestroyed()) host.webContents.send(IpcChannel.PlayerClosed, info)
+      }
+    })
+    session = started
+    tracker.finish()
+    kidsTracker.start(item.videoId)
+    kidsCurrent = item
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, reason: 'error', message: (error as Error).message }
+  }
+}
+
+/** Další nebo předchozí pohádka titulu – načte se do běžícího přehrávače. */
+function loadKids(current: PlayerSession, videoId: number): void {
+  const item = kidsPlayItem(kidsRepository, videoId, kidsAutoplay())
+  if (!item) return
+  kidsTracker.start(item.videoId)
+  kidsCurrent = item
+  current.load({
+    file: item.path,
+    title: item.title,
+    startSec: item.startSec,
+    next: null,
+    tracks: trackChoicesFor(item.path),
+    kids: item.info
+  })
+}
+
 /** Titulky z OpenSubtitles: nastavení z hlavního okna, hledání a stažení jen z ovládání přehrávače. */
 function registerOnlineSubtitlesIpc(service: OnlineSubtitlesService): void {
   const fromPlayer = (sender: Electron.WebContents): PlayerSession | null =>
@@ -351,7 +435,8 @@ void app.whenReady().then(() => {
     chromiumFetch
   )
   const clipsDir = join(app.getPath('userData'), 'cache', 'clips')
-  const kidsRepository = new KidsRepository(db)
+  kidsRepository = new KidsRepository(db)
+  kidsTracker = new KidsTracker(kidsRepository, () => broadcast(IpcChannel.KidsChanged))
   handleMediaProtocol(images, clipsDir, (id) => kidsRepository.thumbnailPath(id))
 
   // Barvy z plakátů a klipy na pozadí – potřebují ffmpeg.
@@ -454,7 +539,7 @@ void app.whenReady().then(() => {
     downloader: kidsDownloader,
     library: kidsLibrary,
     repository: kidsRepository,
-    play
+    play: playKids
   })
   void kidsLibrary.scan().catch((error: Error) => console.warn(`Složka Kids: ${error.message}`))
   ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))

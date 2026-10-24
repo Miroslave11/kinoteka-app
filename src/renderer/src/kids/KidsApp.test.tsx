@@ -14,7 +14,11 @@ const video = (id: number, titleId: number | null, name: string, addedAt: string
   channel: null,
   durationSec: 300,
   thumbnailUrl: null,
-  addedAt
+  addedAt,
+  progress: null,
+  watched: false,
+  favorite: false,
+  lastPlayedAt: null
 })
 
 const TITLES: KidsTitle[] = [
@@ -23,6 +27,7 @@ const TITLES: KidsTitle[] = [
     name: 'Prasátko Peppa',
     keywords: [],
     coverUrl: null,
+    favorite: false,
     videos: [
       video(2, 1, 'Bláto', '2026-10-24T10:00:00Z'),
       video(1, 1, 'Výlet', '2026-10-20T10:00:00Z')
@@ -33,6 +38,7 @@ const TITLES: KidsTitle[] = [
     name: 'Krteček',
     keywords: [],
     coverUrl: null,
+    favorite: false,
     videos: [video(3, 2, 'Krtek a autíčko', '2026-10-22T10:00:00Z')]
   }
 ]

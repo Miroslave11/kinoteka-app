@@ -45,6 +45,12 @@ export interface KidsVideo {
   /** kinoteka-media://kids/… ; null = obrázek zatím není. */
   thumbnailUrl: string | null
   addedAt: string
+  /** Rozkoukáno (0–1); null = nerozkoukané. */
+  progress: number | null
+  watched: boolean
+  favorite: boolean
+  /** Kdy se naposledy sledovala (řada „Dívat se dál“); null = ještě nikdy. */
+  lastPlayedAt: string | null
 }
 
 /** Titul dětské části = podsložka ve složce Kids. */
@@ -54,7 +60,9 @@ export interface KidsTitle {
   name: string
   keywords: string[]
   coverUrl: string | null
+  /** Pohádky v pořadí, jak přibyly (= pořadí přehrávání „další pohádka“). */
   videos: KidsVideo[]
+  favorite: boolean
 }
 
 export interface KidsScanResult {
@@ -78,16 +86,24 @@ export type KidsTheme = (typeof KIDS_THEMES)[number]['id']
 
 export interface KidsSettings {
   theme: KidsTheme
+  /** Po konci pohádky se sama spustí další ze stejného titulu. */
+  autoplayNext: boolean
 }
 
-export const DEFAULT_KIDS_SETTINGS: KidsSettings = { theme: 'obloha' }
+export const DEFAULT_KIDS_SETTINGS: KidsSettings = { theme: 'obloha', autoplayNext: true }
 
 /** Ověří nastavení z okna; neznámé hodnoty nahradí výchozími. */
 export function parseKidsSettings(value: unknown): KidsSettings {
   const input =
     typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
   const theme = KIDS_THEMES.find((t) => t.id === input['theme'])?.id
-  return { theme: theme ?? DEFAULT_KIDS_SETTINGS.theme }
+  return {
+    theme: theme ?? DEFAULT_KIDS_SETTINGS.theme,
+    autoplayNext:
+      typeof input['autoplayNext'] === 'boolean'
+        ? input['autoplayNext']
+        : DEFAULT_KIDS_SETTINGS.autoplayNext
+  }
 }
 
 export interface KidsStatus {

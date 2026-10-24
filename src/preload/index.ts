@@ -88,6 +88,8 @@ const api: KinotekaApi = {
     scan: () => ipcRenderer.invoke(IpcChannel.KidsScan),
     onChanged: (listener) => subscribe(IpcChannel.KidsChanged, () => listener()),
     playVideo: (videoId) => ipcRenderer.invoke(IpcChannel.KidsPlayVideo, videoId),
+    setFavorite: (kind, id, favorite) =>
+      ipcRenderer.invoke(IpcChannel.KidsSetFavorite, kind, id, favorite),
     openFolder: () => ipcRenderer.invoke(IpcChannel.KidsOpenFolder)
   },
   library: {

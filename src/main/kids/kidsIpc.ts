@@ -19,7 +19,7 @@ import type { KidsRepository } from './KidsRepository'
 import type { YtDlpTool } from './YtDlpTool'
 
 const FOLDER_SETTING = 'kids.folder'
-const SETTINGS_KEY = 'kids.settings'
+export const KIDS_SETTINGS_KEY = 'kids.settings'
 /** Domácí složka s videi (rozhodnuto v SCOPE-DETI.md); na jiném počítači Videa\Kids. */
 const HOME_VIDEOS = 'C:\\Mirek_data\\09_Videa'
 
@@ -36,7 +36,8 @@ export interface KidsIpcDeps {
   downloader: KidsDownloader
   library: KidsLibrary
   repository: KidsRepository
-  play: (host: BrowserWindow | null, file: string) => Promise<unknown>
+  /** Spustí pohádku v dětském přehrávači. */
+  play: (host: BrowserWindow | null, videoId: number) => Promise<unknown>
 }
 
 export function registerKidsIpc({
@@ -54,11 +55,11 @@ export function registerKidsIpc({
   }))
 
   ipcMain.handle(IpcChannel.KidsGetSettings, () =>
-    parseKidsSettings(settings.get(SETTINGS_KEY) ?? DEFAULT_KIDS_SETTINGS)
+    parseKidsSettings(settings.get(KIDS_SETTINGS_KEY) ?? DEFAULT_KIDS_SETTINGS)
   )
   ipcMain.handle(IpcChannel.KidsSaveSettings, (_event, value: unknown) => {
     const saved = parseKidsSettings(value)
-    settings.set(SETTINGS_KEY, saved)
+    settings.set(KIDS_SETTINGS_KEY, saved)
     broadcast(IpcChannel.KidsChanged)
     return saved
   })
@@ -100,11 +101,17 @@ export function registerKidsIpc({
   )
 
   // Přehrává se podle id – okno nikdy neposílá cestu k souboru.
-  ipcMain.handle(IpcChannel.KidsPlayVideo, (event, id: unknown) => {
-    const path = Number.isInteger(id) ? repository.videoPath(id as number) : null
-    return path
-      ? play(BrowserWindow.fromWebContents(event.sender), path)
+  ipcMain.handle(IpcChannel.KidsPlayVideo, (event, id: unknown) =>
+    Number.isInteger(id)
+      ? play(BrowserWindow.fromWebContents(event.sender), id as number)
       : { ok: false, reason: 'error', message: 'Video už ve složce není.' }
+  )
+
+  ipcMain.handle(IpcChannel.KidsSetFavorite, (_event, kind: unknown, id: unknown, on: unknown) => {
+    if ((kind !== 'title' && kind !== 'video') || !Number.isInteger(id) || typeof on !== 'boolean')
+      return
+    repository.setFavorite(kind, id as number, on)
+    broadcast(IpcChannel.KidsChanged)
   })
 
   ipcMain.handle(IpcChannel.KidsOpenFolder, async () => {

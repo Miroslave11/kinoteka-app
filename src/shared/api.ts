@@ -160,7 +160,10 @@ export interface KinotekaApi {
     /** Projde složku, nová videa zařadí do titulů. */
     scan(): Promise<KidsScanResult>
     onChanged(listener: () => void): () => void
+    /** Přehraje pohádku v dětském přehrávači (rozkoukanou od uložené pozice). */
     playVideo(videoId: number): Promise<OpenFileResult>
+    /** Srdíčko u titulu nebo pohádky. */
+    setFavorite(kind: 'title' | 'video', id: number, favorite: boolean): Promise<void>
     openFolder(): Promise<void>
   }
   library: {

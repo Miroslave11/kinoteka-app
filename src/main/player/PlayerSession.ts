@@ -7,6 +7,7 @@ import { IpcChannel } from '../../shared/ipc'
 import {
   describeAudioOutput,
   INITIAL_PLAYER_STATE,
+  type KidsPlayerInfo,
   type PlayerClosedInfo,
   type PlayerCommand,
   type PlayerState
@@ -82,6 +83,10 @@ export interface PlayerSessionOptions {
   onProgress?: (position: number, duration: number) => void
   /** Uživatel chce další díl – volající pak zavolá `load()`. */
   onNext?: () => void
+  /** Pohádka z dětské části: dětské ovládání, předchozí pohádka a srdíčko. */
+  kids?: KidsPlayerInfo
+  onPrevious?: () => void
+  onToggleFavorite?: () => void
   /** Uživatel ručně vybral zvukovou stopu (zapamatuje se pro titul). */
   onAudioTrackChosen?: (track: AudioTrack) => void
   /** Uživatel ručně vybral titulky (null = vypnul). */
@@ -99,6 +104,7 @@ export interface LoadOptions {
   startSec?: number
   next: string | null
   tracks: TrackChoices
+  kids?: KidsPlayerInfo
 }
 
 const asNumber = (value: unknown): number =>
@@ -154,6 +160,7 @@ export class PlayerSession {
       ...INITIAL_PLAYER_STATE,
       title: options.title ?? basename(options.file),
       next: options.next ?? null,
+      kids: options.kids ?? null,
       fullscreen: videoWindow.isFullScreen()
     }
   }
@@ -245,6 +252,10 @@ export class PlayerSession {
         return this.close()
       case 'play-next':
         return this.options.onNext?.()
+      case 'play-previous':
+        return this.options.onPrevious?.()
+      case 'toggle-favorite':
+        return this.options.onToggleFavorite?.()
       case 'set-audio-track': {
         const track = this.state.audioTracks.find((t) => t.id === command.id)
         if (!track) return
@@ -275,6 +286,7 @@ export class PlayerSession {
     this.update({
       title: options.title,
       next: options.next,
+      kids: options.kids ?? this.state.kids,
       position: 0,
       duration: 0,
       ended: false,
@@ -473,6 +485,11 @@ export class PlayerSession {
   /** Soubor, který se právě přehrává. */
   get currentFile(): string {
     return this.file
+  }
+
+  /** Změna dětského ovládání (srdíčko, zbývající čas) během přehrávání. */
+  updateKids(patch: Partial<KidsPlayerInfo>): void {
+    if (this.state.kids) this.update({ kids: { ...this.state.kids, ...patch } })
   }
 
   private describeVideo(): PlayerState['video'] {

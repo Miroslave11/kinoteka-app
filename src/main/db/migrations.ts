@@ -223,5 +223,28 @@ export const MIGRATIONS: readonly string[] = [
     added_at TEXT NOT NULL
   );
   CREATE INDEX kids_video_title ON kids_video (title_id);
+  `,
+
+  // 14 – dětská část: rozkoukané a zhlédnuté pohádky, oblíbené (odděleně od deníku dospělých)
+  `
+  CREATE TABLE kids_progress (
+    video_id INTEGER PRIMARY KEY REFERENCES kids_video (id) ON DELETE CASCADE,
+    position REAL NOT NULL,
+    duration REAL NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE kids_watch (
+    video_id INTEGER PRIMARY KEY REFERENCES kids_video (id) ON DELETE CASCADE,
+    count INTEGER NOT NULL,
+    last_at TEXT NOT NULL
+  );
+
+  CREATE TABLE kids_favorite (
+    kind TEXT NOT NULL CHECK (kind IN ('title', 'video')),
+    ref_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (kind, ref_id)
+  );
   `
 ]

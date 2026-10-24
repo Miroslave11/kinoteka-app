@@ -556,3 +556,7 @@
 .k-app[data-theme='vesmir'] ::-webkit-scrollbar-thumb {
   background-color: rgb(255 255 255 / 0.25);
 }
+
+.k-heart.is-on {
+  color: #ff4f7a;
+}
