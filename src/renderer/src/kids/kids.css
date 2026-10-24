@@ -234,6 +234,10 @@
   background: var(--k-panel) !important;
 }
 
+.k-parents.k-exit {
+  margin-left: 0;
+}
+
 .k-round {
   width: 64px;
   height: 64px;

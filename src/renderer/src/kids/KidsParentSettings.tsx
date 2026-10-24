@@ -180,6 +180,18 @@ export default function KidsParentSettings(): React.JSX.Element {
       </div>
 
       <div className="k-setrow">
+        <label>
+          Odchod z dětského režimu jen za branou
+          <small>vypnuto = tlačítko Odejít vedle Pro rodiče funguje bez PINu</small>
+        </label>
+        <button
+          className={`k-toggle ${settings.protectExit ? '' : 'off'}`}
+          aria-pressed={settings.protectExit}
+          onClick={() => void save({ protectExit: !settings.protectExit })}
+        />
+      </div>
+
+      <div className="k-setrow">
         <label>Spouštět Kinotéku rovnou v dětském režimu</label>
         <button
           className={`k-toggle ${settings.startInKids ? '' : 'off'}`}

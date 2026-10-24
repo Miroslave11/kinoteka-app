@@ -72,6 +72,19 @@ if (!app.commandLine.hasSwitch('user-data-dir')) {
 }
 registerMediaScheme()
 
+// Jen jedna Kinotéka naráz: dvě instance nad stejnou databází a mezipamětí by si zapisovaly
+// pod rukama (Chromium pak hlásí „Unable to move the cache“). Další spuštění jen přepne
+// do už otevřeného okna.
+const singleInstance = app.requestSingleInstanceLock()
+if (!singleInstance) app.quit()
+let mainWindow: BrowserWindow | null = null
+app.on('second-instance', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+})
+
 let session: PlayerSession | null = null
 let playback: PlaybackRepository
 let tracker: PlaybackTracker
@@ -83,6 +96,7 @@ const chromiumFetch: typeof fetch = (input, init) =>
 
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow(createMainWindowOptions(preloadPath()))
+  mainWindow = win
   win.once('ready-to-show', () => win.show())
   hardenWebContents(win)
   void loadRendererPage(win, 'index')
@@ -419,6 +433,7 @@ function registerPlayerIpc(): void {
 }
 
 void app.whenReady().then(() => {
+  if (!singleInstance) return
   const db = openDatabase(join(app.getPath('userData'), 'kinoteka.db'))
   const repository = new LibraryRepository(db)
   const library = new LibraryService(repository)
