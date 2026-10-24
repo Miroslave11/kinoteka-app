@@ -34,6 +34,16 @@ jobs:
           path: resources/bin
           key: bin-${{ hashFiles('scripts/fetch-mpv.mjs', 'scripts/fetch-ffmpeg.mjs') }}
 
+      # Koncept založit předem: electron-builder nahrává instalátor a latest.yml souběžně
+      # a bez existujícího konceptu si každé nahrávání založí vlastní (stalo se u 1.1.0).
+      - name: Koncept vydání v kinoteka-vydani
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.KINOTEKA_VYDANI_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo Miroslave11/kinoteka-vydani >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --repo Miroslave11/kinoteka-vydani --draft               --title "Kinotéka ${GITHUB_REF_NAME#v}"               --notes "$(awk -v v="## ${GITHUB_REF_NAME#v}" 'index($0, v) == 1 {f = 1; next} /^## / {if (f) exit} f' CHANGELOG.md)"
+
       - name: Sestavení a nahrání konceptu vydání
         env:
           # Klíč s právem zápisu jen do repozitáře kinoteka-vydani (Settings → Secrets → Actions).
