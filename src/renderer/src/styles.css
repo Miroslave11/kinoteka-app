@@ -1541,6 +1541,38 @@ option {
   gap: 10px;
 }
 
+/* ---------- Děti: test stahování (D1) ---------- */
+.kids-url {
+  margin-top: 14px;
+}
+
+.kids-url .field {
+  flex: 1;
+}
+
+.kids-progress {
+  margin-top: 14px;
+}
+
+.kids-progress .progress-bar {
+  height: 8px;
+  margin-bottom: 6px;
+}
+
+.kids-result {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.kids-result img {
+  width: 220px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 10px;
+  flex: none;
+}
+
 .ok {
   color: var(--ok);
 }
