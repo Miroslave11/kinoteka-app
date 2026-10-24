@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kinotéka Děti – mockupy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --coral: #ff6b6b;
+  --sun: #ffc93c;
+  --mint: #2ec4a6;
+  --grape: #9b7bff;
+  --sky: #3fa9f5;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #e9edf3; color: #1f2a44; font-family: Nunito, system-ui, sans-serif; padding: 16px; font-size: 15px; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ---------- navigace mockupu (není součást aplikace) ---------- */
+.mock-nav { max-width: 1440px; margin: 0 auto 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mock-nav h1 { font-size: 13px; font-weight: 700; color: #5d6779; margin-right: 8px; }
+.mock-nav button { padding: 7px 12px; border-radius: 8px; background: #fff; border: 1px solid #d5dbe5; color: #3b4558; font-size: 13px; font-weight: 700; }
+.mock-nav button.on { background: #1f2a44; color: #fff; border-color: #1f2a44; }
+.mock-nav .sep { width: 1px; height: 24px; background: #cfd5df; margin: 0 6px; }
+.mock-nav .swatch { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px #c9d0db; }
+.mock-nav .swatch.on { box-shadow: 0 0 0 3px #1f2a44; }
+.mock-note { max-width: 1440px; margin: 10px auto 0; color: #5d6779; font-size: 13px; line-height: 1.55; }
+.mock-note b { color: #1f2a44; }
+
+/* ---------- motivy ---------- */
+.kids {
+  --ink: #1f2a44; --soft: #5b6880; --panel: rgba(255,255,255,.82); --panel-solid: #fff; --line: rgba(31,42,68,.1);
+  --accent: var(--coral); --ring: #fff;
+  --grad: linear-gradient(180deg, #7fd0ff 0%, #bfe9ff 55%, #e6f7ff 100%);
+  --pattern: none;
+}
+.kids[data-theme="obloha"] { --pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='260'%3E%3Cg fill='%23fff' opacity='.55'%3E%3Cellipse cx='70' cy='60' rx='46' ry='18'/%3E%3Cellipse cx='96' cy='48' rx='30' ry='22'/%3E%3Cellipse cx='300' cy='170' rx='56' ry='20'/%3E%3Cellipse cx='330' cy='156' rx='34' ry='26'/%3E%3C/g%3E%3Cg fill='%23fff' opacity='.7'%3E%3Ccircle cx='220' cy='40' r='3'/%3E%3Ccircle cx='380' cy='60' r='2'/%3E%3Ccircle cx='40' cy='200' r='2.5'/%3E%3C/g%3E%3C/svg%3E"); }
+.kids[data-theme="louka"] {
+  --grad: linear-gradient(180deg, #bdeeff 0%, #dff7d0 45%, #c5ecaa 100%);
+  --pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='240'%3E%3Cg opacity='.5'%3E%3Cg transform='translate(60 60)'%3E%3Ccircle r='7' cy='-10' fill='%23ff9fc0'/%3E%3Ccircle r='7' cy='10' fill='%23ff9fc0'/%3E%3Ccircle r='7' cx='-10' fill='%23ff9fc0'/%3E%3Ccircle r='7' cx='10' fill='%23ff9fc0'/%3E%3Ccircle r='6' fill='%23ffd23f'/%3E%3C/g%3E%3Cg transform='translate(220 170)'%3E%3Ccircle r='6' cy='-9' fill='%23b49bff'/%3E%3Ccircle r='6' cy='9' fill='%23b49bff'/%3E%3Ccircle r='6' cx='-9' fill='%23b49bff'/%3E%3Ccircle r='6' cx='9' fill='%23b49bff'/%3E%3Ccircle r='5' fill='%23fff3b0'/%3E%3C/g%3E%3Ccircle cx='200' cy='50' r='4' fill='%23fff'/%3E%3Ccircle cx='90' cy='190' r='4' fill='%23fff'/%3E%3C/g%3E%3C/svg%3E");
+  --accent: #ff7a59;
+}
+.kids[data-theme="more"] {
+  --grad: linear-gradient(180deg, #8de3f5 0%, #b9f0fa 50%, #e3fbff 100%);
+  --pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='260'%3E%3Cg fill='none' stroke='%23fff' stroke-width='3' opacity='.6'%3E%3Ccircle cx='50' cy='60' r='14'/%3E%3Ccircle cx='76' cy='92' r='7'/%3E%3Ccircle cx='250' cy='170' r='18'/%3E%3Ccircle cx='280' cy='130' r='8'/%3E%3Cpath d='M0 236 q40 -18 80 0 t80 0 t80 0 t80 0'/%3E%3C/g%3E%3C/svg%3E");
+  --accent: #ff8a3d;
+}
+.kids[data-theme="vesmir"] {
+  --ink: #f5f3ff; --soft: #c6c0f0; --panel: rgba(255,255,255,.1); --panel-solid: #3a3388; --line: rgba(255,255,255,.14);
+  --grad: linear-gradient(180deg, #1d1b4f 0%, #2e2a78 55%, #4a3aa0 100%);
+  --pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='280'%3E%3Cg fill='%23fff'%3E%3Ccircle cx='30' cy='40' r='1.6'/%3E%3Ccircle cx='120' cy='90' r='1.2'/%3E%3Ccircle cx='200' cy='30' r='2'/%3E%3Ccircle cx='320' cy='70' r='1.4'/%3E%3Ccircle cx='70' cy='200' r='1.8'/%3E%3Ccircle cx='260' cy='220' r='1.3'/%3E%3C/g%3E%3Cpath d='M300 170 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4z' fill='%23ffe680' opacity='.8'/%3E%3Ccircle cx='150' cy='190' r='14' fill='%23ff9fc0' opacity='.35'/%3E%3C/svg%3E");
+  --accent: #ffc93c; --ring: #ffe680;
+}
+
+/* ---------- rám aplikace ---------- */
+.kids {
+  position: relative; max-width: 1440px; height: 860px; margin: 0 auto; overflow: hidden;
+  border-radius: 18px; border: 1px solid #cfd6e1; color: var(--ink);
+  background: var(--pattern), var(--grad); box-shadow: 0 24px 60px rgba(31,42,68,.18);
+}
+.kids::after { /* kopečky dole */
+  content: ''; position: absolute; left: -5%; right: -5%; bottom: -120px; height: 220px; z-index: 0; pointer-events: none;
+  background: radial-gradient(60% 100% at 25% 100%, rgba(255,255,255,.55), transparent 70%), radial-gradient(55% 90% at 80% 100%, rgba(255,255,255,.45), transparent 70%);
+}
+.kids[data-theme="vesmir"]::after { background: radial-gradient(60% 100% at 30% 100%, rgba(155,123,255,.35), transparent 70%); }
+.screen { display: none; position: absolute; inset: 0; z-index: 1; }
+.screen.on { display: flex; flex-direction: column; }
+
+h1, h2, h3, .brand, .title-name, .big-btn { font-family: Fredoka, Nunito, sans-serif; }
+
+/* horní lišta */
+.topbar { display: flex; align-items: center; gap: 14px; padding: 22px 32px 10px; }
+.brand { display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 700; }
+.brand .logo { width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; background: linear-gradient(135deg, #ffc93c, #ff6b6b); color: #fff; box-shadow: 0 6px 0 rgba(0,0,0,.08); transform: rotate(-6deg); }
+.brand .logo svg { width: 26px; height: 26px; fill: #fff; stroke: none; }
+.brand small { font-size: 16px; font-weight: 600; padding: 4px 12px; border-radius: 99px; background: var(--grape); color: #fff; transform: rotate(3deg); }
+.pills { display: flex; gap: 10px; margin-left: 28px; }
+.pill { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 24px; border-radius: 99px; font-family: Fredoka, sans-serif; font-weight: 600; font-size: 20px; background: var(--panel); box-shadow: 0 5px 0 rgba(31,42,68,.08); }
+.pill.on { background: var(--accent); color: #fff; box-shadow: 0 5px 0 rgba(0,0,0,.14); }
+.pill svg.i { width: 26px; height: 26px; }
+.parents { margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 99px; color: var(--soft); font-weight: 800; font-size: 14px; background: var(--panel); }
+.parents svg.i { width: 18px; height: 18px; }
+
+.content { flex: 1; overflow: hidden; padding: 6px 32px 30px; display: flex; flex-direction: column; gap: 22px; }
+.hello { font-size: 40px; font-weight: 700; letter-spacing: -.01em; }
+.hello span { color: var(--accent); }
+h3.row-h { font-size: 26px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+h3.row-h svg.i { width: 28px; height: 28px; color: var(--accent); }
+
+/* kulaté tituly */
+.bubbles { display: flex; gap: 26px; }
+.bubble { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 150px; transition: transform .2s; }
+.bubble:hover { transform: translateY(-6px) rotate(-2deg); }
+.bubble .face { width: 140px; height: 140px; border-radius: 50%; border: 7px solid var(--ring); box-shadow: 0 8px 0 rgba(31,42,68,.1), 0 14px 30px rgba(31,42,68,.12); background-size: cover; background-position: center; }
+.bubble b { font-family: Fredoka, sans-serif; font-size: 19px; font-weight: 600; text-align: center; line-height: 1.15; }
+
+/* karty */
+.strip { display: flex; gap: 22px; }
+.card { position: relative; flex: none; width: 300px; text-align: left; transition: transform .2s; }
+.card:hover { transform: scale(1.04) rotate(-1deg); }
+.thumb, .face, .mini, .covers span { display: block; }
+.card .thumb { position: relative; aspect-ratio: 16/9; border-radius: 26px; border: 6px solid var(--ring); background-size: cover; background-position: center; box-shadow: 0 7px 0 rgba(31,42,68,.1), 0 16px 34px rgba(31,42,68,.14); overflow: hidden; }
+.card.big { width: 400px; }
+.card b { display: block; margin: 12px 6px 0; font-size: 18px; font-weight: 800; line-height: 1.25; }
+.card small { display: block; margin: 2px 6px 0; color: var(--soft); font-weight: 700; }
+.play-dot { position: absolute; right: 12px; bottom: 12px; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; box-shadow: 0 5px 0 rgba(0,0,0,.15); }
+.play-dot svg { width: 28px; height: 28px; fill: #fff; stroke: none; margin-left: 4px; }
+.bar { position: absolute; left: 14px; right: 84px; bottom: 30px; height: 12px; border-radius: 99px; background: rgba(255,255,255,.7); }
+.bar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
+.badge-time { position: absolute; left: 10px; top: 10px; padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.92); color: #1f2a44; font-weight: 900; font-size: 13px; }
+.badge-seen { position: absolute; right: 10px; top: 10px; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--sun); color: #fff; box-shadow: 0 3px 0 rgba(0,0,0,.12); }
+.badge-seen svg { width: 22px; height: 22px; fill: #fff; stroke: none; }
+.heart-on { color: var(--coral); }
+.heart-on svg { fill: var(--coral); }
+
+/* detail titulu */
+.round-btn { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-solid); box-shadow: 0 5px 0 rgba(31,42,68,.12); color: var(--ink); }
+.round-btn svg.i { width: 30px; height: 30px; }
+.title-head { display: flex; align-items: center; gap: 28px; padding: 4px 0 6px; }
+.title-head .face { width: 190px; height: 190px; border-radius: 50%; border: 9px solid var(--ring); background-size: cover; box-shadow: 0 10px 0 rgba(31,42,68,.1), 0 18px 40px rgba(31,42,68,.16); }
+.title-name { font-size: 56px; font-weight: 700; line-height: 1; }
+.title-sub { margin-top: 8px; font-size: 20px; font-weight: 800; color: var(--soft); }
+.big-btn { display: inline-flex; align-items: center; gap: 12px; height: 70px; padding: 0 34px; border-radius: 99px; font-size: 26px; font-weight: 600; background: var(--accent); color: #fff; box-shadow: 0 6px 0 rgba(0,0,0,.16); }
+.big-btn svg { width: 30px; height: 30px; fill: #fff; stroke: none; }
+.head-actions { display: flex; gap: 14px; margin-top: 18px; align-items: center; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 26px 24px; }
+.grid .card { width: auto; }
+
+/* přehrávač */
+.player { background: #0d1020; }
+.player .video { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.player .shade-top { position: absolute; left: 0; right: 0; top: 0; height: 160px; background: linear-gradient(rgba(0,0,0,.5), transparent); }
+.player .shade-bot { position: absolute; left: 0; right: 0; bottom: 0; height: 260px; background: linear-gradient(transparent, rgba(0,0,0,.55)); }
+.player .p-top { position: absolute; left: 32px; right: 32px; top: 28px; display: flex; align-items: center; gap: 18px; color: #fff; }
+.player .p-top .round-btn { width: 76px; height: 76px; background: #fff; color: #1f2a44; }
+.player .p-top h2 { font-size: 30px; font-weight: 600; text-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.player .p-bot { position: absolute; left: 60px; right: 60px; bottom: 34px; color: #fff; }
+.p-track { position: relative; height: 22px; border-radius: 99px; background: rgba(255,255,255,.35); }
+.p-track i { position: absolute; left: 0; top: 0; bottom: 0; width: 96%; border-radius: 99px; background: var(--sun); }
+.p-track b { position: absolute; left: 96%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; background: #fff; border: 6px solid var(--sun); }
+.p-ctrl { display: flex; align-items: center; justify-content: center; gap: 34px; margin-top: 26px; }
+.p-ctrl .round-btn { width: 92px; height: 92px; background: rgba(255,255,255,.95); color: #1f2a44; }
+.p-ctrl .round-btn svg { width: 40px; height: 40px; fill: #1f2a44; stroke: none; }
+.p-ctrl .main { width: 128px; height: 128px; background: var(--sun); }
+.p-ctrl .main svg { width: 58px; height: 58px; }
+.p-ctrl .heart { position: absolute; right: 0; bottom: 18px; }
+.p-ctrl .heart svg { fill: var(--coral); }
+.next-up { position: absolute; right: 40px; top: 130px; width: 330px; padding: 14px; border-radius: 26px; background: rgba(255,255,255,.95); color: #1f2a44; display: flex; gap: 14px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.next-up .thumb { width: 120px; aspect-ratio: 16/9; border-radius: 16px; background-size: cover; flex: none; }
+.next-up small { color: #6a7590; font-weight: 800; }
+.next-up b { display: block; font-size: 16px; }
+.timer { position: absolute; left: 50%; top: 34px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 99px; background: rgba(255,255,255,.92); color: #1f2a44; font-weight: 900; }
+.timer svg.i { color: var(--grape); }
+
+/* rodičovská brána */
+.dim { position: absolute; inset: 0; background: rgba(20,24,48,.45); backdrop-filter: blur(6px); display: grid; place-items: center; z-index: 5; }
+.gate { width: 440px; padding: 34px 38px 30px; border-radius: 34px; background: #fff; color: #1f2a44; text-align: center; box-shadow: 0 30px 70px rgba(0,0,0,.3); }
+.gate .lock { width: 76px; height: 76px; margin: 0 auto 12px; border-radius: 24px; display: grid; place-items: center; background: #efeaff; color: var(--grape); }
+.gate .lock svg.i { width: 38px; height: 38px; }
+.gate h2 { font-size: 30px; font-weight: 600; }
+.gate p { color: #66718a; font-weight: 700; margin-top: 6px; }
+.dots { display: flex; justify-content: center; gap: 16px; margin: 22px 0 20px; }
+.dots i { width: 20px; height: 20px; border-radius: 50%; border: 3px solid #c9c2f0; }
+.dots i.f { background: var(--grape); border-color: var(--grape); }
+.keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.keys button { height: 66px; border-radius: 20px; background: #f3f1fb; font-family: Fredoka, sans-serif; font-size: 28px; font-weight: 600; color: #1f2a44; box-shadow: 0 4px 0 #e0dbf3; }
+.keys button.ghost { background: none; box-shadow: none; font-size: 16px; color: #66718a; }
+.gate .alt { margin-top: 16px; font-size: 13px; color: #8a93a8; font-weight: 700; }
+
+/* část pro rodiče */
+.ptop { display: flex; align-items: center; gap: 14px; padding: 20px 32px 6px; }
+.ptop h2 { font-size: 28px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.ptop h2 svg.i { color: var(--grape); width: 28px; height: 28px; }
+.tabs { display: flex; gap: 6px; margin-left: 26px; padding: 6px; border-radius: 99px; background: var(--panel); }
+.tabs button { padding: 10px 18px; border-radius: 99px; font-weight: 800; color: var(--soft); display: flex; gap: 8px; align-items: center; }
+.tabs button svg.i { width: 18px; height: 18px; }
+.tabs button.on { background: var(--panel-solid); color: var(--ink); box-shadow: 0 3px 0 rgba(31,42,68,.08); }
+.ptop .right { margin-left: auto; display: flex; gap: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 99px; font-weight: 800; background: var(--panel-solid); color: var(--ink); box-shadow: 0 3px 0 rgba(31,42,68,.08); }
+.btn svg.i { width: 18px; height: 18px; }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.grape { background: var(--grape); color: #fff; }
+.pbody { flex: 1; display: grid; grid-template-columns: 1.15fr .85fr; gap: 22px; padding: 14px 32px 30px; overflow: hidden; }
+.panel { border-radius: 28px; background: var(--panel-solid); padding: 24px 26px; box-shadow: 0 6px 0 rgba(31,42,68,.06), 0 18px 40px rgba(31,42,68,.08); overflow: hidden; }
+.kids[data-theme="vesmir"] .panel { background: rgba(34,30,92,.92); border: 1px solid var(--line); }
+.panel h3 { font-size: 21px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.panel h3 small { margin-left: auto; font-family: Nunito; font-size: 13px; color: var(--soft); font-weight: 800; }
+.url { display: flex; gap: 10px; }
+.field { flex: 1; height: 50px; border-radius: 16px; border: 2px solid var(--line); background: rgba(127,140,170,.06); padding: 0 16px; display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--ink); }
+.field svg.i { width: 20px; height: 20px; color: var(--soft); }
+.hint { margin-top: 8px; font-size: 13px; color: var(--soft); font-weight: 700; }
+.preview { display: flex; gap: 18px; margin-top: 20px; padding: 16px; border-radius: 22px; background: rgba(127,140,170,.08); }
+.preview .thumb { width: 230px; aspect-ratio: 16/9; border-radius: 18px; background-size: cover; flex: none; position: relative; }
+.preview h4 { font-size: 18px; font-weight: 900; line-height: 1.25; }
+.preview p { color: var(--soft); font-weight: 700; margin-top: 4px; }
+.form { display: grid; grid-template-columns: 150px 1fr; gap: 14px 14px; align-items: center; margin-top: 20px; }
+.form label { font-weight: 800; color: var(--soft); }
+.select { height: 48px; border-radius: 16px; border: 2px solid var(--line); padding: 0 14px; display: flex; align-items: center; gap: 10px; font-weight: 800; }
+.select .mini { width: 30px; height: 30px; border-radius: 50%; background-size: cover; flex: none; }
+.select .chev { margin-left: auto; color: var(--soft); }
+.select em { font-style: normal; font-size: 12px; font-weight: 800; color: var(--mint); background: rgba(46,196,166,.14); padding: 3px 9px; border-radius: 99px; }
+.seg { display: inline-flex; padding: 4px; border-radius: 16px; background: rgba(127,140,170,.1); gap: 4px; }
+.seg span { padding: 9px 14px; border-radius: 12px; font-weight: 800; color: var(--soft); }
+.seg span.on { background: var(--panel-solid); color: var(--ink); box-shadow: 0 2px 0 rgba(31,42,68,.08); }
+.kids[data-theme="vesmir"] .seg span.on { background: rgba(255,255,255,.18); }
+.check { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+.check i { width: 26px; height: 26px; border-radius: 9px; background: var(--mint); display: grid; place-items: center; color: #fff; }
+.check i svg.i { width: 16px; height: 16px; stroke-width: 3.4; }
+.check i.off { background: none; border: 2px solid var(--line); }
+.actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+.queue { display: flex; flex-direction: column; gap: 12px; }
+.q { display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: 20px; background: rgba(127,140,170,.07); }
+.q .thumb { width: 96px; aspect-ratio: 16/9; border-radius: 12px; background-size: cover; flex: none; }
+.q .info { flex: 1; min-width: 0; }
+.q b { display: block; font-size: 14px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q small { font-weight: 800; color: var(--soft); font-size: 12px; }
+.q .pbar { height: 9px; border-radius: 99px; background: rgba(127,140,170,.2); margin: 7px 0 4px; }
+.q .pbar i { display: block; height: 100%; border-radius: 99px; background: var(--sky); }
+.q.done small { color: var(--mint); }
+.q.err small { color: #e5484d; }
+.q .x { color: var(--soft); }
+
+/* tituly */
+.tlist { display: flex; flex-direction: column; gap: 8px; }
+.trow { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 18px; font-weight: 900; }
+.trow .mini { width: 44px; height: 44px; border-radius: 50%; background-size: cover; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.1); flex: none; }
+.trow small { margin-left: auto; color: var(--soft); font-weight: 800; }
+.trow.on { background: rgba(155,123,255,.15); }
+.covers { display: flex; gap: 10px; }
+.covers span { width: 70px; height: 70px; border-radius: 50%; background-size: cover; border: 4px solid transparent; }
+.covers span.on { border-color: var(--grape); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.chips span { padding: 6px 12px; border-radius: 99px; background: rgba(155,123,255,.14); font-weight: 800; font-size: 13px; }
+.chips span.add { background: none; border: 2px dashed var(--line); color: var(--soft); }
+.vids { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+.vid { display: grid; grid-template-columns: 86px 1fr 70px 210px 36px; gap: 12px; align-items: center; padding: 8px; border-radius: 16px; background: rgba(127,140,170,.06); font-weight: 800; font-size: 14px; }
+.vid .thumb { aspect-ratio: 16/9; border-radius: 10px; background-size: cover; }
+.vid .select { height: 38px; font-size: 13px; border-radius: 12px; }
+.vid small { color: var(--soft); }
+
+/* nastavení */
+.setrow { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.setrow:last-child { border-bottom: 0; }
+.setrow label { font-weight: 900; }
+.setrow label small { display: block; font-weight: 700; color: var(--soft); font-size: 12px; margin-top: 2px; }
+.themes { display: flex; gap: 14px; }
+.themes span { width: 92px; text-align: center; font-weight: 800; font-size: 13px; }
+.themes span i { display: block; height: 62px; border-radius: 18px; margin-bottom: 6px; border: 4px solid transparent; background-size: auto, cover; }
+.themes span.on i { border-color: var(--grape); }
+.toggle { width: 58px; height: 32px; border-radius: 99px; background: var(--mint); position: relative; }
+.toggle::after { content: ''; position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; }
+.toggle.off { background: rgba(127,140,170,.35); }
+.toggle.off::after { right: auto; left: 4px; }
+.ok-line { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--mint); }
+
+/* vstup z dospělé aplikace */
+.adult { position: absolute; inset: 0; display: flex; background: #07080c; color: #f4f5f7; font-family: Inter, Nunito, sans-serif; }
+.adult .side { width: 240px; padding: 24px 14px; background: #0c0e14; border-right: 1px solid #1a1d26; display: flex; flex-direction: column; gap: 4px; }
+.adult .side .b { font-weight: 900; font-size: 20px; padding: 0 10px 22px; display: flex; align-items: center; gap: 10px; }
+.adult .side .b i { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #ffcf8a, #ff8a3d); }
+.adult .nav { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; color: #c9ccd3; font-weight: 700; }
+.adult .nav svg.i { width: 20px; height: 20px; }
+.adult .nav.kidsnav { margin-top: 10px; background: linear-gradient(90deg, rgba(255,107,107,.18), rgba(255,201,60,.14), rgba(46,196,166,.14), rgba(63,169,245,.16)); color: #fff; border: 1px solid rgba(255,255,255,.12); }
+.adult .nav.kidsnav .rb { width: 26px; height: 26px; border-radius: 8px; background: conic-gradient(#ff6b6b, #ffc93c, #2ec4a6, #3fa9f5, #9b7bff, #ff6b6b); }
+.adult .main { flex: 1; display: grid; place-items: center; padding: 40px; }
+.adult .explain { max-width: 620px; line-height: 1.6; color: #b9bec8; font-size: 16px; }
+.adult .explain h2 { color: #fff; font-family: Inter, Nunito, sans-serif; font-size: 26px; margin-bottom: 12px; }
+.adult .explain li { margin: 6px 0 0 20px; }
+</style>
+</head>
+<body>
+
+<nav class="mock-nav" aria-label="Obrazovky mockupu">
+  <h1>Kinotéka Děti – mockupy</h1>
+  <button data-s="s-home" class="on">1 Domů</button>
+  <button data-s="s-title">2 Titul</button>
+  <button data-s="s-player">3 Přehrávač</button>
+  <button data-s="s-gate">4 Rodičovská brána</button>
+  <button data-s="s-download">5 Stáhnout z YouTube</button>
+  <button data-s="s-titles">6 Správa titulů</button>
+  <button data-s="s-settings">7 Nastavení</button>
+  <button data-s="s-entry">8 Vstup z Kinotéky</button>
+  <span class="sep"></span>
+  <h1>Motiv:</h1>
+  <button class="swatch on" data-t="obloha" title="Obloha" style="background:linear-gradient(#7fd0ff,#e6f7ff)"></button>
+  <button class="swatch" data-t="louka" title="Louka" style="background:linear-gradient(#bdeeff,#c5ecaa)"></button>
+  <button class="swatch" data-t="more" title="Moře" style="background:linear-gradient(#8de3f5,#e3fbff)"></button>
+  <button class="swatch" data-t="vesmir" title="Vesmír" style="background:linear-gradient(#1d1b4f,#4a3aa0)"></button>
+</nav>
+
+<div class="kids" id="app" data-theme="obloha">
+
+  <!-- 1 Domů -->
+  <section class="screen on" id="s-home">
+    <header class="topbar">
+      <div class="brand"><span class="logo"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7z"/></svg></span>Kinotéka <small>Děti</small></div>
+      <div class="pills">
+        <button class="pill on"><svg class="i"><use href="#i-home"/></svg>Domů</button>
+        <button class="pill"><svg class="i"><use href="#i-heart"/></svg>Oblíbené</button>
+      </div>
+      <button class="parents"><svg class="i"><use href="#i-lock"/></svg>Pro rodiče</button>
+    </header>
+    <div class="content">
+      <h2 class="hello">Na co se <span>podíváme?</span></h2>
+      <div class="bubbles" data-bubbles="0,1,2,3,4,5,6"></div>
+      <h3 class="row-h"><svg class="i"><use href="#i-play"/></svg>Dívat se dál</h3>
+      <div class="strip">
+        <button class="card big" data-card="0|3|62|Bláto|5 min"></button>
+        <button class="card big" data-card="1|1|25|Štěňata zachraňují vláček|11 min"></button>
+        <button class="card big" data-card="3|5|80|Na pláži|7 min"></button>
+      </div>
+      <h3 class="row-h"><svg class="i"><use href="#i-spark"/></svg>Nové pohádky</h3>
+      <div class="strip">
+        <button class="card" data-card="2|2|0|Krtek a autíčko|8 min"></button>
+        <button class="card" data-card="5|4|0|O pejskovi a kočičce|9 min"></button>
+        <button class="card" data-card="6|6|0|Prší, prší|3 min"></button>
+        <button class="card" data-card="4|0|0|Mašinka a sníh|10 min"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 Titul -->
+  <section class="screen" id="s-title">
+    <header class="topbar">
+      <button class="round-btn" title="Zpět"><svg class="i"><use href="#i-back"/></svg></button>
+      <div class="pills" style="margin-left:6px">
+        <button class="pill"><svg class="i"><use href="#i-home"/></svg>Domů</button>
+        <button class="pill"><svg class="i"><use href="#i-heart"/></svg>Oblíbené</button>
+      </div>
+      <button class="parents"><svg class="i"><use href="#i-lock"/></svg>Pro rodiče</button>
+    </header>
+    <div class="content">
+      <div class="title-head">
+        <span class="face" data-face="0"></span>
+        <div>
+          <div class="title-name">Prasátko Peppa</div>
+          <div class="title-sub">24 pohádek · 8 už viděno</div>
+          <div class="head-actions">
+            <button class="big-btn"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg>Pokračovat: Bláto</button>
+            <button class="round-btn heart-on" title="Oblíbené"><svg class="i"><use href="#i-heart"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="grid">
+        <button class="card" data-card="0|3|100|Skákání v blátě|5 min|seen"></button>
+        <button class="card" data-card="0|0|100|Tatínek ztratil brýle|5 min|seen"></button>
+        <button class="card" data-card="0|3|62|Bláto|5 min"></button>
+        <button class="card" data-card="0|1|0|Výlet k moři|5 min"></button>
+        <button class="card" data-card="0|5|0|Narozeninová oslava|10 min"></button>
+        <button class="card" data-card="0|2|0|Na zahradě|5 min"></button>
+        <button class="card" data-card="0|4|0|Sněhulák|5 min"></button>
+        <button class="card" data-card="0|6|0|Kouzelný hrad|1 h 2 min"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 Přehrávač -->
+  <section class="screen player" id="s-player">
+    <div class="video" data-scene="0,3,big"></div>
+    <div class="shade-top"></div><div class="shade-bot"></div>
+    <div class="p-top">
+      <button class="round-btn" title="Zpět"><svg class="i"><use href="#i-back"/></svg></button>
+      <h2>Prasátko Peppa · Bláto</h2>
+    </div>
+    <div class="timer"><svg class="i"><use href="#i-clock"/></svg>Ještě 12 minut pohádek</div>
+    <div class="next-up">
+      <span class="thumb" data-scene="0,1"></span>
+      <div><small>Další pohádka za 5 s</small><b>Výlet k moři</b></div>
+    </div>
+    <div class="p-bot">
+      <div class="p-track"><i></i><b></b></div>
+      <div class="p-ctrl" style="position:relative">
+        <button class="round-btn" title="Předchozí"><svg viewBox="0 0 24 24"><path d="M6 5h2.5v14H6zM20 5v14L9 12z"/></svg></button>
+        <button class="round-btn main" title="Pauza"><svg viewBox="0 0 24 24"><path d="M7 5h3.6v14H7zM13.4 5H17v14h-3.6z"/></svg></button>
+        <button class="round-btn" title="Další"><svg viewBox="0 0 24 24"><path d="M15.5 5H18v14h-2.5zM4 5l11 7-11 7z"/></svg></button>
+        <button class="round-btn heart" title="Oblíbené" style="width:72px;height:72px"><svg viewBox="0 0 24 24" style="width:34px;height:34px"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3.1 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.8 0 6 3.9 4.5 7.3C19.5 16.4 12 21 12 21z"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 Brána -->
+  <section class="screen" id="s-gate">
+    <header class="topbar">
+      <div class="brand"><span class="logo"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7z"/></svg></span>Kinotéka <small>Děti</small></div>
+    </header>
+    <div class="content"><div class="bubbles" data-bubbles="0,1,2,3,4,5,6"></div></div>
+    <div class="dim">
+      <div class="gate">
+        <div class="lock"><svg class="i"><use href="#i-lock"/></svg></div>
+        <h2>Pro rodiče</h2>
+        <p>Zadej PIN</p>
+        <div class="dots"><i class="f"></i><i class="f"></i><i></i><i></i></div>
+        <div class="keys">
+          <button>1</button><button>2</button><button>3</button>
+          <button>4</button><button>5</button><button>6</button>
+          <button>7</button><button>8</button><button>9</button>
+          <button class="ghost">Zrušit</button><button>0</button><button class="ghost">⌫</button>
+        </div>
+        <div class="alt">Bez nastaveného PINu se místo něj zobrazí příklad, třeba „Kolik je 8 × 7?“</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 Stahování -->
+  <section class="screen" id="s-download">
+    <header class="ptop" data-ptop="0"></header>
+    <div class="pbody">
+      <div class="panel">
+        <h3><svg class="i" style="color:#ff0033"><use href="#i-yt"/></svg>Stáhnout z YouTube</h3>
+        <div class="url">
+          <div class="field"><svg class="i"><use href="#i-link"/></svg>https://www.youtube.com/watch?v=xYz12AbC9_q</div>
+          <button class="btn grape">Načíst</button>
+        </div>
+        <p class="hint">Vlož odkaz na video nebo na playlist. Videa se uloží do C:\Mirek_data\09_Videa\Kids.</p>
+        <div class="preview">
+          <span class="thumb" data-scene="0,3"><span class="badge-time">5:12</span></span>
+          <div>
+            <h4>Peppa Pig – Muddy Puddles | Full Episodes</h4>
+            <p>Peppa Pig – Official Channel</p>
+            <p style="font-size:13px">Součást playlistu „Peppa Pig Season 1“ (52 videí)</p>
+          </div>
+        </div>
+        <div class="form">
+          <label>Zařadit do</label>
+          <div class="select"><span class="mini" data-face-bg="0"></span>Prasátko Peppa <em>navrženo podle kanálu</em><svg class="i chev"><use href="#i-chev"/></svg></div>
+          <label>Kvalita</label>
+          <div><span class="seg"><span class="on">Nejlepší do 1080p</span><span>720p (méně místa)</span></span></div>
+          <label>Stáhnout</label>
+          <div style="display:flex;gap:22px">
+            <span class="check"><i><svg class="i"><use href="#i-check"/></svg></i>Jen toto video</span>
+            <span class="check"><i class="off"></i>Celý playlist (52)</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn">Zrušit</button>
+          <button class="btn primary"><svg class="i"><use href="#i-down"/></svg>Stáhnout</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Fronta stahování <small>yt-dlp 2026.10.17 · aktuální</small></h3>
+        <div class="queue">
+          <div class="q"><span class="thumb" data-scene="1,1"></span><div class="info"><b>Paw Patrol – Pups Save the Train</b><div class="pbar"><i style="width:45%"></i></div><small>Stahuje se 45 % · 3,2 MB/s · zbývá 0:40 → Tlapková patrola</small></div><button class="x"><svg class="i"><use href="#i-x"/></svg></button></div>
+          <div class="q"><span class="thumb" data-scene="2,2"></span><div class="info"><b>Krtek a autíčko (celý díl)</b><div class="pbar"><i style="width:0"></i></div><small>Čeká · → Krteček</small></div><button class="x"><svg class="i"><use href="#i-x"/></svg></button></div>
+          <div class="q done"><span class="thumb" data-scene="6,6"></span><div class="info"><b>Prší, prší – písnička pro děti</b><small>✓ Hotovo · 3 min · Písničky</small></div></div>
+          <div class="q done"><span class="thumb" data-scene="3,5"></span><div class="info"><b>Bluey – Beach</b><small>✓ Hotovo · 7 min · Bluey</small></div></div>
+          <div class="q err"><span class="thumb" data-scene="4,0"></span><div class="info"><b>youtube.com/watch?v=…</b><small>Video není dostupné (soukromé nebo smazané)</small></div><button class="x"><svg class="i"><use href="#i-x"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 Správa titulů -->
+  <section class="screen" id="s-titles">
+    <header class="ptop" data-ptop="1"></header>
+    <div class="pbody" style="grid-template-columns:.55fr 1.45fr">
+      <div class="panel">
+        <h3>Tituly <small>7</small></h3>
+        <div class="tlist">
+          <div class="trow on"><span class="mini" data-face-bg="0"></span>Prasátko Peppa<small>24</small></div>
+          <div class="trow"><span class="mini" data-face-bg="1"></span>Tlapková patrola<small>18</small></div>
+          <div class="trow"><span class="mini" data-face-bg="2"></span>Krteček<small>12</small></div>
+          <div class="trow"><span class="mini" data-face-bg="3"></span>Bluey<small>15</small></div>
+          <div class="trow"><span class="mini" data-face-bg="4"></span>Mašinka Tomáš<small>9</small></div>
+          <div class="trow"><span class="mini" data-face-bg="5"></span>Večerníček<small>31</small></div>
+          <div class="trow"><span class="mini" data-face-bg="6"></span>Písničky<small>20</small></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn"><svg class="i"><use href="#i-plus"/></svg>Nový titul</button></div>
+      </div>
+      <div class="panel">
+        <div class="form" style="margin-top:0;grid-template-columns:200px 1fr">
+          <label>Název</label>
+          <div class="field" style="flex:none">Prasátko Peppa</div>
+          <label>Obrázek titulu</label>
+          <div class="covers"><span class="on" data-face-bg="0"></span><span data-scene-bg="0,3"></span><span data-scene-bg="0,1"></span><span data-scene-bg="0,5"></span></div>
+          <label>Zařazovat videa, kde je<br><small style="font-weight:700">v názvu, kanálu nebo playlistu</small></label>
+          <div class="chips"><span>peppa</span><span>prasátko</span><span>peppa pig</span><span class="add">+ přidat</span></div>
+          <label>Složka</label>
+          <div class="hint" style="margin:0">C:\Mirek_data\09_Videa\Kids\Prasátko Peppa</div>
+        </div>
+        <div class="vids">
+          <div class="vid"><span class="thumb" data-scene="0,3"></span><span>Skákání v blátě<br><small>Peppa Pig – Official Channel</small></span><small>5 min</small><div class="select">Přesunout do…<svg class="i chev"><use href="#i-chev"/></svg></div><button title="Smazat do Koše"><svg class="i"><use href="#i-trash"/></svg></button></div>
+          <div class="vid"><span class="thumb" data-scene="0,0"></span><span>Tatínek ztratil brýle<br><small>Peppa Pig – Official Channel</small></span><small>5 min</small><div class="select">Přesunout do…<svg class="i chev"><use href="#i-chev"/></svg></div><button title="Smazat do Koše"><svg class="i"><use href="#i-trash"/></svg></button></div>
+          <div class="vid"><span class="thumb" data-scene="1,1"></span><span>Paw Patrol – Pups Save Peppa?<br><small>zařazeno podle slova „Peppa“ v názvu</small></span><small>11 min</small><div class="select"><span class="mini" data-face-bg="1"></span>Tlapková patrola<svg class="i chev"><use href="#i-chev"/></svg></div><button title="Smazat do Koše"><svg class="i"><use href="#i-trash"/></svg></button></div>
+        </div>
+        <p class="hint" style="margin-top:12px">Přesunutím se video přesune i na disku do složky titulu. Smazané video jde do Koše.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 Nastavení -->
+  <section class="screen" id="s-settings">
+    <header class="ptop" data-ptop="2"></header>
+    <div class="pbody" style="grid-template-columns:1fr">
+      <div class="panel" style="max-width:980px">
+        <div class="setrow"><label>Složka s pohádkami</label><div style="display:flex;gap:10px;align-items:center"><div class="field">C:\Mirek_data\09_Videa\Kids</div><button class="btn">Změnit…</button></div></div>
+        <div class="setrow"><label>PIN pro rodiče<small>Bez PINu se zobrazí příklad</small></label><div style="display:flex;gap:10px;align-items:center"><span class="ok-line"><svg class="i"><use href="#i-check"/></svg>Nastavený</span><button class="btn">Změnit PIN</button><button class="btn">Zrušit PIN</button></div></div>
+        <div class="setrow"><label>Motiv</label><div class="themes" id="themePick"></div></div>
+        <div class="setrow"><label>Další pohádka automaticky<small>ze stejného titulu</small></label><span class="toggle"></span></div>
+        <div class="setrow"><label>Časový limit<small>potom přehrávání skončí s hláškou</small></label><span class="seg"><span>Vypnuto</span><span class="on">30 min</span><span>1 h</span><span>Vlastní…</span></span></div>
+        <div class="setrow"><label>Spouštět Kinotéku rovnou v dětském režimu</label><span class="toggle off"></span></div>
+        <div class="setrow"><label>Stahování z YouTube<small>yt-dlp se stáhne při prvním použití</small></label><div style="display:flex;gap:10px;align-items:center"><span class="ok-line"><svg class="i"><use href="#i-check"/></svg>yt-dlp 2026.10.17 · aktuální</span><button class="btn">Zkontrolovat aktualizace</button></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 Vstup -->
+  <section class="screen" id="s-entry">
+    <div class="adult">
+      <aside class="side">
+        <div class="b"><i></i>Kinotéka</div>
+        <div class="nav"><svg class="i"><use href="#i-home"/></svg>Domů</div>
+        <div class="nav"><svg class="i"><use href="#i-film"/></svg>Filmy</div>
+        <div class="nav"><svg class="i"><use href="#i-tv"/></svg>Seriály</div>
+        <div class="nav"><svg class="i"><use href="#i-book"/></svg>Deník</div>
+        <div class="nav kidsnav"><span class="rb"></span>Děti</div>
+      </aside>
+      <div class="main">
+        <div class="explain">
+          <h2>Vstup do dětské části</h2>
+          <ul>
+            <li>V postranním menu přibude barevná položka <b style="color:#fff">Děti</b>. Kliknutí přepne celé okno do dětského režimu.</li>
+            <li>Zpět do dospělé části vede jen tlačítko <b style="color:#fff">Pro rodiče</b> přes PIN nebo příklad.</li>
+            <li>V nastavení jde zapnout, aby se Kinotéka rovnou spouštěla v dětském režimu – dítě si pak pustí jen pohádky.</li>
+            <li>Dětská videa se neobjeví ve Filmech, Seriálech ani v Deníku dospělých.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<p class="mock-note"><b>Poznámky k mockupu:</b> obrázky jsou jen ilustrační (v aplikaci budou náhledy z YouTube nebo snímky z videa). Kulaté tituly nahoře poznají i děti, které ještě nečtou. Karty a tlačítka jsou velké (nejmenší cíl ~56 px), bez vnořených nabídek. Motivy přepneš vpravo nahoře v liště mockupu; Vesmír je klidnější, třeba na večer. Část „Pro rodiče“ (obrazovky 5–7) je za rodičovskou bránou.</p>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9-8.7C1.6 8.1 3.7 4.5 7.2 4.5c2 0 3.4 1 4.8 2.8 1.4-1.8 2.8-2.8 4.8-2.8 3.5 0 5.6 3.6 4.2 6.8C19 15.6 12 20 12 20z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="3"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></symbol>
+  <symbol id="i-yt" viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.5v5l4.5-2.5z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M17 9h4M3 15h4M17 15h4"/></symbol>
+  <symbol id="i-tv" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 3l4 4 4-4"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></symbol>
+</svg>
+
+<script>
+// Ilustrační postavičky a scény (jen pro mockup – žádné skutečné postavy).
+const TITLES = [
+  { name: 'Prasátko Peppa', body: '#ff9fbf', bg: ['#ffe3ee', '#ffc2d8'], ears: 'tri' },
+  { name: 'Tlapková patrola', body: '#5aa6ff', bg: ['#dcecff', '#b5d6ff'], ears: 'dog' },
+  { name: 'Krteček', body: '#5a4a86', bg: ['#ece7ff', '#d3c9ff'], ears: 'none' },
+  { name: 'Bluey', body: '#66c3ef', bg: ['#dbf5ff', '#b3e7fb'], ears: 'dog' },
+  { name: 'Mašinka Tomáš', body: '#ff7650', bg: ['#ffe5dc', '#ffc6b4'], ears: 'none' },
+  { name: 'Večerníček', body: '#ffcf4a', bg: ['#fff4cf', '#ffe48f'], ears: 'hat' },
+  { name: 'Písničky', body: '#43c98b', bg: ['#dcf7e8', '#b2edd0'], ears: 'notes' }
+]
+const SKIES = [['#8fd8ff', '#e3f6ff'], ['#ffd6a5', '#fff1dc'], ['#b7e4ff', '#f0fbff'], ['#c9b8ff', '#f3eeff'], ['#ffe3f0', '#fff'], ['#9fe5ff', '#e8fbff'], ['#ffd1e8', '#fff3fa']]
+const HILLS = ['#7ed957', '#5cc6a8', '#9bd66b', '#f7c26b', '#a6e3a1', '#6fcf97', '#b5e48c']
+
+function face(t, x, y, s) {
+  const ears = {
+    tri: `<path d="M${x - s * .5} ${y - s * .7} l${s * .18} -${s * .38} l${s * .22} ${s * .3}z M${x + s * .5} ${y - s * .7} l-${s * .18} -${s * .38} l-${s * .22} ${s * .3}z" fill="${t.body}"/>`,
+    dog: `<ellipse cx="${x - s * .78}" cy="${y - s * .15}" rx="${s * .22}" ry="${s * .42}" fill="${t.body}" opacity=".85"/><ellipse cx="${x + s * .78}" cy="${y - s * .15}" rx="${s * .22}" ry="${s * .42}" fill="${t.body}" opacity=".85"/>`,
+    hat: `<path d="M${x - s * .55} ${y - s * .72} h${s * 1.1} l-${s * .55} -${s * .55}z" fill="#ff6b6b"/>`,
+    notes: `<text x="${x + s * .7}" y="${y - s * .6}" font-size="${s * .55}" fill="#fff" font-family="Arial">♪</text>`,
+    none: ''
+  }[t.ears]
+  return `${ears}<circle cx="${x}" cy="${y}" r="${s * .8}" fill="${t.body}"/>
+    <circle cx="${x - s * .28}" cy="${y - s * .12}" r="${s * .14}" fill="#fff"/><circle cx="${x + s * .28}" cy="${y - s * .12}" r="${s * .14}" fill="#fff"/>
+    <circle cx="${x - s * .25}" cy="${y - s * .09}" r="${s * .07}" fill="#1f2a44"/><circle cx="${x + s * .31}" cy="${y - s * .09}" r="${s * .07}" fill="#1f2a44"/>
+    <path d="M${x - s * .25} ${y + s * .25} q${s * .25} ${s * .22} ${s * .5} 0" stroke="#1f2a44" stroke-width="${s * .07}" fill="none" stroke-linecap="round"/>
+    <circle cx="${x - s * .5}" cy="${y + s * .18}" r="${s * .1}" fill="#ff6b8a" opacity=".45"/><circle cx="${x + s * .5}" cy="${y + s * .18}" r="${s * .1}" fill="#ff6b8a" opacity=".45"/>`
+}
+const url = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+function faceSvg(i) {
+  const t = TITLES[i]
+  return url(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${t.bg[0]}"/><stop offset="1" stop-color="${t.bg[1]}"/></linearGradient></defs><rect width="200" height="200" fill="url(#g)"/><circle cx="40" cy="40" r="10" fill="#fff" opacity=".6"/><circle cx="165" cy="150" r="14" fill="#fff" opacity=".45"/>${face(t, 100, 112, 62)}</svg>`)
+}
+function sceneSvg(ti, si) {
+  const t = TITLES[ti], sky = SKIES[si % SKIES.length], hill = HILLS[(si + ti) % HILLS.length]
+  return url(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient></defs><rect width="320" height="180" fill="url(#s)"/><circle cx="${260 - si * 18}" cy="40" r="20" fill="#ffd84d"/><ellipse cx="${80 + si * 10}" cy="38" rx="30" ry="11" fill="#fff" opacity=".85"/><ellipse cx="${100 + si * 10}" cy="30" rx="18" ry="12" fill="#fff" opacity=".85"/><path d="M-10 150 Q80 ${100 + si * 4} 170 140 T340 ${130 - si * 3} V190 H-10z" fill="${hill}"/><path d="M-10 165 Q120 140 220 160 T340 155 V190 H-10z" fill="${hill}" opacity=".7" style="filter:brightness(.85)"/>${face(t, 120 + (si % 3) * 40, 118, 30)}${si % 2 ? face(TITLES[(ti + 3) % TITLES.length], 215, 128, 20) : ''}</svg>`)
+}
+
+document.querySelectorAll('[data-bubbles]').forEach((el) => {
+  el.innerHTML = el.dataset.bubbles.split(',').map((i) => `<button class="bubble"><span class="face" style='background-image:${faceSvg(+i)}'></span><b>${TITLES[+i].name}</b></button>`).join('')
+})
+document.querySelectorAll('[data-face]').forEach((el) => { el.style.backgroundImage = faceSvg(+el.dataset.face) })
+document.querySelectorAll('[data-face-bg]').forEach((el) => { el.style.backgroundImage = faceSvg(+el.dataset.faceBg) })
+document.querySelectorAll('[data-scene], [data-scene-bg]').forEach((el) => {
+  const [t, s] = (el.dataset.scene ?? el.dataset.sceneBg).split(',').map(Number)
+  el.style.backgroundImage = sceneSvg(t, s)
+})
+document.querySelectorAll('[data-card]').forEach((el) => {
+  const [t, s, p, name, time, seen] = el.dataset.card.split('|')
+  el.innerHTML = `<span class="thumb" style='background-image:${sceneSvg(+t, +s)}'>
+      <span class="badge-time">${time}</span>
+      ${seen ? '<span class="badge-seen"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7z"/></svg></span>' : ''}
+      ${+p > 0 && +p < 100 ? `<span class="bar"><i style="width:${p}%"></i></span>` : ''}
+      <span class="play-dot"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg></span>
+    </span><b>${name}</b><small>${TITLES[+t].name}</small>`
+})
+
+const PTABS = [['i-down', 'Stáhnout z YouTube'], ['i-list', 'Tituly'], ['i-gear', 'Nastavení']]
+document.querySelectorAll('[data-ptop]').forEach((el) => {
+  const on = +el.dataset.ptop
+  el.innerHTML = `<h2><svg class="i"><use href="#i-lock"/></svg>Pro rodiče</h2>
+    <div class="tabs">${PTABS.map(([icon, label], i) => `<button class="${i === on ? 'on' : ''}" data-go="${['s-download', 's-titles', 's-settings'][i]}"><svg class="i"><use href="#${icon}"/></svg>${label}</button>`).join('')}</div>
+    <div class="right"><button class="btn primary" data-go="s-home"><svg class="i"><use href="#i-home"/></svg>Zpět k pohádkám</button><button class="btn">Odejít z dětského režimu</button></div>`
+})
+
+const THEMES = [['obloha', 'Obloha'], ['louka', 'Louka'], ['more', 'Moře'], ['vesmir', 'Vesmír']]
+const app = document.getElementById('app')
+function setTheme(name) {
+  app.dataset.theme = name
+  document.querySelectorAll('.swatch').forEach((b) => b.classList.toggle('on', b.dataset.t === name))
+  const pick = document.getElementById('themePick')
+  pick.innerHTML = THEMES.map(([id, label]) => `<span class="${id === name ? 'on' : ''}" data-t="${id}"><i></i>${label}</span>`).join('')
+  pick.querySelectorAll('span').forEach((span) => {
+    const probe = document.createElement('div'); probe.className = 'kids'; probe.dataset.theme = span.dataset.t; probe.style.display = 'none'; document.body.append(probe)
+    const cs = getComputedStyle(probe)
+    span.querySelector('i').style.background = `${cs.getPropertyValue('--pattern')}, ${cs.getPropertyValue('--grad')}`
+    probe.remove()
+  })
+}
+function show(id) {
+  document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('on', s.id === id))
+  document.querySelectorAll('.mock-nav [data-s]').forEach((b) => b.classList.toggle('on', b.dataset.s === id))
+}
+document.addEventListener('click', (e) => {
+  const s = e.target.closest('[data-s]'); if (s) show(s.dataset.s)
+  const g = e.target.closest('[data-go]'); if (g) show(g.dataset.go)
+  const t = e.target.closest('[data-t]'); if (t) setTheme(t.dataset.t)
+  if (e.target.closest('#s-home .bubble')) show('s-title')
+  if (e.target.closest('#s-home .card, #s-title .card')) show('s-player')
+  if (e.target.closest('.parents')) show('s-gate')
+  if (e.target.closest('#s-gate .keys button:not(.ghost)')) show('s-download')
+  if (e.target.closest('#s-title .topbar .round-btn, #s-player .p-top .round-btn')) show('s-home')
+})
+// #obrazovka/motiv v adrese (např. deti.html#s-player/vesmir)
+const [startScreen, startTheme] = location.hash.slice(1).split('/')
+setTheme(startTheme || 'obloha')
+if (startScreen) show(startScreen)
+</script>
+</body>
+</html>
