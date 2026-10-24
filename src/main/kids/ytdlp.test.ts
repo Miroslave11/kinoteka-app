@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildDownloadArgs,
+  buildInfoArgs,
   errorMessage,
+  parseInfo,
   parseProgressLine,
   sha256For,
   YTDLP_FORMAT
@@ -107,5 +109,43 @@ describe('sha256For', () => {
       '33121d192d706e62f684a06f80918e3f3a8ba52ac3a65213b6951c39c7d9f555'
     )
     expect(sha256For(sums, 'yt-dlp_x86.exe')).toBeNull()
+  })
+})
+
+describe('buildInfoArgs', () => {
+  it('playlist jen jako seznam, video bez playlistu', () => {
+    const playlist = buildInfoArgs('https://www.youtube.com/playlist?list=PLx', 'C:\e.exe', true)
+    expect(playlist).toEqual(expect.arrayContaining(['-J', '--flat-playlist', '--yes-playlist']))
+    expect(playlist.at(-1)).toBe('https://www.youtube.com/playlist?list=PLx')
+    const video = buildInfoArgs('https://youtu.be/jNQXAC9IVRw', 'C:\e.exe', false)
+    expect(video).toContain('--no-playlist')
+    expect(video).not.toContain('--flat-playlist')
+  })
+})
+
+describe('parseInfo', () => {
+  it('video: název, kanál, délka', () => {
+    expect(
+      parseInfo({ title: ' Bláto ', uploader: 'Peppa', duration: 311.6, entries: undefined })
+    ).toEqual({ title: 'Bláto', channel: 'Peppa', durationSec: 312, entries: [] })
+  })
+
+  it('playlist: vynechá soukromá a smazaná videa', () => {
+    const info = parseInfo({
+      title: 'Klipy',
+      channel: 'Prasátko Peppa',
+      entries: [
+        { id: 'aaaaaaaaaaa', title: 'Bláto' },
+        { id: 'bbbbbbbbbbb', title: '[Private video]' },
+        { id: 'ccccccccccc', title: null },
+        { id: 'kratke', title: 'Špatné id' }
+      ]
+    })
+    expect(info?.entries).toEqual([{ id: 'aaaaaaaaaaa', title: 'Bláto' }])
+  })
+
+  it('bez názvu → null', () => {
+    expect(parseInfo({ title: '' })).toBeNull()
+    expect(parseInfo('nesmysl')).toBeNull()
   })
 })

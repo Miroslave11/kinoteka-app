@@ -1,10 +1,17 @@
-import { spawn as nodeSpawn } from 'node:child_process'
+import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
-import type { KidsDownloadProgress, KidsDownloadResult } from '../../shared/kids'
-import { buildDownloadArgs, errorMessage, parseProgressLine } from './ytdlp'
+import type { KidsDownloadProgress, KidsDownloadResult, KidsQuality } from '../../shared/kids'
+import {
+  buildDownloadArgs,
+  buildInfoArgs,
+  errorMessage,
+  parseInfo,
+  parseProgressLine,
+  type VideoInfo
+} from './ytdlp'
 
 interface KidsDownloaderEvents {
   progress: [KidsDownloadProgress]
@@ -23,7 +30,7 @@ export interface KidsDownloaderOptions {
 }
 
 /** Údaje z `.info.json`, které vedle videa uloží yt-dlp. */
-interface VideoInfo {
+interface InfoJson {
   title?: unknown
   channel?: unknown
   uploader?: unknown
@@ -35,6 +42,8 @@ const withoutExtension = (path: string): string => path.replace(/\.[^.\\/]+$/, '
 /** Stáhne jedno video z YouTube do složky s dětskými videi (vždy jen jedno najednou). */
 export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
   private running = false
+  private child: ChildProcess | null = null
+  private canceled = false
 
   constructor(private readonly options: KidsDownloaderOptions) {
     super()
@@ -44,32 +53,80 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     return this.running
   }
 
-  async download(url: string): Promise<KidsDownloadResult> {
+  private spawnYtDlp(exe: string, args: string[]): ChildProcess {
+    return (this.options.spawn ?? nodeSpawn)(exe, args, {
+      windowsHide: true,
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8' }
+    })
+  }
+
+  private async prepareTool(): Promise<string> {
+    try {
+      return await this.options.tool()
+    } catch (error) {
+      throw new Error(`Nástroj yt-dlp nejde stáhnout: ${(error as Error).message}`, {
+        cause: error
+      })
+    }
+  }
+
+  /** Údaje o videu nebo playlistu bez stahování (název, kanál, délka, videa v playlistu). */
+  async info(url: string, playlist: boolean): Promise<VideoInfo> {
+    const exe = await this.prepareTool()
+    const child = this.spawnYtDlp(exe, buildInfoArgs(url, this.options.nodePath, playlist))
+    const stdout: Buffer[] = []
+    const output: string[] = []
+    child.stdout!.on('data', (chunk: Buffer) => stdout.push(chunk))
+    createInterface({ input: child.stderr! }).on('line', (line) => output.push(line))
+    const code = await new Promise<number | null>((resolve) => {
+      child.on('error', () => resolve(-1))
+      child.on('close', resolve)
+    })
+    let info: VideoInfo | null
+    try {
+      info = parseInfo(JSON.parse(Buffer.concat(stdout).toString('utf8')))
+    } catch {
+      info = null
+    }
+    if (code !== 0 || !info) throw new Error(errorMessage(output))
+    return info
+  }
+
+  /** Zruší právě běžící stahování (ve frontě). */
+  cancel(): void {
+    if (!this.child) return
+    this.canceled = true
+    killTree(this.child, this.options.spawn ?? nodeSpawn)
+  }
+
+  async download(
+    url: string,
+    options: { folder?: string; quality?: KidsQuality } = {}
+  ): Promise<KidsDownloadResult> {
     if (this.running)
       return { ok: false, message: 'Už se stahuje jiné video – počkej, až doběhne.' }
     this.running = true
+    this.canceled = false
     try {
       this.emit('progress', { phase: 'tool', percent: null, speed: null, eta: null })
       let exe: string
       try {
-        exe = await this.options.tool()
+        exe = await this.prepareTool()
       } catch (error) {
-        return {
-          ok: false,
-          message: `Nástroj yt-dlp nejde stáhnout: ${(error as Error).message}`
-        }
+        return { ok: false, message: (error as Error).message }
       }
-      const folder = this.options.folder()
+      const folder = options.folder ?? this.options.folder()
       await mkdir(folder, { recursive: true })
       await mkdir(this.options.tempDir, { recursive: true })
       const pathFile = join(this.options.tempDir, `yt-dlp-${Date.now()}.txt`)
       try {
-        return await this.run(exe, url, folder, pathFile)
+        return await this.run(exe, url, folder, pathFile, options.quality)
       } finally {
         await rm(pathFile, { force: true })
       }
     } finally {
       this.running = false
+      this.child = null
     }
   }
 
@@ -77,7 +134,8 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     exe: string,
     url: string,
     folder: string,
-    pathFile: string
+    pathFile: string,
+    quality: KidsQuality | undefined
   ): Promise<KidsDownloadResult> {
     this.emit('progress', { phase: 'starting', percent: null, speed: null, eta: null })
     const args = buildDownloadArgs({
@@ -85,12 +143,11 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
       folder,
       ffmpegDir: this.options.ffmpegDir,
       nodePath: this.options.nodePath,
-      pathFile
+      pathFile,
+      quality
     })
-    const child = (this.options.spawn ?? nodeSpawn)(exe, args, {
-      windowsHide: true,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8' }
-    })
+    const child = this.spawnYtDlp(exe, args)
+    this.child = child
     const output: string[] = []
     const onLine = (line: string): void => {
       const progress = parseProgressLine(line)
@@ -106,6 +163,7 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
       child.on('error', () => resolve(-1))
       child.on('close', resolve)
     })
+    if (this.canceled) return { ok: false, message: 'Zrušeno.' }
     if (code !== 0) return { ok: false, message: errorMessage(output) }
 
     let file: string
@@ -127,9 +185,9 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     thumbnail: string | null
   }> {
     const base = withoutExtension(file)
-    let info: VideoInfo = {}
+    let info: InfoJson = {}
     try {
-      info = JSON.parse(await readFile(`${base}.info.json`, 'utf8')) as VideoInfo
+      info = JSON.parse(await readFile(`${base}.info.json`, 'utf8')) as InfoJson
     } catch {
       // Bez údajů se použije aspoň název souboru.
     }
@@ -149,4 +207,22 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
       thumbnail
     }
   }
+}
+
+/**
+ * Ukončí proces i s podprocesy. yt-dlp.exe je na Windows spouštěč, který pouští vlastní
+ * kopii Pythonu (a ta ffmpeg) – samotné `kill()` by zastavilo jen spouštěč a stahování
+ * by běželo dál.
+ */
+export function killTree(
+  child: ChildProcess,
+  spawnImpl: typeof nodeSpawn,
+  platform: NodeJS.Platform = process.platform
+): void {
+  if (platform === 'win32' && child.pid) {
+    spawnImpl('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true }).on(
+      'error',
+      () => child.kill()
+    )
+  } else child.kill()
 }

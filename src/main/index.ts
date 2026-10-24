@@ -25,6 +25,7 @@ import { registerJournalIpc } from './journal/journalIpc'
 import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
 import { KidsDownloader } from './kids/KidsDownloader'
+import { KidsDownloadQueue } from './kids/KidsDownloadQueue'
 import { kidsFolder, KIDS_SETTINGS_KEY, registerKidsIpc } from './kids/kidsIpc'
 import { KidsGuard } from './kids/KidsGuard'
 import { KidsTracker, kidsPlayItem, PlayTimeMeter, type KidsPlayItem } from './kids/kidsPlayback'
@@ -465,7 +466,7 @@ void app.whenReady().then(() => {
   kidsGuard = new KidsGuard(settings)
   // „Spouštět Kinotéku rovnou v dětském režimu“: okno se otevře zamčené v části Děti.
   if (kidsSettings().startInKids) kidsGuard.enter()
-  handleMediaProtocol(images, clipsDir, (id) => kidsRepository.thumbnailPath(id))
+  handleMediaProtocol(images, clipsDir, (id) => kidsRepository.thumbnailPath(id), chromiumFetch)
 
   // Barvy z plakátů a klipy na pozadí – potřebují ffmpeg.
   const ffmpeg = binaryPath('ffmpeg', 'ffmpeg.exe')
@@ -561,10 +562,17 @@ void app.whenReady().then(() => {
     thumbnailDir: join(app.getPath('userData'), 'cache', 'kids')
   })
   kidsLibrary.on('changed', () => broadcast(IpcChannel.KidsChanged))
+  const kidsQueue = new KidsDownloadQueue({
+    downloader: kidsDownloader,
+    repository: kidsRepository,
+    folder: () => kidsFolder(settings),
+    scan: () => kidsLibrary.scan()
+  })
   registerKidsIpc({
     settings,
     tool: ytDlp,
     downloader: kidsDownloader,
+    queue: kidsQueue,
     library: kidsLibrary,
     repository: kidsRepository,
     guard: kidsGuard,

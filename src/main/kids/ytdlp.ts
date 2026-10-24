@@ -1,11 +1,73 @@
-import type { KidsDownloadProgress } from '../../shared/kids'
+import type { KidsDownloadProgress, KidsQuality } from '../../shared/kids'
 
 /**
- * Formát: nejlépe H.264 do 1080p (přehraje cokoli a nezatíží procesor), jinak nejlepší
- * dostupný obraz do 1080p, jinak cokoli. Obraz a zvuk spojí ffmpeg do mp4.
+ * Formát: nejlépe H.264 do zvolené výšky (přehraje cokoli a nezatíží procesor), jinak
+ * nejlepší dostupný obraz do té výšky, jinak cokoli. Obraz a zvuk spojí ffmpeg do mp4.
  */
-export const YTDLP_FORMAT =
-  'bv*[height<=1080][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/b'
+export const formatFor = (quality: KidsQuality): string =>
+  `bv*[height<=${quality}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=${quality}]+ba/b[height<=${quality}]/b`
+
+export const YTDLP_FORMAT = formatFor('1080')
+
+/** Společné volby: bez aktualizace a konfigurace, certifikáty Windows, JavaScript z Electronu. */
+const baseArgs = (nodePath: string): string[] => [
+  '--no-update',
+  '--ignore-config',
+  '--encoding',
+  'utf-8',
+  // Certifikáty z Windows místo přibaleného seznamu – funguje i za antivirem, který kontroluje HTTPS.
+  '--compat-options',
+  'no-certifi',
+  // Jen Node z Electronu (bez Deno a dalších programů, které by na počítači náhodou byly).
+  '--no-js-runtimes',
+  '--js-runtimes',
+  `node:${nodePath}`
+]
+
+/** Údaje o videu nebo playlistu bez stahování (náhled v části Pro rodiče). */
+export function buildInfoArgs(url: string, nodePath: string, playlist: boolean): string[] {
+  return [
+    ...baseArgs(nodePath),
+    '-J',
+    '--no-warnings',
+    // Playlist stačí jako seznam videí (bez načítání každého z nich).
+    ...(playlist ? ['--flat-playlist', '--yes-playlist'] : ['--no-playlist']),
+    url
+  ]
+}
+
+export interface VideoInfo {
+  title: string
+  channel: string | null
+  durationSec: number | null
+  /** Playlist: videa v něm (id, název). */
+  entries: { id: string; title: string }[]
+}
+
+const text = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() ? value.trim() : null
+
+/** Výstup `yt-dlp -J` (video nebo playlist s --flat-playlist). */
+export function parseInfo(json: unknown): VideoInfo | null {
+  if (typeof json !== 'object' || json === null) return null
+  const info = json as Record<string, unknown>
+  const title = text(info['title'])
+  if (!title) return null
+  const entries = Array.isArray(info['entries'])
+    ? (info['entries'] as Record<string, unknown>[])
+        .map((entry) => ({ id: text(entry['id']) ?? '', title: text(entry['title']) ?? '' }))
+        // Smazaná a soukromá videa v playlistu nemají název (nebo „[Private video]“).
+        .filter(
+          (entry) => /^[\w-]{11}$/.test(entry.id) && entry.title && !/^\[.*\]$/.test(entry.title)
+        )
+    : []
+  return {
+    title,
+    channel: text(info['channel']) ?? text(info['uploader']),
+    durationSec: typeof info['duration'] === 'number' ? Math.round(info['duration']) : null,
+    entries
+  }
+}
 
 /** Řádek průběhu, který si yt-dlp vypisuje podle šablony níže. */
 const PROGRESS_PREFIX = '[KTK]'
@@ -20,26 +82,17 @@ export interface DownloadArgsOptions {
   nodePath: string
   /** Soubor, do kterého yt-dlp zapíše cestu k hotovému videu. */
   pathFile: string
+  quality?: KidsQuality
 }
 
 export function buildDownloadArgs(options: DownloadArgsOptions): string[] {
   return [
-    '--no-update',
-    '--ignore-config',
-    '--encoding',
-    'utf-8',
-    // Certifikáty z Windows místo přibaleného seznamu – funguje i za antivirem, který kontroluje HTTPS.
-    '--compat-options',
-    'no-certifi',
-    // Jen Node z Electronu (bez Deno a dalších programů, které by na počítači náhodou byly).
-    '--no-js-runtimes',
-    '--js-runtimes',
-    `node:${options.nodePath}`,
+    ...baseArgs(options.nodePath),
     '--ffmpeg-location',
     options.ffmpegDir,
     '--no-playlist',
     '-f',
-    YTDLP_FORMAT,
+    formatFor(options.quality ?? '1080'),
     '--merge-output-format',
     'mp4',
     '--write-info-json',

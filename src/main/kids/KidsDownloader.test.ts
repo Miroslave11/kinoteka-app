@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { KidsDownloadProgress } from '../../shared/kids'
-import { KidsDownloader } from './KidsDownloader'
+import { KidsDownloader, killTree } from './KidsDownloader'
 
 let root: string
 
@@ -129,5 +129,33 @@ describe('KidsDownloader', () => {
     const first = kids.download('https://youtu.be/abcdefghijk')
     expect(await kids.download('https://youtu.be/abcdefghijk')).toMatchObject({ ok: false })
     expect(await first).toMatchObject({ ok: true })
+  })
+})
+
+describe('killTree', () => {
+  it('na Windows ukončí celý strom přes taskkill', () => {
+    const child = { pid: 1234, kill: vi.fn() }
+    const spawnImpl = vi.fn(() => Object.assign(new EventEmitter()))
+    killTree(child as never, spawnImpl as never, 'win32')
+    expect(spawnImpl).toHaveBeenCalledWith('taskkill', ['/pid', '1234', '/T', '/F'], {
+      windowsHide: true
+    })
+    expect(child.kill).not.toHaveBeenCalled()
+  })
+
+  it('taskkill nejde spustit → aspoň kill()', () => {
+    const child = { pid: 1234, kill: vi.fn() }
+    const taskkill = new EventEmitter()
+    killTree(child as never, vi.fn(() => taskkill) as never, 'win32')
+    taskkill.emit('error', new Error('ENOENT'))
+    expect(child.kill).toHaveBeenCalled()
+  })
+
+  it('jinde stačí kill()', () => {
+    const child = { pid: 1234, kill: vi.fn() }
+    const spawnImpl = vi.fn()
+    killTree(child as never, spawnImpl as never, 'linux')
+    expect(spawnImpl).not.toHaveBeenCalled()
+    expect(child.kill).toHaveBeenCalled()
   })
 })
