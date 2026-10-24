@@ -28,8 +28,43 @@ export type KidsDownloadResult =
       fileName: string
       /** Náhled videa jako data URL; null = YouTube náhled nedal. */
       thumbnail: string | null
+      /** Video v knihovně Děti (po zařazení do titulu); null = nenašlo se. */
+      videoId?: number | null
     }
   | { ok: false; message: string }
+
+export interface KidsVideo {
+  id: number
+  titleId: number | null
+  /** Název dílu bez názvu pořadu a dovětků („Bláto“). */
+  name: string
+  /** Původní název z YouTube. */
+  originalName: string
+  channel: string | null
+  durationSec: number | null
+  /** kinoteka-media://kids/… ; null = obrázek zatím není. */
+  thumbnailUrl: string | null
+  addedAt: string
+}
+
+/** Titul dětské části = podsložka ve složce Kids. */
+export interface KidsTitle {
+  /** null = videa přímo ve složce Kids, která se nepodařilo zařadit („Ostatní“). */
+  id: number | null
+  name: string
+  keywords: string[]
+  coverUrl: string | null
+  videos: KidsVideo[]
+}
+
+export interface KidsScanResult {
+  titles: number
+  videos: number
+  /** Kolik videí z kořene složky se zařadilo (přesunulo) do titulů. */
+  sorted: number
+  /** Soubory, které se nepodařilo přesunout nebo přečíst. */
+  errors: string[]
+}
 
 export interface KidsStatus {
   /** Složka s dětskými videi. */

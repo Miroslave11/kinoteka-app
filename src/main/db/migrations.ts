@@ -194,5 +194,34 @@ export const MIGRATIONS: readonly string[] = [
     episode INTEGER,
     episode_title TEXT
   );
+  `,
+
+  // 13 – dětská část: tituly (= podsložky složky Kids) a videa v nich
+  `
+  CREATE TABLE kids_title (
+    id INTEGER PRIMARY KEY,
+    -- název podsložky je zároveň název titulu
+    folder TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    -- další slova, podle kterých se do titulu řadí nová videa (JSON pole)
+    keywords TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE kids_video (
+    id INTEGER PRIMARY KEY,
+    path TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    -- NULL = video leží přímo ve složce Kids a k žádnému titulu se nepodařilo zařadit
+    title_id INTEGER REFERENCES kids_title (id) ON DELETE SET NULL,
+    youtube_id TEXT,
+    -- název videa z YouTube (nebo ze jména souboru)
+    name TEXT NOT NULL,
+    channel TEXT,
+    duration REAL,
+    thumbnail TEXT,
+    size INTEGER NOT NULL,
+    mtime_ms INTEGER NOT NULL,
+    added_at TEXT NOT NULL
+  );
+  CREATE INDEX kids_video_title ON kids_video (title_id);
   `
 ]

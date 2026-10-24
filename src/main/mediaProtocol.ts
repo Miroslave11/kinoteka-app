@@ -1,6 +1,6 @@
 import { protocol } from 'electron'
-import { open, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { open, readFile, stat } from 'node:fs/promises'
+import { extname, join } from 'node:path'
 import type { ImageCache } from './metadata/ImageCache'
 
 export const MEDIA_SCHEME = 'kinoteka-media'
@@ -71,16 +71,47 @@ async function serveClip(
   }
 }
 
+const IMAGE_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp'
+}
+
+/** Obrázek dětského videa podle id – cestu zná jen hlavní proces. */
+async function serveKidsImage(
+  kidsThumbnail: (videoId: number) => string | null,
+  pathname: string
+): Promise<Response> {
+  const match = /^\/video\/(\d+)$/.exec(pathname)
+  const file = match ? kidsThumbnail(Number(match[1])) : null
+  const type = file && IMAGE_TYPES[extname(file).toLowerCase()]
+  if (!file || !type) return new Response(null, { status: 404 })
+  try {
+    return new Response(new Uint8Array(await readFile(file)), {
+      headers: { 'Content-Type': type, 'Cache-Control': 'max-age=86400' }
+    })
+  } catch {
+    return new Response(null, { status: 404 })
+  }
+}
+
 /**
  * kinoteka-media://tmdb/w500/abc.jpg → obrázek z cache (případně stažený z TMDB)
  * kinoteka-media://clips/12-0.mp4   → klip na pozadí
+ * kinoteka-media://kids/video/7     → obrázek dětského videa
  */
-export function handleMediaProtocol(images: ImageCache, clipsDir: string): void {
+export function handleMediaProtocol(
+  images: ImageCache,
+  clipsDir: string,
+  kidsThumbnail: (videoId: number) => string | null
+): void {
   protocol.handle(MEDIA_SCHEME, async (request) => {
     const url = new URL(request.url)
     if (url.hostname === 'clips') {
       return serveClip(clipsDir, url.pathname.slice(1), request.headers.get('Range'))
     }
+    if (url.hostname === 'kids') return serveKidsImage(kidsThumbnail, url.pathname)
     if (url.hostname !== 'tmdb') return new Response(null, { status: 404 })
     const image = await images.get(url.pathname)
     if (!image) return new Response(null, { status: 404 })

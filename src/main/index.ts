@@ -25,9 +25,11 @@ import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
 import { KidsDownloader } from './kids/KidsDownloader'
 import { kidsFolder, registerKidsIpc } from './kids/kidsIpc'
+import { KidsLibrary } from './kids/KidsLibrary'
+import { KidsRepository } from './kids/KidsRepository'
 import { YtDlpTool } from './kids/YtDlpTool'
 import { openDatabase } from './db/database'
-import { makeClip, posterPixels } from './media/ffmpeg'
+import { makeClip, posterPixels, videoThumbnail } from './media/ffmpeg'
 import { runFfprobe } from './media/ffprobe'
 import { PreviewService } from './media/PreviewService'
 import { handleMediaProtocol, registerMediaScheme } from './mediaProtocol'
@@ -349,7 +351,8 @@ void app.whenReady().then(() => {
     chromiumFetch
   )
   const clipsDir = join(app.getPath('userData'), 'cache', 'clips')
-  handleMediaProtocol(images, clipsDir)
+  const kidsRepository = new KidsRepository(db)
+  handleMediaProtocol(images, clipsDir, (id) => kidsRepository.thumbnailPath(id))
 
   // Barvy z plakátů a klipy na pozadí – potřebují ffmpeg.
   const ffmpeg = binaryPath('ffmpeg', 'ffmpeg.exe')
@@ -434,7 +437,26 @@ void app.whenReady().then(() => {
     nodePath: process.execPath,
     tempDir: join(app.getPath('temp'), 'kinoteka')
   })
-  registerKidsIpc(settings, ytDlp, kidsDownloader, play)
+  const kidsLibrary = new KidsLibrary(kidsRepository, {
+    folder: () => kidsFolder(settings),
+    busy: () => kidsDownloader.busy,
+    probeDuration: async (path) =>
+      existsSync(ffprobe) ? (await runFfprobe(ffprobe, path)).durationSec || null : null,
+    makeThumbnail: existsSync(ffmpeg)
+      ? (input, atSec, output) => videoThumbnail(ffmpeg, input, atSec, output)
+      : undefined,
+    thumbnailDir: join(app.getPath('userData'), 'cache', 'kids')
+  })
+  kidsLibrary.on('changed', () => broadcast(IpcChannel.KidsChanged))
+  registerKidsIpc({
+    settings,
+    tool: ytDlp,
+    downloader: kidsDownloader,
+    library: kidsLibrary,
+    repository: kidsRepository,
+    play
+  })
+  void kidsLibrary.scan().catch((error: Error) => console.warn(`Složka Kids: ${error.message}`))
   ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))
   ipcMain.handle(IpcChannel.SubtitlesSaveSettings, (_event, value: unknown) =>
     saveSubtitleSettings(settings, value)

@@ -120,3 +120,23 @@ export async function makeClip(
     await rm(temporary, { force: true })
   }
 }
+
+/** Obrázek z videa (náhled dětského videa bez obrázku z YouTube), šířka 480. */
+export async function videoThumbnail(
+  executable: string,
+  input: string,
+  atSec: number,
+  output: string
+): Promise<void> {
+  const temporary = output.replace(/\.jpg$/, '.part.jpg')
+  try {
+    await runFfmpeg(
+      executable,
+      ['-ss', String(atSec), '-i', input, '-frames:v', '1', '-vf', 'scale=480:-2', '-y', temporary],
+      { timeoutMs: 60_000 }
+    )
+    await rename(temporary, output)
+  } finally {
+    await rm(temporary, { force: true })
+  }
+}

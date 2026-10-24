@@ -35,8 +35,6 @@ const withoutExtension = (path: string): string => path.replace(/\.[^.\\/]+$/, '
 /** Stáhne jedno video z YouTube do složky s dětskými videi (vždy jen jedno najednou). */
 export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
   private running = false
-  /** Naposledy stažené video – okno ho přehraje bez znalosti cesty. */
-  lastFile: string | null = null
 
   constructor(private readonly options: KidsDownloaderOptions) {
     super()
@@ -117,7 +115,6 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
       file = ''
     }
     if (!file) return { ok: false, message: errorMessage(output) }
-    this.lastFile = file
     return { ok: true, ...(await this.describe(file)) }
   }
 

@@ -57,7 +57,8 @@ export default function KidsDownloadTest(): React.JSX.Element {
   }
 
   const play = async (): Promise<void> => {
-    const opened = await kids.playLast()
+    if (!result?.ok || !result.videoId) return
+    const opened = await kids.playVideo(result.videoId)
     setPlayError(!opened.ok && opened.reason === 'error' ? opened.message : null)
   }
 
@@ -65,8 +66,8 @@ export default function KidsDownloadTest(): React.JSX.Element {
     <section className="card">
       <h2>Děti – test stahování z YouTube</h2>
       <p className="muted small">
-        Dočasný test pro přírůstek D1. Video se uloží do složky s dětskými videi jako mp4 spolu s
-        obrázkem a údaji z YouTube.
+        Dočasný test (přírůstky D1–D2). Video se uloží jako mp4 s obrázkem a údaji z YouTube a
+        zařadí se do titulu – podsložky ve složce s dětskými videi.
       </p>
       <dl className="kv">
         <dt>Složka</dt>
