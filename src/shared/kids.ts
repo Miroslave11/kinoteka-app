@@ -127,7 +127,8 @@ export function parseTmdbChoice(value: unknown): KidsTmdbChoice | undefined {
   if (typeof value !== 'object') return undefined
   const input = value as Record<string, unknown>
   const id = input['id']
-  if ((input['kind'] !== 'tv' && input['kind'] !== 'movie') || !Number.isInteger(id)) return undefined
+  if ((input['kind'] !== 'tv' && input['kind'] !== 'movie') || !Number.isInteger(id))
+    return undefined
   return (id as number) > 0 ? { kind: input['kind'], id: id as number } : undefined
 }
 

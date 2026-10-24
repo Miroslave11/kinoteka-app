@@ -117,8 +117,7 @@ const api: KinotekaApi = {
     manageTitles: () => ipcRenderer.invoke(IpcChannel.KidsManageTitles),
     manage: (action) => ipcRenderer.invoke(IpcChannel.KidsManage, action),
     searchTmdb: (query) => ipcRenderer.invoke(IpcChannel.KidsSearchTmdb, query),
-    chooseTmdb: (titleId, choice) =>
-      ipcRenderer.invoke(IpcChannel.KidsChooseTmdb, titleId, choice),
+    chooseTmdb: (titleId, choice) => ipcRenderer.invoke(IpcChannel.KidsChooseTmdb, titleId, choice),
     pickCover: (titleId) => ipcRenderer.invoke(IpcChannel.KidsPickCover, titleId)
   },
   library: {
