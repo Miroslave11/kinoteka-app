@@ -5,6 +5,7 @@ import { AppProvider, useApp } from './app/AppContext'
 import FileDetailsDialog from './components/FileDetailsDialog'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
+import UpdateBanner from './components/UpdateBanner'
 import KidsApp from './kids/KidsApp'
 import BrowsePage from './pages/BrowsePage'
 import HomePage from './pages/HomePage'
@@ -81,6 +82,7 @@ function Shell(): React.JSX.Element {
       {detailsFileId !== null && (
         <FileDetailsDialog fileId={detailsFileId} onClose={() => showDetails(null)} />
       )}
+      <UpdateBanner />
       {error && (
         <p className="notice is-error floating" onClick={() => setError(null)}>
           {error}

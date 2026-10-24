@@ -18,6 +18,13 @@ const api: KinotekaApi = {
     info: () => ipcRenderer.invoke(IpcChannel.AppInfo),
     openFolder: (which) => ipcRenderer.invoke(IpcChannel.AppOpenFolder, which)
   },
+  update: {
+    state: () => ipcRenderer.invoke(IpcChannel.UpdateState),
+    check: () => ipcRenderer.invoke(IpcChannel.UpdateCheck),
+    install: () => ipcRenderer.invoke(IpcChannel.UpdateInstall),
+    setAutoCheck: (enabled) => ipcRenderer.invoke(IpcChannel.UpdateSetAutoCheck, enabled),
+    onChanged: (listener) => subscribe(IpcChannel.UpdateChanged, listener)
+  },
   player: {
     openFile: () => ipcRenderer.invoke(IpcChannel.PlayerOpenFile),
     playFile: (request) => ipcRenderer.invoke(IpcChannel.PlayerPlayFile, request),

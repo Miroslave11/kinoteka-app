@@ -2232,3 +2232,33 @@ p.info-chip {
   gap: 3px;
   color: var(--accent);
 }
+
+/* Pruh „Je připravená nová verze“ (automatické aktualizace). */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(760px, calc(100vw - 48px));
+  padding: 10px 12px 10px 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  color: var(--text);
+  background: color-mix(in oklab, var(--bg) 70%, transparent);
+  border: 1px solid var(--accent-soft);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(16px);
+  transform: translateX(-50%);
+}
+
+.update-banner > svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.update-banner .btn {
+  flex: none;
+}

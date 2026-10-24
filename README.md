@@ -15,6 +15,10 @@ Instalátor není podepsaný, Windows SmartScreen proto při prvním spuštění
 („Další informace“ → „Přesto spustit“). Knihovna, deník a nastavení jsou v `%APPDATA%\kinoteka`
 (stejná složka jako při vývoji, takže se po instalaci zachovají) a odinstalace je nemaže.
 
+Nainstalovaná Kinotéka se sama aktualizuje z veřejného repozitáře
+[kinoteka-vydani](https://github.com/Miroslave11/kinoteka-vydani), kde jsou jen instalátory
+(zdrojový kód zůstává soukromý).
+
 ## Spuštění bez instalace
 
 Dvojklik na `Spustit Kinoteku.bat` ve složce projektu. Při prvním spuštění doinstaluje
@@ -44,3 +48,20 @@ npm run dev
 
 CI (GitHub Actions, Windows) při každém pushi spustí lint, kontrolu formátu, typů, testy a build
 a sestaví instalátor.
+
+## Vydání a automatické aktualizace
+
+1. Zvýšit verzi v `package.json` a doplnit `CHANGELOG.md`, začlenit do `main`.
+2. Tag `v<verze>` (např. `git tag v1.2.0 && git push origin v1.2.0`) spustí workflow
+   „Vydání“: sestaví instalátor a nahraje ho s `latest.yml` jako **koncept** vydání do
+   [kinoteka-vydani](https://github.com/Miroslave11/kinoteka-vydani).
+3. Koncept zkontrolovat a zveřejnit – teprve potom si ho nainstalované Kinotéky stáhnou
+   (po spuštění a každých 6 hodin) a nainstalují při zavření.
+
+Workflow potřebuje tajnou proměnnou `KINOTEKA_VYDANI_TOKEN` (Settings → Secrets and variables
+→ Actions): osobní klíč GitHubu (fine-grained) s právem _Contents: Read and write_ jen pro
+repozitář `kinoteka-vydani`. Když vyprší, stačí ho vyměnit – nainstalovaných aplikací se to
+netýká.
+
+Aktualizace jdou vyzkoušet i ve vývoji proti vlastnímu serveru se souborem `latest.yml`:
+`KINOTEKA_DEV_UPDATE_URL=http://127.0.0.1:8767/ npm run dev`.

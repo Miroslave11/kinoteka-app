@@ -58,6 +58,7 @@ import {
 } from './subtitles/externalSubtitles'
 import { OnlineSubtitlesService } from './subtitles/OnlineSubtitlesService'
 import { loadSubtitleSettings, saveSubtitleSettings } from './subtitles/subtitleSettings'
+import { registerUpdateIpc } from './update/updateIpc'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
 import { SettingsRepository } from './settings/SettingsRepository'
 import { createMainWindowOptions } from './windowOptions'
@@ -626,6 +627,7 @@ void app.whenReady().then(() => {
   )
   registerLibraryIpc(library, repository)
   registerAppInfoIpc()
+  registerUpdateIpc(settings)
   const autoScan = new AutoScan(settings, () => library.scanAll())
   autoScan.start()
   ipcMain.handle(IpcChannel.LibraryAutoScan, () => autoScan.enabled())
