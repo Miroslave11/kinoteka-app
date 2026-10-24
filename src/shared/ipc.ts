@@ -83,5 +83,7 @@ export const IpcChannel = {
   KidsResetPlayTime: 'kids:reset-play-time',
   KidsPickFolder: 'kids:pick-folder',
   KidsCheckYtDlp: 'kids:check-yt-dlp',
-  KidsOpenFolder: 'kids:open-folder'
+  KidsOpenFolder: 'kids:open-folder',
+  KidsManageTitles: 'kids:manage-titles',
+  KidsManage: 'kids:manage'
 } as const

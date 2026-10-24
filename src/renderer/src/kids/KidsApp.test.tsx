@@ -27,6 +27,7 @@ const TITLES: KidsTitle[] = [
     name: 'Prasátko Peppa',
     keywords: [],
     coverUrl: null,
+    coverVideoId: null,
     favorite: false,
     videos: [
       video(2, 1, 'Bláto', '2026-10-24T10:00:00Z'),
@@ -38,6 +39,7 @@ const TITLES: KidsTitle[] = [
     name: 'Krteček',
     keywords: [],
     coverUrl: null,
+    coverVideoId: null,
     favorite: false,
     videos: [video(3, 2, 'Krtek a autíčko', '2026-10-22T10:00:00Z')]
   }
@@ -131,5 +133,51 @@ describe('KidsApp', () => {
     renderAt('/deti')
     expect(await screen.findByText('Pohádky pro dnešek skončily.')).toBeTruthy()
     expect(api.kids.playVideo).not.toHaveBeenCalled()
+  })
+})
+
+describe('Pro rodiče → Tituly', () => {
+  beforeEach(() => {
+    api.kids.mode!.mockResolvedValue({
+      locked: true,
+      parent: true,
+      hasPin: true,
+      timeLeftSec: null
+    })
+    api.kids.manageTitles = vi.fn(async () => ({ folder: 'D:/Kids', titles: TITLES }))
+    api.kids.manage = vi.fn(async () => ({ ok: true }))
+  })
+
+  it('přejmenuje titul a přesune pohádku do jiného titulu', async () => {
+    const { container } = renderAt('/deti/rodice/tituly')
+    const name = (await screen.findByDisplayValue('Prasátko Peppa')) as HTMLInputElement
+    expect(screen.getByText('D:/Kids\\Prasátko Peppa')).toBeTruthy()
+    fireEvent.change(name, { target: { value: 'Peppa' } })
+    fireEvent.click(screen.getByText('Přejmenovat'))
+    await vi.waitFor(() =>
+      expect(api.kids.manage).toHaveBeenCalledWith({
+        kind: 'rename-title',
+        titleId: 1,
+        name: 'Peppa'
+      })
+    )
+    const select = container.querySelector('.k-vid select') as HTMLSelectElement
+    fireEvent.change(select, { target: { value: '2' } })
+    await vi.waitFor(() =>
+      expect(api.kids.manage).toHaveBeenCalledWith({ kind: 'move-video', videoId: 2, titleId: 2 })
+    )
+  })
+
+  it('mazání do Koše chce druhé kliknutí, chyba se ukáže', async () => {
+    api.kids.manage!.mockResolvedValue({ ok: false, message: 'Soubor je otevřený.' })
+    const { container } = renderAt('/deti/rodice/tituly')
+    await screen.findByDisplayValue('Prasátko Peppa')
+    const trash = container.querySelector('.k-vid .k-trash') as HTMLButtonElement
+    fireEvent.click(trash)
+    expect(api.kids.manage).not.toHaveBeenCalled()
+    expect(trash.textContent).toBe('Smazat?')
+    fireEvent.click(trash)
+    expect(await screen.findByText('Soubor je otevřený.')).toBeTruthy()
+    expect(api.kids.manage).toHaveBeenCalledWith({ kind: 'trash-video', videoId: 2 })
   })
 })

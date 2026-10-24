@@ -559,7 +559,9 @@ void app.whenReady().then(() => {
     makeThumbnail: existsSync(ffmpeg)
       ? (input, atSec, output) => videoThumbnail(ffmpeg, input, atSec, output)
       : undefined,
-    thumbnailDir: join(app.getPath('userData'), 'cache', 'kids')
+    thumbnailDir: join(app.getPath('userData'), 'cache', 'kids'),
+    trash: (path) => shell.trashItem(path),
+    downloadingInto: (folder): boolean => kidsQueue.isDownloadingInto(folder)
   })
   kidsLibrary.on('changed', () => broadcast(IpcChannel.KidsChanged))
   const kidsQueue = new KidsDownloadQueue({

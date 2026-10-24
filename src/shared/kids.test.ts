@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { parseDownloadRequest, parseYoutubeLink, parseYoutubeUrl } from './kids'
+import {
+  cleanKeywords,
+  parseDownloadRequest,
+  parseManageAction,
+  parseYoutubeLink,
+  parseYoutubeUrl
+} from './kids'
 
 describe('parseYoutubeUrl', () => {
   const canonical = 'https://www.youtube.com/watch?v=jNQXAC9IVRw'
@@ -76,5 +82,40 @@ describe('parseDownloadRequest', () => {
     expect(parseDownloadRequest({ ...video, title: 'x'.repeat(121) })).toBeNull()
     expect(parseDownloadRequest({ ...video, quality: '4k' })).toBeNull()
     expect(parseDownloadRequest(null)).toBeNull()
+  })
+})
+
+describe('parseManageAction', () => {
+  it('platné požadavky projdou, klíčová slova se uklidí', () => {
+    expect(parseManageAction({ kind: 'rename-title', titleId: 3, name: ' Bluey ' })).toEqual({
+      kind: 'rename-title',
+      titleId: 3,
+      name: 'Bluey'
+    })
+    expect(
+      parseManageAction({ kind: 'set-keywords', titleId: 3, keywords: [' peppa ', 'PEPPA', '', 5] })
+    ).toEqual({ kind: 'set-keywords', titleId: 3, keywords: ['peppa'] })
+    expect(parseManageAction({ kind: 'set-cover', titleId: 3, videoId: null })).toEqual({
+      kind: 'set-cover',
+      titleId: 3,
+      videoId: null
+    })
+    expect(parseManageAction({ kind: 'move-video', videoId: 7, titleId: 3 })).toEqual({
+      kind: 'move-video',
+      videoId: 7,
+      titleId: 3
+    })
+  })
+
+  it('neplatné odmítne', () => {
+    expect(parseManageAction({ kind: 'rename-title', titleId: 3, name: '   ' })).toBeNull()
+    expect(parseManageAction({ kind: 'trash-video', videoId: '7' })).toBeNull()
+    expect(parseManageAction({ kind: 'move-video', videoId: 7 })).toBeNull()
+    expect(parseManageAction({ kind: 'set-cover', titleId: 3 })).toBeNull()
+    expect(parseManageAction({ kind: 'smazat-vse' })).toBeNull()
+  })
+
+  it('nejvýš 20 klíčových slov', () => {
+    expect(cleanKeywords(Array.from({ length: 30 }, (_, i) => `slovo ${i}`))).toHaveLength(20)
   })
 })

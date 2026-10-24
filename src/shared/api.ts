@@ -21,6 +21,8 @@ import type { JournalEntry, ManualEntry } from './journal'
 import type {
   KidsChallenge,
   KidsDownloadRequest,
+  KidsManageAction,
+  KidsManageResult,
   KidsPreviewResult,
   KidsQueueItem,
   KidsMode,
@@ -195,6 +197,10 @@ export interface KinotekaApi {
     pickFolder(): Promise<string | null>
     checkYtDlp(): Promise<{ ok: true; version: string } | { ok: false; message: string }>
     openFolder(): Promise<void>
+    /** Všechny tituly včetně prázdných a cesta ke složce Kids (správa titulů). */
+    manageTitles(): Promise<{ folder: string; titles: KidsTitle[] }>
+    /** Přejmenování, obrázek, klíčová slova, přesun a mazání do Koše (jen rodiče). */
+    manage(action: KidsManageAction): Promise<KidsManageResult>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>

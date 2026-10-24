@@ -7,8 +7,10 @@ import {
   isValidPin,
   parseKidsSettings,
   parseDownloadRequest,
+  parseManageAction,
   parseYoutubeLink,
   type KidsChallenge,
+  type KidsManageResult,
   type KidsPreviewResult,
   type KidsQueueItem,
   type KidsMode,
@@ -170,6 +172,20 @@ export function registerKidsIpc({
     repository.setFavorite(kind, id as number, on)
     broadcast(IpcChannel.KidsChanged)
   })
+
+  // ---------- správa titulů (část Pro rodiče) ----------
+  ipcMain.handle(IpcChannel.KidsManageTitles, () => ({
+    folder: kidsFolder(settings),
+    titles: guard.parentAccess() ? repository.list({ includeEmpty: true }) : []
+  }))
+  ipcMain.handle(
+    IpcChannel.KidsManage,
+    async (_event, value: unknown): Promise<KidsManageResult> => {
+      if (!guard.parentAccess()) return { ok: false, message: 'Upravovat můžou jen rodiče.' }
+      const action = parseManageAction(value)
+      return action ? library.manage(action) : { ok: false, message: 'Neplatný požadavek.' }
+    }
+  )
 
   ipcMain.handle(IpcChannel.KidsOpenFolder, async () => {
     await shell.openPath(kidsFolder(settings))

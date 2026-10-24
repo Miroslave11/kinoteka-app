@@ -246,5 +246,10 @@ export const MIGRATIONS: readonly string[] = [
     created_at TEXT NOT NULL,
     PRIMARY KEY (kind, ref_id)
   );
+  `,
+
+  // 15 – dětská část: obrázek titulu vybraný rodičem
+  `
+  ALTER TABLE kids_title ADD COLUMN cover_video_id INTEGER REFERENCES kids_video (id) ON DELETE SET NULL;
   `
 ]

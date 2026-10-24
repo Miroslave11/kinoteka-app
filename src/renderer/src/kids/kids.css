@@ -1209,3 +1209,239 @@
 .k-x:hover {
   background: rgb(127 140 170 / 0.14);
 }
+
+/* ---------- Pro rodiče → Tituly ---------- */
+.k-titles {
+  grid-template-columns: minmax(260px, 0.55fr) minmax(0, 1.45fr);
+}
+
+@media (max-width: 1100px) {
+  .k-titles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.k-panel-h small {
+  margin-left: auto;
+  font-family: Nunito, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--k-soft);
+}
+
+.k-tlist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 58vh;
+  overflow-y: auto;
+}
+
+.k-trow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 18px;
+  font-weight: 900;
+  text-align: left;
+  color: var(--k-ink);
+}
+
+.k-trow:hover {
+  background: rgb(127 140 170 / 0.08);
+}
+
+.k-trow.on {
+  background: rgb(155 123 255 / 0.15);
+}
+
+.k-trow small {
+  margin-left: auto;
+  font-weight: 800;
+  color: var(--k-soft);
+}
+
+.k-mini {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
+}
+
+.k-new {
+  margin-top: 14px;
+}
+
+.k-title-form {
+  grid-template-columns: 200px minmax(0, 1fr);
+  margin-top: 0;
+}
+
+.k-title-form > label small {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.k-covers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.k-covers button {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  background-size: cover;
+  background-position: center;
+}
+
+.k-covers button.on {
+  border-color: var(--k-grape);
+}
+
+.k-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.k-chips span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 99px;
+  background: rgb(155 123 255 / 0.14);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.k-chips span button {
+  display: grid;
+  place-items: center;
+  color: var(--k-soft);
+}
+
+.k-chip-add {
+  width: 120px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  border: 2px dashed var(--k-line);
+  background: none;
+  color: var(--k-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  outline: 0;
+}
+
+.k-chip-add:focus {
+  border-color: var(--k-grape);
+}
+
+.k-path {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.k-vids {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 18px 0 12px;
+}
+
+.k-vid {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) 70px 210px auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgb(127 140 170 / 0.06);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.k-vid-thumb {
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+}
+
+.k-vid-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.k-vid-name small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.k-vid small {
+  color: var(--k-soft);
+}
+
+.k-vid select.k-field {
+  height: 38px;
+  border-radius: 12px;
+  font-size: 13px;
+  appearance: auto;
+  cursor: pointer;
+}
+
+.k-trash {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 99px;
+  font-weight: 800;
+  color: var(--k-soft);
+  white-space: nowrap;
+}
+
+.k-trash:hover {
+  background: rgb(229 72 77 / 0.1);
+  color: #e5484d;
+}
+
+.k-trash.asking {
+  background: #e5484d !important;
+  color: #fff !important;
+}
+
+.k-actions .k-trash {
+  height: 44px;
+  padding: 0 18px;
+}
+
+.k-top-notice {
+  margin: 0 0 14px;
+}
+
+.k-loose {
+  margin: 0;
+}
+
+@media (max-width: 1400px) {
+  .k-vid {
+    grid-template-columns: 70px minmax(0, 1fr) 56px 170px auto;
+  }
+}

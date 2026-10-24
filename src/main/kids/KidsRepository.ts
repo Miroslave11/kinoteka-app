@@ -28,7 +28,25 @@ export interface StoredTitle {
   id: number
   folder: string
   keywords: string[]
+  coverVideoId: number | null
 }
+
+/** Soubor videa v databázi (pro přesun a mazání). */
+export interface StoredVideo {
+  id: number
+  path: string
+  titleId: number | null
+  size: number
+  mtimeMs: number
+}
+
+const storedVideo = (row: Row): StoredVideo => ({
+  id: Number(row['id']),
+  path: String(row['path']),
+  titleId: row['title_id'] === null ? null : Number(row['title_id']),
+  size: Number(row['size']),
+  mtimeMs: Number(row['mtime_ms'])
+})
 
 function parseKeywords(value: unknown): string[] {
   try {
@@ -50,13 +68,55 @@ export class KidsRepository {
 
   titles(): StoredTitle[] {
     return this.db
-      .prepare('SELECT id, folder, keywords FROM kids_title ORDER BY folder')
+      .prepare('SELECT id, folder, keywords, cover_video_id FROM kids_title ORDER BY folder')
       .all()
       .map((row) => ({
         id: Number(row['id']),
         folder: String(row['folder']),
-        keywords: parseKeywords(row['keywords'])
+        keywords: parseKeywords(row['keywords']),
+        coverVideoId: row['cover_video_id'] === null ? null : Number(row['cover_video_id'])
       }))
+  }
+
+  title(id: number): StoredTitle | null {
+    return this.titles().find((t) => t.id === id) ?? null
+  }
+
+  /** Nový název titulu = nový název podsložky (složku přejmenuje knihovna). */
+  renameTitle(id: number, folder: string): void {
+    this.db.prepare('UPDATE kids_title SET folder = ? WHERE id = ?').run(folder, id)
+  }
+
+  setKeywords(id: number, keywords: readonly string[]): void {
+    this.db
+      .prepare('UPDATE kids_title SET keywords = ? WHERE id = ?')
+      .run(JSON.stringify(keywords), id)
+  }
+
+  /** Obrázek titulu podle vybraného videa; null = obrázek prvního videa. */
+  setCover(id: number, videoId: number | null): void {
+    this.db.prepare('UPDATE kids_title SET cover_video_id = ? WHERE id = ?').run(videoId, id)
+  }
+
+  /** Smaže titul i záznamy jeho videí (soubory zahodí knihovna). */
+  deleteTitle(id: number): void {
+    this.removeVideos(this.titleVideos(id).map((v) => v.id))
+    this.db.prepare('DELETE FROM kids_title WHERE id = ?').run(id)
+    this.setFavorite('title', id, false)
+  }
+
+  titleVideos(titleId: number): StoredVideo[] {
+    return this.db
+      .prepare('SELECT id, path, title_id, size, mtime_ms FROM kids_video WHERE title_id = ?')
+      .all(titleId)
+      .map(storedVideo)
+  }
+
+  video(id: number): StoredVideo | null {
+    const row = this.db
+      .prepare('SELECT id, path, title_id, size, mtime_ms FROM kids_video WHERE id = ?')
+      .get(id)
+    return row ? storedVideo(row) : null
   }
 
   /** Titul pro podsložku – založí ho, pokud ještě není. */
@@ -191,9 +251,10 @@ export class KidsRepository {
 
   /**
    * Tituly s videi (nejnověji přidané video první); videa, která se nepodařilo zařadit,
-   * jsou na konci jako titul „Ostatní“. Obrázek titulu = obrázek nejstaršího videa.
+   * jsou na konci jako titul „Ostatní“. Obrázek titulu = vybraný rodičem, jinak obrázek
+   * nejstaršího videa. Prázdné tituly (bez videí) jen pro správu titulů (`includeEmpty`).
    */
-  list(): KidsTitle[] {
+  list({ includeEmpty = false }: { includeEmpty?: boolean } = {}): KidsTitle[] {
     const titles = this.titles()
     const keywordsOf = new Map<number, TitleKeywords>(
       titles.map((t) => [t.id, { name: t.folder, keywords: t.keywords }])
@@ -244,15 +305,20 @@ export class KidsRepository {
       videos.set(titleId, [...(videos.get(titleId) ?? []), video])
     }
     const result: KidsTitle[] = titles
-      .filter((t) => videos.has(t.id))
-      .map((t) => ({
-        id: t.id,
-        name: t.folder,
-        keywords: t.keywords,
-        coverUrl: covers.get(t.id) ?? null,
-        videos: videos.get(t.id)!,
-        favorite: favorites.title.has(t.id)
-      }))
+      .filter((t) => includeEmpty || videos.has(t.id))
+      .map((t) => {
+        const own = videos.get(t.id) ?? []
+        const cover = own.find((v) => v.id === t.coverVideoId && v.thumbnailUrl)
+        return {
+          id: t.id,
+          name: t.folder,
+          keywords: t.keywords,
+          coverUrl: cover?.thumbnailUrl ?? covers.get(t.id) ?? null,
+          coverVideoId: cover ? t.coverVideoId : null,
+          videos: own,
+          favorite: favorites.title.has(t.id)
+        }
+      })
       .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
     const loose = videos.get(null)
     if (loose)
@@ -261,6 +327,7 @@ export class KidsRepository {
         name: 'Ostatní',
         keywords: [],
         coverUrl: covers.get(null) ?? null,
+        coverVideoId: null,
         videos: loose,
         favorite: false
       })
