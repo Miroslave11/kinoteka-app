@@ -1424,6 +1424,11 @@ option {
   opacity: 0.45;
 }
 
+/* Díl, který teprve vyjde – méně zašedlý, termín zvýrazněný. */
+.ep.is-missing.is-upcoming {
+  opacity: 0.75;
+}
+
 .ep-still .artwork {
   z-index: 0;
 }
@@ -1542,6 +1547,13 @@ option {
 
 p.info-chip {
   width: fit-content;
+}
+
+.info-chip.airing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
 }
 
 /* ---------- IMDb ---------- */
@@ -1730,7 +1742,9 @@ p.info-chip {
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
 }
 
-.ep-side .accent {
+.ep-side .accent,
+.ep-info small.accent,
+.poster-card .cap .accent {
   color: var(--accent);
 }
 

@@ -27,6 +27,24 @@ export interface TitleMetadata {
   tmdbUrl: string
   /** Jen seriály: série a díly podle TMDB (i ty, které na disku nejsou). */
   seasons: MetadataSeason[]
+  /** Jen seriály: jestli se ještě vysílá a kdy vyjde další díl. Starší uložené údaje ho nemají. */
+  airing?: ShowAiring
+}
+
+/** Stav vysílání seriálu podle TMDB. */
+export interface ShowAiring {
+  /** running = pokračuje nebo se chystá, ended = skončil, canceled = zrušen. */
+  status: 'running' | 'ended' | 'canceled'
+  /** Nejbližší ohlášený díl. */
+  nextEpisode: AiringEpisode | null
+}
+
+export interface AiringEpisode {
+  season: number
+  episode: number
+  name: string | null
+  /** Datum původní premiéry (RRRR-MM-DD). */
+  airDate: string
 }
 
 export interface Person {

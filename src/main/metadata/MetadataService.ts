@@ -167,6 +167,11 @@ export class MetadataService extends EventEmitter<MetadataServiceEvents> {
         if (this.catalog.mergeByTmdb()) this.catalog.rebuild()
       }
     } catch (error) {
+      // Pravidelná obnova běžícího seriálu nesmí kvůli výpadku sítě shodit platné údaje.
+      if (request.background) {
+        this.catalog.postponeRefresh(request.id)
+        return
+      }
       const message =
         error instanceof TmdbError ? error.message : `Chyba: ${(error as Error).message}`
       this.catalog.setMatchStatus(request.id, 'error', message)

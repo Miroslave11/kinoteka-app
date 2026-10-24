@@ -29,6 +29,7 @@ Schváleno: 2026-10-22
 9. **Mazání** – s potvrzením, včetně přidružených titulků, i celé série.
 10. **Deník zhlédnutých** – historie (kdy, kolikrát), hodnocení 1–5, poznámka, ruční „viděl jsem“, filtr.
 11. **Stahování titulků z internetu** _(doplněno 2026-10-23 na přání, původně mimo V1)_ – OpenSubtitles.com přes oficiální API s vlastním bezplatným klíčem; hledání podle TMDB/IMDb ID, série a dílu i otisku souboru, uložení vedle filmu.
+12. **Termíny dalších dílů** _(doplněno 2026-10-24 na přání)_ – podle TMDB: kdy vyjde další díl nebo nová série běžícího seriálu, případně že seriál skončil nebo byl zrušen (detail seriálu, seznam dílů, řada „Brzy vyjde“ na Domů); údaje běžících seriálů se obnovují jednou denně.
 
 **Design:** tmavé téma ve stylu Plex, dynamické barvy z plakátu, na pozadí krátké tiché klipy vyříznuté z vlastního souboru (ffmpeg), HD pozadí z TMDB, vyhledávání, řazení, filtry.
 
