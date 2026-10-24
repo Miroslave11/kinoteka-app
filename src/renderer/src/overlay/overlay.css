@@ -636,3 +636,210 @@ button {
     transform: rotate(360deg);
   }
 }
+
+/* ---------- Dětské ovládání (pohádky z dětské části) ---------- */
+.kids-overlay {
+  position: relative;
+  height: 100%;
+  cursor: default;
+  font-family: 'Nunito Variable', Nunito, system-ui, sans-serif;
+  color: #fff;
+}
+
+.kids-overlay.is-idle {
+  cursor: none;
+}
+
+.kids-overlay .ko-top,
+.kids-overlay .ko-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transition: opacity 0.3s;
+}
+
+.kids-overlay.is-idle .ko-top,
+.kids-overlay.is-idle .ko-bottom {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ko-top {
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 28px 36px 60px;
+  background: linear-gradient(rgb(0 0 0 / 0.5), transparent);
+}
+
+.ko-top h1 {
+  margin: 0;
+  font-family: 'Fredoka Variable', Fredoka, sans-serif;
+  font-size: 30px;
+  font-weight: 600;
+  text-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
+}
+
+.ko-bottom {
+  bottom: 0;
+  padding: 80px 60px 34px;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.55));
+}
+
+.ko-round {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.95);
+  color: #1f2a44;
+  box-shadow: 0 6px 0 rgb(0 0 0 / 0.18);
+  cursor: pointer;
+}
+
+.ko-round:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ko-back {
+  width: 76px;
+  height: 76px;
+}
+
+.ko-main {
+  width: 128px;
+  height: 128px;
+  background: #ffc93c;
+}
+
+.ko-heart {
+  position: absolute;
+  right: 0;
+  width: 76px;
+  height: 76px;
+}
+
+.ko-heart.is-on {
+  color: #ff4f7a;
+}
+
+.ko-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  margin-top: 26px;
+}
+
+.ko-track {
+  position: relative;
+  height: 22px;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.35);
+  cursor: pointer;
+}
+
+.ko-track i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+  background: #ffc93c;
+}
+
+.ko-track b {
+  position: absolute;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 6px solid #ffc93c;
+}
+
+.ko-ended {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -60%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 30px 36px;
+  border-radius: 34px;
+  background: rgb(255 255 255 / 0.96);
+  color: #1f2a44;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.35);
+}
+
+.ko-next-label {
+  font-family: 'Fredoka Variable', Fredoka, sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.ko-next {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px;
+  border: 0;
+  border-radius: 26px;
+  background: #f3f1fb;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ko-next-thumb {
+  width: 200px;
+  aspect-ratio: 16 / 9;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #b9c8ff, #ffb3d6);
+  background-size: cover;
+  background-position: center;
+}
+
+.ko-next b {
+  max-width: 260px;
+  font-size: 20px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.ko-play-small {
+  width: 64px;
+  height: 64px;
+  background: #ff6b6b;
+  color: #fff;
+}
+
+.ko-ended-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.ko-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 58px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 99px;
+  background: #ece9f8;
+  color: #1f2a44;
+  font-family: 'Fredoka Variable', Fredoka, sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+}

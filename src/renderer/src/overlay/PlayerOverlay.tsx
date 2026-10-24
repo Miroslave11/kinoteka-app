@@ -19,6 +19,7 @@ import {
   type PlayerCommand,
   type PlayerState
 } from '../../../shared/player'
+import KidsOverlay from './KidsOverlay'
 import SeekBar from './SeekBar'
 import OnlineSubtitlesPanel from './OnlineSubtitlesPanel'
 import ShortcutHelp from './ShortcutHelp'
@@ -117,6 +118,8 @@ export default function PlayerOverlay(): React.JSX.Element {
   }
 
   const passthrough = state.audio?.passthrough === true
+  if (state.kids) return <KidsOverlay state={state} kids={state.kids} />
+
   const controlsProps = {
     onMouseEnter: () => setOverControls(true),
     onMouseLeave: () => setOverControls(false),

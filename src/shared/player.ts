@@ -25,6 +25,18 @@ export interface PlayerState {
   subDelay: number
   /** Upozornění, které overlay na chvíli ukáže. */
   notice: string | null
+  /** Pohádka z dětské části – overlay ukáže dětské ovládání; null = běžné přehrávání. */
+  kids: KidsPlayerInfo | null
+}
+
+export interface KidsPlayerInfo {
+  /** V titulu je předchozí pohádka. */
+  hasPrevious: boolean
+  /** Další pohádka titulu; null = tahle je poslední. */
+  next: { name: string; thumbnailUrl: string | null } | null
+  /** Po konci se další pohádka spustí sama. */
+  autoplayNext: boolean
+  favorite: boolean
 }
 
 export interface AudioOutputInfo {
@@ -57,7 +69,8 @@ export const INITIAL_PLAYER_STATE: PlayerState = {
   audioTracks: [],
   subtitleTracks: [],
   subDelay: 0,
-  notice: null
+  notice: null,
+  kids: null
 }
 
 export type PlayerCommand =
@@ -71,6 +84,9 @@ export type PlayerCommand =
   | { type: 'escape' }
   | { type: 'close' }
   | { type: 'play-next' }
+  /** Dětský přehrávač: předchozí pohádka a srdíčko. */
+  | { type: 'play-previous' }
+  | { type: 'toggle-favorite' }
   | { type: 'set-audio-track'; id: number }
   /** null = titulky vypnout */
   | { type: 'set-subtitle-track'; id: number | null }
@@ -101,6 +117,8 @@ export function parsePlayerCommand(value: unknown): PlayerCommand | null {
     case 'escape':
     case 'close':
     case 'play-next':
+    case 'play-previous':
+    case 'toggle-favorite':
     case 'load-subtitle':
       return { type: command['type'] }
     case 'set-pause':

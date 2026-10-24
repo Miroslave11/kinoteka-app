@@ -1,9 +1,10 @@
 import '@fontsource-variable/fredoka'
 import '@fontsource-variable/nunito'
 import './kids.css'
-import { ArrowLeft, Home, Star } from 'lucide-react'
+import { ArrowLeft, Heart, Home, Star } from 'lucide-react'
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { KidsDataProvider, useKids } from './KidsData'
+import KidsFavoritesPage from './KidsFavoritesPage'
 import KidsHome from './KidsHome'
 import { ParentsButton, Rainbow } from './KidsParts'
 import KidsTitlePage from './KidsTitlePage'
@@ -44,6 +45,9 @@ function KidsShell(): React.JSX.Element {
           <NavLink to="/deti" end className={pill}>
             <Home size={26} strokeWidth={2.4} /> Domů
           </NavLink>
+          <NavLink to="/deti/oblibene" className={pill}>
+            <Heart size={26} strokeWidth={2.4} /> Oblíbené
+          </NavLink>
         </nav>
         {/* Rodičovská brána přijde v přírůstku D5 – zatím rovnou zpět do Kinotéky. */}
         <ParentsButton onClick={() => navigate('/')} />
@@ -52,6 +56,7 @@ function KidsShell(): React.JSX.Element {
         <Routes>
           <Route path="/" element={<KidsHome />} />
           <Route path="/titul/:id" element={<KidsTitlePage />} />
+          <Route path="/oblibene" element={<KidsFavoritesPage />} />
         </Routes>
       </main>
     </div>
