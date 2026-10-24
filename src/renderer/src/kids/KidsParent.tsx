@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router'
 import { useKids } from './KidsData'
 import KidsParentDownload from './KidsParentDownload'
 import KidsParentSettings from './KidsParentSettings'
+import KidsParentTitles from './KidsParentTitles'
 
 /**
  * Část Pro rodiče (za rodičovskou branou): stahování, správa titulů a nastavení.
@@ -56,10 +57,7 @@ export default function KidsParent(): React.JSX.Element {
       <Routes>
         <Route path="/" element={<Navigate to="stahovani" replace />} />
         <Route path="/stahovani" element={<KidsParentDownload />} />
-        <Route
-          path="/tituly"
-          element={<div className="k-panel">Správa titulů přijde v dalším kroku.</div>}
-        />
+        <Route path="/tituly" element={<KidsParentTitles />} />
         <Route path="/nastaveni" element={<KidsParentSettings />} />
       </Routes>
     </div>

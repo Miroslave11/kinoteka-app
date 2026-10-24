@@ -1,12 +1,12 @@
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
-import { mkdir, readdir, readFile, rename, stat } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname, extname, join, relative, sep } from 'node:path'
-import type { KidsScanResult } from '../../shared/kids'
+import type { KidsManageAction, KidsManageResult, KidsScanResult } from '../../shared/kids'
 import { isVideoFile } from '../../shared/library'
 import { diffScan, isIgnoredDir, listVideoFiles, type FoundFile } from '../library/scanner'
 import { deriveTitleName, matchTitle, safeFolderName, type VideoMeta } from './classify'
-import type { KidsRepository, VideoRecord } from './KidsRepository'
+import type { KidsRepository, StoredVideo, VideoRecord } from './KidsRepository'
 
 interface KidsLibraryEvents {
   changed: []
@@ -22,7 +22,20 @@ export interface KidsLibraryOptions {
   makeThumbnail?: (input: string, atSec: number, output: string) => Promise<void>
   /** Kam ukládat obrázky vytvořené z videí. */
   thumbnailDir: string
+  /** Do Koše (`shell.trashItem`). */
+  trash?: (path: string) => Promise<void>
+  /** Stahuje se (nebo na to čeká) něco do této podsložky – tu nejde přejmenovat ani smazat. */
+  downloadingInto?: (folder: string) => boolean
   now?: () => Date
+}
+
+/** Srozumitelná zpráva k chybě při práci se soubory. */
+export function fileError(error: unknown): string {
+  const code = (error as NodeJS.ErrnoException).code
+  if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES')
+    return 'Soubor je otevřený v jiném programu (třeba v přehrávači) – zavři ho a zkus to znovu.'
+  if (code === 'ENOENT') return 'Soubor už na disku není – zkus složku projít znovu.'
+  return (error as Error).message
 }
 
 /** Rozpracované soubory yt-dlp: „x.f398.mp4“ (obraz bez zvuku), „x.temp.mp4“ (spojování). */
@@ -62,6 +75,8 @@ async function readVideoInfo(
  */
 export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
   private running: Promise<KidsScanResult> | null = null
+  /** Sken a úpravy titulů se střídají – nikdy neběží dvě práce se soubory naráz. */
+  private lock: Promise<unknown> = Promise.resolve()
 
   constructor(
     private readonly repository: KidsRepository,
@@ -72,7 +87,7 @@ export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
 
   /** Projde složku; souběžná volání se spojí. */
   scan(): Promise<KidsScanResult> {
-    this.running ??= this.doScan().finally(() => {
+    this.running ??= this.exclusive(() => this.doScan()).finally(() => {
       this.running = null
     })
     return this.running
@@ -80,6 +95,127 @@ export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
 
   private now(): Date {
     return this.options.now?.() ?? new Date()
+  }
+
+  private exclusive<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.lock.then(work)
+    this.lock = result.catch(() => undefined)
+    return result
+  }
+
+  /** Úprava titulů a videí z části Pro rodiče (soubory na disku i záznamy). */
+  async manage(action: KidsManageAction): Promise<KidsManageResult> {
+    let result: KidsManageResult
+    try {
+      const message = await this.exclusive(() => this.apply(action))
+      result = message ? { ok: false, message } : { ok: true }
+    } catch (error) {
+      result = { ok: false, message: fileError(error) }
+    }
+    this.emit('changed')
+    return result
+  }
+
+  /** Vrací chybovou zprávu, nebo null = hotovo. */
+  private async apply(action: KidsManageAction): Promise<string | null> {
+    const root = this.options.folder()
+    const repo = this.repository
+    const busy = (folder: string): boolean => this.options.downloadingInto?.(folder) ?? false
+    const BUSY = 'Do titulu se právě stahuje – počkej, až stahování doběhne.'
+    const EXISTS = 'Titul s tímto názvem už je.'
+
+    switch (action.kind) {
+      case 'create-title': {
+        const folder = safeFolderName(action.name)
+        if (!folder) return 'Neplatný název.'
+        if (existsSync(join(root, folder))) return EXISTS
+        await mkdir(join(root, folder), { recursive: true })
+        repo.ensureTitle(folder, this.now())
+        return null
+      }
+      case 'rename-title': {
+        const title = repo.title(action.titleId)
+        if (!title) return 'Titul už neexistuje.'
+        const folder = safeFolderName(action.name)
+        if (!folder) return 'Neplatný název.'
+        if (folder === title.folder) return null
+        if (busy(title.folder)) return BUSY
+        const sameFolder = folder.toLowerCase() === title.folder.toLowerCase()
+        if (!sameFolder && existsSync(join(root, folder))) return EXISTS
+        const from = join(root, title.folder)
+        const to = join(root, folder)
+        await rename(from, to)
+        repo.renameTitle(title.id, folder)
+        // Videa si nechají id – pozice, zhlédnutí i oblíbené zůstanou.
+        for (const video of repo.titleVideos(title.id))
+          await this.relocate(video, join(to, relative(from, video.path)))
+        return null
+      }
+      case 'set-keywords': {
+        if (!repo.title(action.titleId)) return 'Titul už neexistuje.'
+        repo.setKeywords(action.titleId, action.keywords)
+        return null
+      }
+      case 'set-cover': {
+        if (!repo.title(action.titleId)) return 'Titul už neexistuje.'
+        if (action.videoId !== null && repo.video(action.videoId)?.titleId !== action.titleId)
+          return 'Video už v titulu není.'
+        repo.setCover(action.titleId, action.videoId)
+        return null
+      }
+      case 'trash-title': {
+        const title = repo.title(action.titleId)
+        if (!title) return null
+        if (busy(title.folder)) return BUSY
+        const videos = repo.titleVideos(title.id)
+        if (existsSync(join(root, title.folder))) await this.trash(join(root, title.folder))
+        repo.deleteTitle(title.id)
+        await this.removeGeneratedThumbnails(videos)
+        return null
+      }
+      case 'move-video': {
+        const video = repo.video(action.videoId)
+        if (!video) return 'Video už ve složce není.'
+        const target = repo.title(action.titleId)
+        if (!target) return 'Titul už neexistuje.'
+        if (video.titleId === target.id) return null
+        const targetDir = join(root, target.folder)
+        await this.moveWithSidecars(video.path, await readdir(dirname(video.path)), targetDir)
+        await this.relocate(video, join(targetDir, basename(video.path)))
+        return null
+      }
+      case 'trash-video': {
+        const video = repo.video(action.videoId)
+        if (!video) return null
+        // Nejdřív video – když je otevřené v přehrávači, obrázek a údaje zůstanou u něj.
+        if (existsSync(video.path)) await this.trash(video.path)
+        const dir = dirname(video.path)
+        const base = basename(withoutExtension(video.path))
+        for (const name of await readdir(dir).catch(() => []))
+          if (name.startsWith(`${base}.`)) await this.trash(join(dir, name))
+        repo.removeVideos([video.id])
+        await this.removeGeneratedThumbnails([video])
+        return null
+      }
+    }
+  }
+
+  private async trash(path: string): Promise<void> {
+    if (!this.options.trash) throw new Error('Koš není k dispozici.')
+    await this.options.trash(path)
+  }
+
+  /** Video je na disku jinde – nový záznam (titul, obrázek), stejné id. */
+  private async relocate(video: StoredVideo, path: string): Promise<void> {
+    this.repository.updateVideo(
+      video.id,
+      await this.record(this.options.folder(), { path, size: video.size, mtimeMs: video.mtimeMs })
+    )
+  }
+
+  private async removeGeneratedThumbnails(videos: readonly StoredVideo[]): Promise<void> {
+    for (const video of videos)
+      await rm(join(this.options.thumbnailDir, `${video.id}.jpg`), { force: true })
   }
 
   private async doScan(): Promise<KidsScanResult> {
@@ -115,7 +251,10 @@ export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
   }
 
   /** Záznam o videu: titul podle podsložky, údaje z `.info.json`, obrázek vedle videa. */
-  private async record(root: string, file: FoundFile): Promise<VideoRecord> {
+  private async record(
+    root: string,
+    file: Pick<FoundFile, 'path' | 'size' | 'mtimeMs'>
+  ): Promise<VideoRecord> {
     const info = await readVideoInfo(file.path)
     const folder = relative(root, file.path).split(sep)
     const base = withoutExtension(file.path)
@@ -180,7 +319,7 @@ export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
       (name) => name === basename(path) || name.startsWith(`${base}.`)
     )
     if (related.some((name) => existsSync(join(targetDir, name))))
-      throw new Error('v cílové složce už stejný soubor je')
+      throw new Error('V cílové složce už stejný soubor je.')
     // Video poslední – kdyby se přesun přerušil, zůstane ve složce Kids a zkusí se znovu.
     const ordered = [...related.filter((n) => n !== basename(path)), basename(path)]
     for (const name of ordered) await rename(join(dirname(path), name), join(targetDir, name))

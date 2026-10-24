@@ -168,6 +168,15 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
     this.emit('changed')
   }
 
+  /** Stahuje se (nebo čeká) něco do této podsložky titulu? */
+  isDownloadingInto(folder: string): boolean {
+    return this.queue.some(
+      (item) =>
+        (item.status === 'waiting' || item.status === 'downloading') &&
+        item.title.toLowerCase() === folder.toLowerCase()
+    )
+  }
+
   /** Odebere hotová, přeskočená a chybná videa ze seznamu. */
   clearFinished(): void {
     this.queue = this.queue.filter(

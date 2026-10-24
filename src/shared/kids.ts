@@ -60,6 +60,8 @@ export interface KidsTitle {
   name: string
   keywords: string[]
   coverUrl: string | null
+  /** Obrázek titulu vybraný rodičem; null = obrázek prvního videa. */
+  coverVideoId: number | null
   /** Pohádky v pořadí, jak přibyly (= pořadí přehrávání „další pohádka“). */
   videos: KidsVideo[]
   favorite: boolean
@@ -268,3 +270,69 @@ export interface KidsQueueItem {
 /** Obrázek videa z YouTube přes aplikaci (okno nesmí načítat cizí adresy). */
 export const youtubeThumbnailUrl = (videoId: string): string =>
   `kinoteka-media://ytthumb/${videoId}`
+
+// ---------- správa titulů (část Pro rodiče) ----------
+
+export const MAX_KEYWORDS = 20
+const MAX_KEYWORD_LENGTH = 40
+const MAX_TITLE_NAME = 120
+
+export type KidsManageAction =
+  | { kind: 'create-title'; name: string }
+  | { kind: 'rename-title'; titleId: number; name: string }
+  | { kind: 'set-keywords'; titleId: number; keywords: string[] }
+  /** videoId null = obrázek prvního videa. */
+  | { kind: 'set-cover'; titleId: number; videoId: number | null }
+  | { kind: 'trash-title'; titleId: number }
+  | { kind: 'move-video'; videoId: number; titleId: number }
+  | { kind: 'trash-video'; videoId: number }
+
+export type KidsManageResult = { ok: true } | { ok: false; message: string }
+
+/** Klíčová slova titulu: oříznutá, bez prázdných a opakovaných, nejvýš 20. */
+export function cleanKeywords(values: readonly unknown[]): string[] {
+  const result: string[] = []
+  for (const value of values) {
+    if (typeof value !== 'string') continue
+    const keyword = value.trim().replace(/\s+/g, ' ').slice(0, MAX_KEYWORD_LENGTH)
+    if (keyword && !result.some((k) => k.toLowerCase() === keyword.toLowerCase()))
+      result.push(keyword)
+  }
+  return result.slice(0, MAX_KEYWORDS)
+}
+
+/** Ověří požadavek z okna (nic z něj se nepoužije bez kontroly). */
+export function parseManageAction(value: unknown): KidsManageAction | null {
+  if (typeof value !== 'object' || value === null) return null
+  const input = value as Record<string, unknown>
+  const id = (key: string): number | null =>
+    Number.isInteger(input[key]) && (input[key] as number) > 0 ? (input[key] as number) : null
+  const name =
+    typeof input['name'] === 'string' && input['name'].trim().length <= MAX_TITLE_NAME
+      ? input['name'].trim()
+      : ''
+  const titleId = id('titleId')
+  const videoId = id('videoId')
+  switch (input['kind']) {
+    case 'create-title':
+      return name ? { kind: 'create-title', name } : null
+    case 'rename-title':
+      return name && titleId ? { kind: 'rename-title', titleId, name } : null
+    case 'set-keywords':
+      return titleId && Array.isArray(input['keywords'])
+        ? { kind: 'set-keywords', titleId, keywords: cleanKeywords(input['keywords']) }
+        : null
+    case 'set-cover':
+      return titleId && (videoId || input['videoId'] === null)
+        ? { kind: 'set-cover', titleId, videoId }
+        : null
+    case 'trash-title':
+      return titleId ? { kind: 'trash-title', titleId } : null
+    case 'move-video':
+      return videoId && titleId ? { kind: 'move-video', videoId, titleId } : null
+    case 'trash-video':
+      return videoId ? { kind: 'trash-video', videoId } : null
+    default:
+      return null
+  }
+}

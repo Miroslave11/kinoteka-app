@@ -56,7 +56,13 @@ function setup(options: { have?: string[]; titles?: string[] } = {}) {
     repository: {
       videoByYoutubeId: (id: string) =>
         options.have?.includes(id) ? { id: 1, title: 'Prasátko Peppa' } : null,
-      titles: () => (options.titles ?? []).map((folder, i) => ({ id: i + 1, folder, keywords: [] }))
+      titles: () =>
+        (options.titles ?? []).map((folder, i) => ({
+          id: i + 1,
+          folder,
+          keywords: [],
+          coverVideoId: null
+        }))
     },
     folder: () => root,
     scan

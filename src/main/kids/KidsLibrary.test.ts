@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openDatabase } from '../db/database'
 import { KidsLibrary } from './KidsLibrary'
@@ -36,10 +36,18 @@ async function downloaded(
   return `${base}.mp4`
 }
 
-function library(options: { busy?: boolean } = {}) {
+/** Koš v testech = složka vedle Kids. */
+const trashed = (): Promise<string[]> => readdir(join(root, 'Koš')).catch(() => [])
+
+function library(options: { busy?: boolean; downloadingInto?: string } = {}) {
   return new KidsLibrary(repository, {
     folder: () => kids,
     busy: () => options.busy ?? false,
+    trash: async (path) => {
+      await mkdir(join(root, 'Koš'), { recursive: true })
+      await rename(path, join(root, 'Koš', basename(path)))
+    },
+    downloadingInto: (folder) => folder === options.downloadingInto,
     probeDuration: vi.fn(async () => 42),
     makeThumbnail: vi.fn(async (_input: string, _at: number, output: string) => {
       await writeFile(output, 'frame')
@@ -148,5 +156,142 @@ describe('KidsLibrary', () => {
 
     expect(summary()).toEqual([['Bing a přátelé', ['Kouzelník']]])
     expect(repository.list()[0]!.videos[0]!.id).toBe(id)
+  })
+})
+
+describe('KidsLibrary – správa titulů', () => {
+  async function setup(options: Parameters<typeof library>[0] = {}) {
+    await downloaded(join(kids, 'Peppa'), 'Bláto', 'aaaaaaaaaaa', { title: 'Bláto', channel: 'P' })
+    await downloaded(join(kids, 'Peppa'), 'Výlet', 'bbbbbbbbbbb', { title: 'Výlet', channel: 'P' })
+    await downloaded(join(kids, 'Krteček'), 'Autíčko', 'ccccccccccc', { title: 'Autíčko' })
+    const lib = library(options)
+    await lib.scan()
+    const titles = repository.list({ includeEmpty: true })
+    const peppa = titles.find((t) => t.name === 'Peppa')!
+    const krtek = titles.find((t) => t.name === 'Krteček')!
+    return { lib, peppa, krtek, mud: peppa.videos.find((v) => v.name === 'Bláto')! }
+  }
+
+  it('přejmenuje titul i složku, videa si nechají id a pozici', async () => {
+    const { lib, peppa, mud } = await setup()
+    repository.record(mud.id, 100, 300)
+
+    expect(
+      await lib.manage({ kind: 'rename-title', titleId: peppa.id!, name: 'Prasátko Peppa' })
+    ).toEqual({ ok: true })
+
+    expect(existsSync(join(kids, 'Prasátko Peppa', 'Bláto [aaaaaaaaaaa].mp4'))).toBe(true)
+    expect(existsSync(join(kids, 'Peppa'))).toBe(false)
+    const renamed = repository.list().find((t) => t.id === peppa.id)!
+    expect(renamed.name).toBe('Prasátko Peppa')
+    expect(renamed.videos.find((v) => v.id === mud.id)!.thumbnailUrl).not.toBeNull()
+    expect(repository.videoPath(mud.id)).toBe(
+      join(kids, 'Prasátko Peppa', 'Bláto [aaaaaaaaaaa].mp4')
+    )
+    expect(repository.progress(mud.id)?.position).toBe(100)
+    // Další sken nic nezmění (žádné nové id).
+    await lib.scan()
+    expect(
+      repository
+        .list()
+        .find((t) => t.id === peppa.id)!
+        .videos.map((v) => v.id)
+    ).toContain(mud.id)
+  })
+
+  it('přejmenování na existující titul nebo během stahování odmítne', async () => {
+    const { lib, peppa } = await setup({ downloadingInto: 'Krteček' })
+    expect(await lib.manage({ kind: 'rename-title', titleId: peppa.id!, name: 'krteček' })).toEqual(
+      { ok: false, message: 'Titul s tímto názvem už je.' }
+    )
+    const krtek = repository.list().find((t) => t.name === 'Krteček')!
+    expect(await lib.manage({ kind: 'rename-title', titleId: krtek.id!, name: 'Krtek' })).toEqual({
+      ok: false,
+      message: 'Do titulu se právě stahuje – počkej, až stahování doběhne.'
+    })
+  })
+
+  it('přesune video i s obrázkem a údaji do jiného titulu', async () => {
+    const { lib, krtek, mud } = await setup()
+
+    expect(await lib.manage({ kind: 'move-video', videoId: mud.id, titleId: krtek.id! })).toEqual({
+      ok: true
+    })
+
+    expect((await readdir(join(kids, 'Krteček'))).sort()).toEqual([
+      'Autíčko [ccccccccccc].info.json',
+      'Autíčko [ccccccccccc].jpg',
+      'Autíčko [ccccccccccc].mp4',
+      'Bláto [aaaaaaaaaaa].info.json',
+      'Bláto [aaaaaaaaaaa].jpg',
+      'Bláto [aaaaaaaaaaa].mp4'
+    ])
+    expect(summary()).toEqual([
+      ['Krteček', ['Autíčko', 'Bláto']],
+      ['Peppa', ['Výlet']]
+    ])
+    expect(repository.list()[0]!.videos.find((v) => v.name === 'Bláto')!.id).toBe(mud.id)
+  })
+
+  it('smaže video do Koše i s obrázkem a údaji', async () => {
+    const { lib, mud } = await setup()
+
+    expect(await lib.manage({ kind: 'trash-video', videoId: mud.id })).toEqual({ ok: true })
+
+    expect((await trashed()).sort()).toEqual([
+      'Bláto [aaaaaaaaaaa].info.json',
+      'Bláto [aaaaaaaaaaa].jpg',
+      'Bláto [aaaaaaaaaaa].mp4'
+    ])
+    expect(summary()).toEqual([
+      ['Krteček', ['Autíčko']],
+      ['Peppa', ['Výlet']]
+    ])
+  })
+
+  it('nový titul, obrázek titulu a klíčová slova; smazání titulu do Koše', async () => {
+    const { lib, peppa } = await setup()
+    const second = peppa.videos.find((v) => v.name === 'Výlet')!
+
+    expect(await lib.manage({ kind: 'create-title', name: 'Bluey' })).toEqual({ ok: true })
+    expect(existsSync(join(kids, 'Bluey'))).toBe(true)
+    expect(repository.list({ includeEmpty: true }).map((t) => t.name)).toContain('Bluey')
+    expect(repository.list().map((t) => t.name)).not.toContain('Bluey')
+
+    await lib.manage({ kind: 'set-cover', titleId: peppa.id!, videoId: second.id })
+    await lib.manage({ kind: 'set-keywords', titleId: peppa.id!, keywords: ['peppa pig'] })
+    const updated = repository.list().find((t) => t.id === peppa.id)!
+    expect(updated).toMatchObject({
+      coverVideoId: second.id,
+      coverUrl: second.thumbnailUrl,
+      keywords: ['peppa pig']
+    })
+    const krtek = repository.list().find((t) => t.name === 'Krteček')!
+    expect(await lib.manage({ kind: 'set-cover', titleId: krtek.id!, videoId: second.id })).toEqual(
+      { ok: false, message: 'Video už v titulu není.' }
+    )
+
+    expect(await lib.manage({ kind: 'trash-title', titleId: peppa.id! })).toEqual({ ok: true })
+    expect(await trashed()).toEqual(['Peppa'])
+    expect(summary()).toEqual([['Krteček', ['Autíčko']]])
+  })
+
+  it('soubor otevřený jinde → srozumitelná chyba, záznam zůstane', async () => {
+    const { mud } = await setup()
+    const lib = new KidsLibrary(repository, {
+      folder: () => kids,
+      busy: () => false,
+      thumbnailDir: join(root, 'cache'),
+      trash: async () => {
+        throw Object.assign(new Error('EBUSY: resource busy'), { code: 'EBUSY' })
+      }
+    })
+
+    expect(await lib.manage({ kind: 'trash-video', videoId: mud.id })).toEqual({
+      ok: false,
+      message:
+        'Soubor je otevřený v jiném programu (třeba v přehrávači) – zavři ho a zkus to znovu.'
+    })
+    expect(repository.videoPath(mud.id)).not.toBeNull()
   })
 })
