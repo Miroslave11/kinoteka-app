@@ -74,6 +74,25 @@ describe('YtDlpTool', () => {
     )
   })
 
+  it('souběžná příprava (předem a náhled) stáhne program jen jednou', async () => {
+    const fetch = github('2026.10.21', 'program v1')
+    const tool = new YtDlpTool({ dir, fetch })
+    await Promise.all([tool.ensure(), tool.ensure()])
+    const downloads = fetch.mock.calls.filter(([url]) => String(url).endsWith('/yt-dlp.exe'))
+    expect(downloads).toHaveLength(1)
+  })
+
+  it('zaseknutý GitHub → srozumitelná chyba místo nekonečného čekání', async () => {
+    const timeout = vi.fn(async () => {
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError')
+    }) as unknown as typeof fetch
+    await expect(new YtDlpTool({ dir, fetch: timeout }).ensure()).rejects.toThrow(
+      /neodpověděl včas/
+    )
+    // Každý dotaz má časový limit.
+    expect(vi.mocked(timeout).mock.calls[0]![1]).toMatchObject({ signal: expect.any(AbortSignal) })
+  })
+
   it('poškozený soubor VERSION = nestažený', async () => {
     await writeFile(join(dir, 'yt-dlp.exe'), 'x')
     expect(await new YtDlpTool({ dir, fetch: github('t', 'x') }).version()).toBeNull()

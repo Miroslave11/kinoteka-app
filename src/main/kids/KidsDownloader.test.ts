@@ -124,6 +124,53 @@ describe('KidsDownloader', () => {
     expect(spawnImpl).not.toHaveBeenCalled()
   })
 
+  it('náhled: hlásí přípravu a načítání; yt-dlp visí → po 3 minutách ukončí a ohlásí chybu', async () => {
+    vi.useFakeTimers()
+    try {
+      const child = Object.assign(new EventEmitter(), {
+        pid: 42,
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        kill: vi.fn()
+      })
+      const spawnImpl = vi.fn(() => child)
+      const kids = downloader(spawnImpl as never)
+      const stages: string[] = []
+      const info = kids.info('https://youtu.be/abcdefghijk', false, (s) => stages.push(s))
+      const failed = expect(info).rejects.toThrow(/3 minuty/)
+      await vi.advanceTimersByTimeAsync(3 * 60 * 1000)
+      await failed
+      expect(stages).toEqual(['tool', 'info'])
+      // Ukončí se celý strom (taskkill na Windows, jinde kill).
+      expect(spawnImpl.mock.calls.length + child.kill.mock.calls.length).toBeGreaterThan(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('příprava předem: připraví yt-dlp a jednou ho spustí; souběžně jen jednou', async () => {
+    const spawnImpl = fakeYtDlp(['2026.10.21'], 0)
+    const tool = vi.fn(async () => 'C:\\yt-dlp.exe')
+    const kids = downloader(spawnImpl, tool)
+    await Promise.all([kids.warmUp(), kids.warmUp()])
+    await kids.warmUp()
+    expect(tool).toHaveBeenCalledTimes(1)
+    expect(spawnImpl).toHaveBeenCalledTimes(1)
+    expect(spawnImpl.mock.calls[0]![1]).toEqual(['--version'])
+  })
+
+  it('příprava předem bez internetu nic nerozbije a příště se zkusí znovu', async () => {
+    const spawnImpl = fakeYtDlp([], 0)
+    const tool = vi.fn(async () => {
+      throw new Error('getaddrinfo ENOTFOUND')
+    })
+    const kids = downloader(spawnImpl, tool)
+    await expect(kids.warmUp()).resolves.toBeUndefined()
+    await kids.warmUp()
+    expect(tool).toHaveBeenCalledTimes(2)
+    expect(spawnImpl).not.toHaveBeenCalled()
+  })
+
   it('druhé stahování během prvního odmítne', async () => {
     const kids = downloader(fakeYtDlp([], 0, { name: 'A [abcdefghijk].mp4' }))
     const first = kids.download('https://youtu.be/abcdefghijk')

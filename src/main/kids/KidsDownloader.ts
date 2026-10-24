@@ -3,7 +3,12 @@ import { EventEmitter } from 'node:events'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
-import type { KidsDownloadProgress, KidsDownloadResult, KidsQuality } from '../../shared/kids'
+import type {
+  KidsDownloadProgress,
+  KidsDownloadResult,
+  KidsPreviewStage,
+  KidsQuality
+} from '../../shared/kids'
 import {
   buildDownloadArgs,
   buildInfoArgs,
@@ -37,6 +42,11 @@ interface InfoJson {
   duration?: unknown
 }
 
+/** Náhled přes yt-dlp na pomalém počítači trvá i minutu – déle už něco visí. */
+const INFO_TIMEOUT_MS = 3 * 60 * 1000
+/** Zkušební spuštění yt-dlp předem (Windows Defender si nový program prověří). */
+const WARM_UP_TIMEOUT_MS = 2 * 60 * 1000
+
 const withoutExtension = (path: string): string => path.replace(/\.[^.\\/]+$/, '')
 
 /** Stáhne jedno video z YouTube do složky s dětskými videi (vždy jen jedno najednou). */
@@ -44,6 +54,7 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
   private running = false
   private child: ChildProcess | null = null
   private canceled = false
+  private warm: Promise<void> | null = null
 
   constructor(private readonly options: KidsDownloaderOptions) {
     super()
@@ -70,18 +81,54 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     }
   }
 
+  /** Počká na konec procesu; po `timeoutMs` ho i s podprocesy ukončí a vrátí 'timeout'. */
+  private finished(child: ChildProcess, timeoutMs: number): Promise<number | null | 'timeout'> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        resolve('timeout')
+        killTree(child, this.options.spawn ?? nodeSpawn)
+      }, timeoutMs)
+      const done = (code: number | null): void => {
+        clearTimeout(timer)
+        resolve(code)
+      }
+      child.on('error', () => done(-1))
+      child.on('close', done)
+    })
+  }
+
+  /**
+   * Připraví yt-dlp předem (při otevření stahování): stáhne ho, je-li potřeba, a jednou
+   * naprázdno spustí. První spuštění nového programu je na pomalém počítači dlouhé.
+   */
+  warmUp(): Promise<void> {
+    this.warm ??= (async () => {
+      const exe = await this.prepareTool()
+      await this.finished(this.spawnYtDlp(exe, ['--version']), WARM_UP_TIMEOUT_MS)
+    })().catch(() => {
+      // Nepovedlo se (třeba bez internetu) – zkusí se znovu příště nebo při náhledu.
+      this.warm = null
+    })
+    return this.warm
+  }
+
   /** Údaje o videu nebo playlistu bez stahování (název, kanál, délka, videa v playlistu). */
-  async info(url: string, playlist: boolean): Promise<VideoInfo> {
+  async info(
+    url: string,
+    playlist: boolean,
+    onStage?: (stage: KidsPreviewStage) => void
+  ): Promise<VideoInfo> {
+    onStage?.('tool')
     const exe = await this.prepareTool()
+    onStage?.('info')
     const child = this.spawnYtDlp(exe, buildInfoArgs(url, this.options.nodePath, playlist))
     const stdout: Buffer[] = []
     const output: string[] = []
     child.stdout!.on('data', (chunk: Buffer) => stdout.push(chunk))
     createInterface({ input: child.stderr! }).on('line', (line) => output.push(line))
-    const code = await new Promise<number | null>((resolve) => {
-      child.on('error', () => resolve(-1))
-      child.on('close', resolve)
-    })
+    const code = await this.finished(child, INFO_TIMEOUT_MS)
+    if (code === 'timeout')
+      throw new Error('YouTube neodpověděl ani za 3 minuty. Zkus to prosím znovu.')
     let info: VideoInfo | null
     try {
       info = parseInfo(JSON.parse(Buffer.concat(stdout).toString('utf8')))

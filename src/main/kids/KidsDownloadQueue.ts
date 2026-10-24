@@ -8,6 +8,7 @@ import {
   type KidsDownloadProgress,
   type KidsDownloadRequest,
   type KidsPreviewResult,
+  type KidsPreviewStage,
   type KidsQueueItem,
   MAX_PLAYLIST_VIDEOS,
   type YoutubeLink
@@ -37,7 +38,11 @@ export interface KidsDownloadQueueDeps {
   folder: () => string
   /** Po každém staženém videu – zařazení do titulu v knihovně. */
   scan: () => Promise<unknown>
+  /** Rychlé údaje o videu bez yt-dlp (oEmbed); null = načte je yt-dlp. */
+  quickInfo?: (videoId: string) => Promise<VideoInfo | null>
 }
+
+type OnStage = (stage: KidsPreviewStage) => void
 
 /**
  * Fronta stahování v části Pro rodiče: náhled odkazu s návrhem titulu, rozbalení playlistu
@@ -61,19 +66,29 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
     return this.queue.map((item) => ({ ...item }))
   }
 
-  private async playlist(id: string): Promise<VideoInfo> {
+  private async playlist(id: string, onStage?: OnStage): Promise<VideoInfo> {
     const cached = this.playlists.get(id)
     if (cached) return cached
-    const info = await this.deps.downloader.info(youtubePlaylistUrl(id), true)
+    const info = await this.deps.downloader.info(youtubePlaylistUrl(id), true, onStage)
     this.playlists.set(id, info)
     return info
   }
 
-  async preview(link: YoutubeLink): Promise<KidsPreviewResult> {
+  /** Video nejdřív rychle přes oEmbed, jinak přes yt-dlp (ten pozná i proč nejde stáhnout). */
+  private async video(id: string, onStage?: OnStage): Promise<VideoInfo> {
+    if (this.deps.quickInfo) {
+      onStage?.('quick')
+      const quick = await this.deps.quickInfo(id)
+      if (quick) return quick
+    }
+    return this.deps.downloader.info(youtubeVideoUrl(id), false, onStage)
+  }
+
+  async preview(link: YoutubeLink, onStage?: OnStage): Promise<KidsPreviewResult> {
     try {
       const [video, playlist] = await Promise.all([
-        link.videoId ? this.deps.downloader.info(youtubeVideoUrl(link.videoId), false) : null,
-        link.playlistId ? this.playlist(link.playlistId).catch(() => null) : null
+        link.videoId ? this.video(link.videoId, onStage) : null,
+        link.playlistId ? this.playlist(link.playlistId, onStage).catch(() => null) : null
       ])
       const main = video ?? playlist
       if (!main) return { ok: false, message: 'Playlist se nepodařilo načíst.' }

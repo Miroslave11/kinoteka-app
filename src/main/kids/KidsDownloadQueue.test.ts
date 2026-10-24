@@ -35,7 +35,13 @@ const PLAYLIST: VideoInfo = {
   ]
 }
 
-function setup(options: { have?: string[]; titles?: string[] } = {}) {
+function setup(
+  options: {
+    have?: string[]
+    titles?: string[]
+    quick?: (id: string) => Promise<VideoInfo | null>
+  } = {}
+) {
   const downloader = Object.assign(new EventEmitter(), {
     info: vi.fn(async (url: string, _playlist: boolean) =>
       url.includes('playlist') ? PLAYLIST : PEPPA_VIDEO
@@ -68,7 +74,8 @@ function setup(options: { have?: string[]; titles?: string[] } = {}) {
         }))
     },
     folder: () => root,
-    scan
+    scan,
+    quickInfo: options.quick
   })
   return { queue, downloader, scan }
 }
@@ -105,6 +112,31 @@ describe('KidsDownloadQueue', () => {
         alreadyIn: 'Prasátko Peppa'
       }
     })
+  })
+
+  it('náhled videa nejdřív rychle přes oEmbed (bez yt-dlp), playlist přes yt-dlp', async () => {
+    const quick = vi.fn(async () => ({ ...PEPPA_VIDEO, durationSec: null }))
+    const { queue, downloader } = setup({ quick })
+    const stages: string[] = []
+    const result = await queue.preview(
+      { videoId: 'aaaaaaaaaaa', playlistId: 'PLpeppa12345' },
+      (s) => stages.push(s)
+    )
+    expect(result).toMatchObject({
+      ok: true,
+      preview: { title: 'Bláto | Prasátko Peppa', durationSec: null, playlist: { count: 3 } }
+    })
+    expect(quick).toHaveBeenCalledWith('aaaaaaaaaaa')
+    expect(downloader.info).toHaveBeenCalledTimes(1)
+    expect(downloader.info.mock.calls[0]![0]).toContain('playlist')
+    expect(stages[0]).toBe('quick')
+  })
+
+  it('oEmbed video nezná → náhled přes yt-dlp', async () => {
+    const { queue, downloader } = setup({ quick: async () => null })
+    const result = await queue.preview({ videoId: 'aaaaaaaaaaa', playlistId: null })
+    expect(result).toMatchObject({ ok: true, preview: { durationSec: 312 } })
+    expect(downloader.info).toHaveBeenCalledTimes(1)
   })
 
   it('chyba náhledu → srozumitelná zpráva', async () => {

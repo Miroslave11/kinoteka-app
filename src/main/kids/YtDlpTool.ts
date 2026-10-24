@@ -8,6 +8,9 @@ const REPO = 'yt-dlp/yt-dlp'
 const EXE = 'yt-dlp.exe'
 /** YouTube se často mění – novou verzi yt-dlp stačí hledat jednou denně. */
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
+/** Dotaz na poslední verzi je malý; program má ~18 MB (na pomalé lince i minuty). */
+const API_TIMEOUT_MS = 30_000
+const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000
 
 export interface YtDlpToolOptions {
   /** Složka, kam se yt-dlp stáhne (v datech aplikace). */
@@ -22,6 +25,9 @@ export interface YtDlpToolOptions {
  * se zkontroluje novější verze.
  */
 export class YtDlpTool {
+  /** Právě běžící příprava – souběžná volání (příprava předem a náhled) ji sdílejí. */
+  private pending: Promise<string> | null = null
+
   constructor(private readonly options: YtDlpToolOptions) {}
 
   get exePath(): string {
@@ -54,7 +60,14 @@ export class YtDlpTool {
    * Cesta k yt-dlp připravenému ke stažení videa: chybí-li, stáhne ho; jinak jednou
    * denně zkusí aktualizaci (bez internetu se použije stávající verze).
    */
-  async ensure(): Promise<string> {
+  ensure(): Promise<string> {
+    this.pending ??= this.prepare().finally(() => {
+      this.pending = null
+    })
+    return this.pending
+  }
+
+  private async prepare(): Promise<string> {
     const installed = await this.version()
     if (!installed) {
       await this.install(await this.latestTag())
@@ -89,9 +102,23 @@ export class YtDlpTool {
     }
   }
 
+  /** fetch s časovým limitem (jinak by zaseknuté spojení čekalo navždy). */
+  private async get(url: string, timeoutMs: number, init: RequestInit = {}): Promise<Response> {
+    try {
+      return await this.options.fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
+    } catch (error) {
+      if ((error as Error).name === 'TimeoutError')
+        throw new Error('GitHub neodpověděl včas – zkontroluj připojení k internetu.', {
+          cause: error
+        })
+      throw error
+    }
+  }
+
   private async latestTag(): Promise<string> {
-    const response = await this.options.fetch(
+    const response = await this.get(
       `https://api.github.com/repos/${REPO}/releases/latest`,
+      API_TIMEOUT_MS,
       { headers: { Accept: 'application/vnd.github+json' } }
     )
     if (!response.ok) throw new Error(`GitHub vrátil chybu HTTP ${response.status}`)
@@ -101,11 +128,18 @@ export class YtDlpTool {
   }
 
   private async download(tag: string, name: string): Promise<Buffer> {
-    const response = await this.options.fetch(
-      `https://github.com/${REPO}/releases/download/${tag}/${name}`
+    const response = await this.get(
+      `https://github.com/${REPO}/releases/download/${tag}/${name}`,
+      DOWNLOAD_TIMEOUT_MS
     )
     if (!response.ok) throw new Error(`Stažení ${name} selhalo: HTTP ${response.status}`)
-    return Buffer.from(await response.arrayBuffer())
+    try {
+      return Buffer.from(await response.arrayBuffer())
+    } catch (error) {
+      if ((error as Error).name === 'TimeoutError')
+        throw new Error(`Stažení ${name} trvalo příliš dlouho – zkus to znovu.`, { cause: error })
+      throw error
+    }
   }
 
   private async install(tag: string): Promise<void> {

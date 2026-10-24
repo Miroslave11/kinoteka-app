@@ -68,6 +68,8 @@ export const IpcChannel = {
 
   KidsStatus: 'kids:status',
   KidsPreview: 'kids:preview',
+  KidsPreviewStage: 'kids:preview-stage',
+  KidsWarmUp: 'kids:warm-up',
   KidsEnqueue: 'kids:enqueue',
   KidsQueue: 'kids:queue',
   KidsQueueRemove: 'kids:queue-remove',

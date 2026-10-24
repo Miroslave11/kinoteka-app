@@ -26,6 +26,7 @@ import type {
   KidsTmdbChoice,
   KidsTmdbResult,
   KidsPreviewResult,
+  KidsPreviewStage,
   KidsQueueItem,
   KidsMode,
   KidsUnlockResult,
@@ -178,6 +179,10 @@ export interface KinotekaApi {
     status(): Promise<KidsStatus>
     /** Náhled odkazu na video nebo playlist s návrhem titulu (část Pro rodiče). */
     preview(url: string): Promise<KidsPreviewResult>
+    /** Co právě náhled dělá (text na tlačítku Načíst). */
+    onPreviewStage(listener: (stage: KidsPreviewStage) => void): () => void
+    /** Připraví yt-dlp na pozadí (při otevření stahování), ať je první náhled rychlejší. */
+    warmUp(): Promise<void>
     /** Zařadí video nebo celý playlist do fronty stahování. */
     enqueue(
       request: KidsDownloadRequest
