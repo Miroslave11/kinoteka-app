@@ -72,6 +72,14 @@ export class YtDlpTool {
     return this.exePath
   }
 
+  /** Tlačítko „Zkontrolovat aktualizace“: stáhne novější verzi hned. Vrací aktuální verzi. */
+  async checkNow(): Promise<string> {
+    const latest = await this.latestTag()
+    if (latest !== (await this.version())) await this.install(latest)
+    await writeFile(this.checkedFile, this.now().toISOString())
+    return latest
+  }
+
   private async checkDue(): Promise<boolean> {
     try {
       const checked = new Date((await readFile(this.checkedFile, 'utf8')).trim()).getTime()

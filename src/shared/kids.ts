@@ -88,23 +88,60 @@ export interface KidsSettings {
   theme: KidsTheme
   /** Po konci pohádky se sama spustí další ze stejného titulu. */
   autoplayNext: boolean
+  /** Kolik minut pohádek denně; null = bez limitu. */
+  timeLimitMin: number | null
+  /** Kinotéka se spustí rovnou v dětském režimu. */
+  startInKids: boolean
 }
 
-export const DEFAULT_KIDS_SETTINGS: KidsSettings = { theme: 'obloha', autoplayNext: true }
+export const DEFAULT_KIDS_SETTINGS: KidsSettings = {
+  theme: 'obloha',
+  autoplayNext: true,
+  timeLimitMin: null,
+  startInKids: false
+}
+
+/** Nejdelší denní limit, který jde nastavit (10 hodin). */
+export const MAX_TIME_LIMIT_MIN = 600
 
 /** Ověří nastavení z okna; neznámé hodnoty nahradí výchozími. */
 export function parseKidsSettings(value: unknown): KidsSettings {
   const input =
     typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
   const theme = KIDS_THEMES.find((t) => t.id === input['theme'])?.id
+  const bool = (key: 'autoplayNext' | 'startInKids'): boolean =>
+    typeof input[key] === 'boolean' ? input[key] : DEFAULT_KIDS_SETTINGS[key]
+  const limit = input['timeLimitMin']
   return {
     theme: theme ?? DEFAULT_KIDS_SETTINGS.theme,
-    autoplayNext:
-      typeof input['autoplayNext'] === 'boolean'
-        ? input['autoplayNext']
-        : DEFAULT_KIDS_SETTINGS.autoplayNext
+    autoplayNext: bool('autoplayNext'),
+    timeLimitMin:
+      Number.isInteger(limit) && (limit as number) > 0 && (limit as number) <= MAX_TIME_LIMIT_MIN
+        ? (limit as number)
+        : null,
+    startInKids: bool('startInKids')
   }
 }
+
+/** Stav dětského režimu pro okno. */
+export interface KidsMode {
+  /** Okno je v dětském režimu – ven jen přes rodičovskou bránu. */
+  locked: boolean
+  /** Rodič prošel bránou (část Pro rodiče je otevřená). */
+  parent: boolean
+  hasPin: boolean
+  /** Zbývající čas pohádek dnes v sekundách; null = bez limitu. */
+  timeLeftSec: number | null
+}
+
+/** Otázka rodičovské brány: PIN, nebo příklad pro dospělé (když PIN není nastavený). */
+export type KidsChallenge = { kind: 'pin' } | { kind: 'math'; question: string }
+
+export type KidsUnlockResult = { ok: true } | { ok: false; message: string; retryAfterSec?: number }
+
+/** PIN = 4 až 8 číslic. */
+export const isValidPin = (value: unknown): value is string =>
+  typeof value === 'string' && /^\d{4,8}$/.test(value)
 
 export interface KidsStatus {
   /** Složka s dětskými videi. */

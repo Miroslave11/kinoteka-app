@@ -1,13 +1,25 @@
 import '@fontsource-variable/fredoka'
 import '@fontsource-variable/nunito'
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Heart, Pause, Play, RotateCcw, SkipBack, SkipForward } from 'lucide-react'
+import {
+  ArrowLeft,
+  Clock,
+  Heart,
+  Moon,
+  Pause,
+  Play,
+  RotateCcw,
+  SkipBack,
+  SkipForward
+} from 'lucide-react'
 import type { KidsPlayerInfo, PlayerCommand, PlayerState } from '../../../shared/player'
 import { useIdle } from './useIdle'
 
 const HIDE_CONTROLS_AFTER_MS = 3000
 /** Po konci pohádky se další spustí sama po tolika sekundách (je-li to zapnuté). */
 const NEXT_COUNTDOWN_SECONDS = 5
+/** Když zbývá méně, ukáže se, kolik minut pohádek ještě zbývá. */
+const SHOW_TIME_LEFT_SEC = 15 * 60
 
 const send = (command: PlayerCommand): void => window.kinoteka.player.send(command)
 
@@ -25,7 +37,7 @@ export default function KidsOverlay({
   const [idle, wake] = useIdle(HIDE_CONTROLS_AFTER_MS, !state.paused && !state.ended)
   const [countdown, setCountdown] = useState<number | null>(null)
 
-  const autoNext = state.ended && kids.next !== null && kids.autoplayNext
+  const autoNext = state.ended && kids.next !== null && kids.autoplayNext && !kids.limitReached
   useEffect(() => {
     if (!autoNext) {
       setCountdown(null)
@@ -79,9 +91,27 @@ export default function KidsOverlay({
           <ArrowLeft size={36} strokeWidth={2.8} />
         </button>
         <h1>{state.title}</h1>
+        {kids.timeLeftSec !== null &&
+          kids.timeLeftSec > 0 &&
+          kids.timeLeftSec <= SHOW_TIME_LEFT_SEC && (
+            <span className="ko-time">
+              <Clock size={20} /> Ještě {Math.ceil(kids.timeLeftSec / 60)} min pohádek
+            </span>
+          )}
       </header>
 
-      {state.ended && (
+      {kids.limitReached && (
+        <div className="ko-ended ko-limit" onClick={stop} onDoubleClick={stop}>
+          <Moon size={56} fill="currentColor" strokeWidth={0} />
+          <span className="ko-next-label">Pohádky pro dnešek skončily</span>
+          <p>Zítra zase!</p>
+          <button className="ko-pill" onClick={() => send({ type: 'close' })}>
+            <ArrowLeft size={24} strokeWidth={2.6} /> Zpět
+          </button>
+        </div>
+      )}
+
+      {state.ended && !kids.limitReached && (
         <div className="ko-ended" onClick={stop} onDoubleClick={stop}>
           {kids.next ? (
             <>

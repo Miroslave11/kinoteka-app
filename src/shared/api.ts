@@ -19,8 +19,11 @@ import type { AudioDevice, AudioSettings } from './audio'
 import type { DeletionPlan, DeletionResult } from './deletion'
 import type { JournalEntry, ManualEntry } from './journal'
 import type {
+  KidsChallenge,
   KidsDownloadProgress,
   KidsDownloadResult,
+  KidsMode,
+  KidsUnlockResult,
   KidsScanResult,
   KidsSettings,
   KidsStatus,
@@ -164,6 +167,24 @@ export interface KinotekaApi {
     playVideo(videoId: number): Promise<OpenFileResult>
     /** Srdíčko u titulu nebo pohádky. */
     setFavorite(kind: 'title' | 'video', id: number, favorite: boolean): Promise<void>
+    /** Je okno v dětském režimu, je otevřená část Pro rodiče, kolik zbývá času pohádek. */
+    mode(): Promise<KidsMode>
+    /** Vstup do dětského režimu (zamkne ho, přežije restart). */
+    enter(): Promise<void>
+    /** Otázka rodičovské brány (PIN, nebo příklad). */
+    challenge(): Promise<KidsChallenge>
+    unlock(answer: string): Promise<KidsUnlockResult>
+    /** Zavře část Pro rodiče (dětský režim zůstane). */
+    leaveParent(): Promise<void>
+    /** Odchod z dětského režimu – jen za branou; false = nepovoleno. */
+    exit(): Promise<boolean>
+    /** Nový PIN (4–8 číslic), null = zrušit. */
+    setPin(pin: string | null): Promise<boolean>
+    /** Vynuluje dnešní čas pohádek. */
+    resetPlayTime(): Promise<boolean>
+    /** Vybere jinou složku s pohádkami; null = zrušeno. */
+    pickFolder(): Promise<string | null>
+    checkYtDlp(): Promise<{ ok: true; version: string } | { ok: false; message: string }>
     openFolder(): Promise<void>
   }
   library: {

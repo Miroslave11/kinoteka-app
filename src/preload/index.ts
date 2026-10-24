@@ -90,6 +90,16 @@ const api: KinotekaApi = {
     playVideo: (videoId) => ipcRenderer.invoke(IpcChannel.KidsPlayVideo, videoId),
     setFavorite: (kind, id, favorite) =>
       ipcRenderer.invoke(IpcChannel.KidsSetFavorite, kind, id, favorite),
+    mode: () => ipcRenderer.invoke(IpcChannel.KidsMode),
+    enter: () => ipcRenderer.invoke(IpcChannel.KidsEnter),
+    challenge: () => ipcRenderer.invoke(IpcChannel.KidsChallenge),
+    unlock: (answer) => ipcRenderer.invoke(IpcChannel.KidsUnlock, answer),
+    leaveParent: () => ipcRenderer.invoke(IpcChannel.KidsLeaveParent),
+    exit: () => ipcRenderer.invoke(IpcChannel.KidsExit),
+    setPin: (pin) => ipcRenderer.invoke(IpcChannel.KidsSetPin, pin),
+    resetPlayTime: () => ipcRenderer.invoke(IpcChannel.KidsResetPlayTime),
+    pickFolder: () => ipcRenderer.invoke(IpcChannel.KidsPickFolder),
+    checkYtDlp: () => ipcRenderer.invoke(IpcChannel.KidsCheckYtDlp),
     openFolder: () => ipcRenderer.invoke(IpcChannel.KidsOpenFolder)
   },
   library: {

@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { openDatabase } from '../db/database'
 import { SAVE_INTERVAL_MS } from '../playback/PlaybackTracker'
-import { KidsTracker, kidsPlayItem } from './kidsPlayback'
+import { KidsTracker, kidsPlayItem, PlayTimeMeter } from './kidsPlayback'
 import { KidsRepository } from './KidsRepository'
+
+const ON = { autoplayNext: true, timeLeftSec: null }
 
 let repository: KidsRepository
 const ids: number[] = []
@@ -36,7 +38,7 @@ beforeEach(() => {
 
 describe('kidsPlayItem', () => {
   it('pořadí podle přidání, předchozí a další pohádka s očištěným názvem a obrázkem', () => {
-    const item = kidsPlayItem(repository, ids[1]!, true)!
+    const item = kidsPlayItem(repository, ids[1]!, ON)!
     expect(item).toMatchObject({
       path: 'C:\\Kids\\Prasátko Peppa - Výlet k moři.mp4',
       title: 'Prasátko Peppa · Výlet k moři',
@@ -53,23 +55,27 @@ describe('kidsPlayItem', () => {
   })
 
   it('první a poslední pohádka; nezařazené video bez názvu titulu', () => {
-    expect(kidsPlayItem(repository, ids[0]!, false)!.info).toMatchObject({
+    expect(
+      kidsPlayItem(repository, ids[0]!, { autoplayNext: false, timeLeftSec: 0 })!.info
+    ).toMatchObject({
       hasPrevious: false,
-      autoplayNext: false
+      autoplayNext: false,
+      timeLeftSec: 0,
+      limitReached: true
     })
-    expect(kidsPlayItem(repository, ids[2]!, true)!.info.next).toBeNull()
-    expect(kidsPlayItem(repository, ids[3]!, true)).toMatchObject({
+    expect(kidsPlayItem(repository, ids[2]!, ON)!.info.next).toBeNull()
+    expect(kidsPlayItem(repository, ids[3]!, ON)).toMatchObject({
       title: 'Domácí video',
       previousId: null,
       nextId: null
     })
-    expect(kidsPlayItem(repository, 999, true)).toBeNull()
+    expect(kidsPlayItem(repository, 999, ON)).toBeNull()
   })
 
   it('rozkoukaná pohádka pokračuje od uložené pozice; srdíčko', () => {
     repository.record(ids[0]!, 120, 300)
     repository.setFavorite('video', ids[0]!, true)
-    expect(kidsPlayItem(repository, ids[0]!, true)).toMatchObject({
+    expect(kidsPlayItem(repository, ids[0]!, ON)).toMatchObject({
       startSec: 120,
       info: { favorite: true }
     })
@@ -125,5 +131,28 @@ describe('KidsTracker', () => {
     tracker.finish()
     expect(tracker.current).toBeNull()
     expect(changed).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('PlayTimeMeter', () => {
+  it('počítá jen čas, kdy se obraz hýbe, a zapisuje po 5 s', () => {
+    let now = 0
+    const flushed: number[] = []
+    const meter = new PlayTimeMeter(
+      (seconds) => flushed.push(seconds),
+      () => now
+    )
+    for (let second = 0; second <= 6; second++) {
+      now = second * 1000
+      meter.update(second)
+    }
+    expect(flushed).toEqual([5])
+    // Pauza: pozice stojí, čas běží.
+    now = 60_000
+    meter.update(6)
+    now = 61_000
+    meter.update(7)
+    meter.stop()
+    expect(flushed).toEqual([5, 2])
   })
 })

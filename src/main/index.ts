@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
-import { DEFAULT_KIDS_SETTINGS, parseKidsSettings } from '../shared/kids'
+import { DEFAULT_KIDS_SETTINGS, parseKidsSettings, type KidsSettings } from '../shared/kids'
 import { VIDEO_EXTENSIONS } from '../shared/library'
 import { parseClassification } from '../shared/classification'
 import { parseFileIds } from '../shared/deletion'
@@ -26,7 +26,8 @@ import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
 import { KidsDownloader } from './kids/KidsDownloader'
 import { kidsFolder, KIDS_SETTINGS_KEY, registerKidsIpc } from './kids/kidsIpc'
-import { KidsTracker, kidsPlayItem, type KidsPlayItem } from './kids/kidsPlayback'
+import { KidsGuard } from './kids/KidsGuard'
+import { KidsTracker, kidsPlayItem, PlayTimeMeter, type KidsPlayItem } from './kids/kidsPlayback'
 import { KidsLibrary } from './kids/KidsLibrary'
 import { KidsRepository } from './kids/KidsRepository'
 import { YtDlpTool } from './kids/YtDlpTool'
@@ -227,23 +228,42 @@ async function play(
 
 /** Právě hraná pohádka z dětské části (sousedé v titulu pro „předchozí / další“). */
 let kidsCurrent: KidsPlayItem | null = null
+let kidsMeter: PlayTimeMeter | null = null
 let kidsTracker: KidsTracker
 let kidsRepository: KidsRepository
+let kidsGuard: KidsGuard
 
-const kidsAutoplay = (): boolean =>
-  parseKidsSettings(settings.get(KIDS_SETTINGS_KEY) ?? DEFAULT_KIDS_SETTINGS).autoplayNext
+const kidsSettings = (): KidsSettings =>
+  parseKidsSettings(settings.get(KIDS_SETTINGS_KEY) ?? DEFAULT_KIDS_SETTINGS)
+
+const kidsPlayOptions = (): { autoplayNext: boolean; timeLeftSec: number | null } => {
+  const { autoplayNext, timeLimitMin } = kidsSettings()
+  return { autoplayNext, timeLeftSec: kidsGuard.timeLeft(timeLimitMin) }
+}
 
 /**
  * Pohádka z dětské části: přehrávač s dětským ovládáním, pozice se ukládá do dětské
- * historie (ne do deníku), rozkoukaná pohádka pokračuje bez ptaní.
+ * historie (ne do deníku), rozkoukaná pohádka pokračuje bez ptaní. Hlídá denní limit.
  */
 async function playKids(host: BrowserWindow | null, videoId: number): Promise<OpenFileResult> {
-  const item = kidsPlayItem(kidsRepository, videoId, kidsAutoplay())
+  const item = kidsPlayItem(kidsRepository, videoId, kidsPlayOptions())
   if (!item) return { ok: false, reason: 'error', message: 'Pohádka už ve složce není.' }
   if (!host) return { ok: false, reason: 'error', message: 'Okno aplikace nebylo nalezeno.' }
+  if (item.info.limitReached) {
+    return { ok: false, reason: 'error', message: 'Pohádky pro dnešek skončily.' }
+  }
   try {
     session?.close()
     let started: PlayerSession | undefined = undefined
+    // Denní limit: čas sledování se přičítá po kouscích; když dojde, pohádka se zastaví.
+    const meter = new PlayTimeMeter((seconds) => {
+      kidsGuard.addPlayTime(seconds)
+      const left = kidsGuard.timeLeft(kidsSettings().timeLimitMin)
+      if (!started || session !== started || left === null) return
+      started.updateKids({ timeLeftSec: left, limitReached: left === 0 })
+      if (left === 0) started.handle({ type: 'set-pause', paused: true })
+    })
+    kidsMeter = meter
     started = await PlayerSession.start({
       mainWindow: host,
       file: item.path,
@@ -256,7 +276,9 @@ async function playKids(host: BrowserWindow | null, videoId: number): Promise<Op
       subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
       logFile: join(app.getPath('logs'), 'mpv.log'),
       onProgress: (position, duration) => {
-        if (session === started) kidsTracker.update(position, duration)
+        if (session !== started) return
+        kidsTracker.update(position, duration)
+        meter.update(position)
       },
       onNext: () => {
         if (session === started && kidsCurrent?.nextId) loadKids(started, kidsCurrent.nextId)
@@ -278,6 +300,8 @@ async function playKids(host: BrowserWindow | null, videoId: number): Promise<Op
           kidsCurrent = null
           kidsTracker.finish()
         }
+        meter.stop()
+        broadcast(IpcChannel.KidsChanged)
         if (!host.isDestroyed()) host.webContents.send(IpcChannel.PlayerClosed, info)
       }
     })
@@ -293,9 +317,10 @@ async function playKids(host: BrowserWindow | null, videoId: number): Promise<Op
 
 /** Další nebo předchozí pohádka titulu – načte se do běžícího přehrávače. */
 function loadKids(current: PlayerSession, videoId: number): void {
-  const item = kidsPlayItem(kidsRepository, videoId, kidsAutoplay())
-  if (!item) return
+  const item = kidsPlayItem(kidsRepository, videoId, kidsPlayOptions())
+  if (!item || item.info.limitReached) return
   kidsTracker.start(item.videoId)
+  kidsMeter?.restart()
   kidsCurrent = item
   current.load({
     file: item.path,
@@ -437,6 +462,9 @@ void app.whenReady().then(() => {
   const clipsDir = join(app.getPath('userData'), 'cache', 'clips')
   kidsRepository = new KidsRepository(db)
   kidsTracker = new KidsTracker(kidsRepository, () => broadcast(IpcChannel.KidsChanged))
+  kidsGuard = new KidsGuard(settings)
+  // „Spouštět Kinotéku rovnou v dětském režimu“: okno se otevře zamčené v části Děti.
+  if (kidsSettings().startInKids) kidsGuard.enter()
   handleMediaProtocol(images, clipsDir, (id) => kidsRepository.thumbnailPath(id))
 
   // Barvy z plakátů a klipy na pozadí – potřebují ffmpeg.
@@ -539,6 +567,7 @@ void app.whenReady().then(() => {
     downloader: kidsDownloader,
     library: kidsLibrary,
     repository: kidsRepository,
+    guard: kidsGuard,
     play: playKids
   })
   void kidsLibrary.scan().catch((error: Error) => console.warn(`Složka Kids: ${error.message}`))

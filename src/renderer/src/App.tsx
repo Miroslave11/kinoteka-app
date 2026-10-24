@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { HashRouter, Route, Routes, useLocation } from 'react-router'
+import { useEffect } from 'react'
+import { HashRouter, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { AppProvider, useApp } from './app/AppContext'
 import FileDetailsDialog from './components/FileDetailsDialog'
 import Sidebar from './components/Sidebar'
@@ -25,10 +26,24 @@ export default function App(): React.JSX.Element {
 
 function Shell(): React.JSX.Element {
   const location = useLocation()
+  const navigate = useNavigate()
   const { error, setError, detailsFileId, showDetails } = useApp()
+  const kidsArea = location.pathname === '/deti' || location.pathname.startsWith('/deti/')
+
+  // Zamčený dětský režim (i po restartu): mimo část Děti se okno vrátí zpět do ní.
+  useEffect(() => {
+    if (kidsArea) return
+    let active = true
+    void window.kinoteka.kids.mode().then((mode) => {
+      if (active && mode.locked) navigate('/deti', { replace: true })
+    })
+    return () => {
+      active = false
+    }
+  }, [kidsArea, location.pathname, navigate])
 
   // Dětský režim má vlastní celé okno – bez menu a zkratek dospělé části.
-  if (location.pathname === '/deti' || location.pathname.startsWith('/deti/')) {
+  if (kidsArea) {
     return (
       <Routes location={location}>
         <Route path="/deti/*" element={<KidsApp />} />

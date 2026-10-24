@@ -43,17 +43,27 @@ const TITLES: KidsTitle[] = [
   }
 ]
 
-let api: { kids: Record<string, ReturnType<typeof vi.fn>> }
+let api: {
+  kids: Record<string, ReturnType<typeof vi.fn>>
+  player: Record<string, ReturnType<typeof vi.fn>>
+}
 
 beforeEach(() => {
   api = {
     kids: {
       listTitles: vi.fn(async () => TITLES),
       getSettings: vi.fn(async () => ({ theme: 'jednorozci' })),
+      mode: vi.fn(async () => ({ locked: true, parent: false, hasPin: true, timeLeftSec: null })),
+      enter: vi.fn(async () => undefined),
+      challenge: vi.fn(async () => ({ kind: 'pin' })),
+      unlock: vi.fn(async (answer: string) =>
+        answer === '2580' ? { ok: true } : { ok: false, message: 'Špatný PIN.' }
+      ),
       scan: vi.fn(async () => ({ titles: 2, videos: 3, sorted: 0, errors: [] })),
       onChanged: vi.fn(() => () => undefined),
       playVideo: vi.fn(async () => ({ ok: true }))
-    }
+    },
+    player: { onClosed: vi.fn(() => () => undefined) }
   }
   window.kinoteka = api as unknown as KinotekaApi
 })
@@ -95,5 +105,31 @@ describe('KidsApp', () => {
     api.kids.listTitles!.mockResolvedValue([])
     renderAt('/deti')
     expect(await screen.findByText(/Zatím tu nejsou žádné pohádky/)).toBeTruthy()
+  })
+
+  it('vstup zamkne dětský režim; Pro rodiče chce PIN', async () => {
+    const { container } = renderAt('/deti')
+    await screen.findAllByText('Krteček')
+    expect(api.kids.enter).toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Pro rodiče'))
+    expect(await screen.findByText('Zadej PIN')).toBeTruthy()
+    const key = (label: string): void => {
+      fireEvent.click(
+        [...container.querySelectorAll('.k-keys button')].find((b) => b.textContent === label)!
+      )
+    }
+    for (const digit of '1111') key(digit)
+    fireEvent.click(screen.getByTitle('Potvrdit'))
+    expect(await screen.findByText('Špatný PIN.')).toBeTruthy()
+    for (const digit of '2580') key(digit)
+    fireEvent.click(screen.getByTitle('Potvrdit'))
+    await vi.waitFor(() => expect(api.kids.unlock).toHaveBeenLastCalledWith('2580'))
+  })
+
+  it('denní limit vyčerpán – místo pohádek měsíček, nic se nepřehraje', async () => {
+    api.kids.mode!.mockResolvedValue({ locked: true, parent: false, hasPin: false, timeLeftSec: 0 })
+    renderAt('/deti')
+    expect(await screen.findByText('Pohádky pro dnešek skončily.')).toBeTruthy()
+    expect(api.kids.playVideo).not.toHaveBeenCalled()
   })
 })
