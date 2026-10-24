@@ -114,10 +114,14 @@ describe('sha256For', () => {
 
 describe('buildInfoArgs', () => {
   it('playlist jen jako seznam, video bez playlistu', () => {
-    const playlist = buildInfoArgs('https://www.youtube.com/playlist?list=PLx', 'C:\e.exe', true)
+    const playlist = buildInfoArgs(
+      'https://www.youtube.com/playlist?list=PLx',
+      'electron.exe',
+      true
+    )
     expect(playlist).toEqual(expect.arrayContaining(['-J', '--flat-playlist', '--yes-playlist']))
     expect(playlist.at(-1)).toBe('https://www.youtube.com/playlist?list=PLx')
-    const video = buildInfoArgs('https://youtu.be/jNQXAC9IVRw', 'C:\e.exe', false)
+    const video = buildInfoArgs('https://youtu.be/jNQXAC9IVRw', 'electron.exe', false)
     expect(video).toContain('--no-playlist')
     expect(video).not.toContain('--flat-playlist')
   })
