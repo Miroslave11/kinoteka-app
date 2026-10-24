@@ -14,7 +14,7 @@ import {
   type YoutubeLink
 } from '../../shared/kids'
 import { deriveTitleName, matchTitle, safeFolderName } from './classify'
-import type { KidsDownloader } from './KidsDownloader'
+import { PREVIEW_CANCELED, type KidsDownloader } from './KidsDownloader'
 import type { KidsRepository } from './KidsRepository'
 import type { VideoInfo } from './ytdlp'
 
@@ -44,6 +44,11 @@ export interface KidsDownloadQueueDeps {
 
 type OnStage = (stage: KidsPreviewStage) => void
 
+interface PreviewRun {
+  onStage?: OnStage
+  signal?: AbortSignal
+}
+
 /**
  * Fronta stahování v části Pro rodiče: náhled odkazu s návrhem titulu, rozbalení playlistu
  * na jednotlivá videa a jejich postupné stažení přímo do podsložky titulu.
@@ -57,6 +62,8 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
   private readonly names = new Map<string, string>()
   private readonly playlists = new Map<string, VideoInfo>()
   private readonly qualities = new Map<number, KidsDownloadRequest['quality']>()
+  /** Běžící náhled – nový ho zruší. */
+  private previewRun: AbortController | null = null
 
   constructor(private readonly deps: KidsDownloadQueueDeps) {
     super()
@@ -66,30 +73,43 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
     return this.queue.map((item) => ({ ...item }))
   }
 
-  private async playlist(id: string, onStage?: OnStage): Promise<VideoInfo> {
+  private async playlist(id: string, run: PreviewRun = {}): Promise<VideoInfo> {
     const cached = this.playlists.get(id)
     if (cached) return cached
-    const info = await this.deps.downloader.info(youtubePlaylistUrl(id), true, onStage)
+    const url = youtubePlaylistUrl(id)
+    const info = await this.deps.downloader.info(url, true, run.onStage, run.signal)
     this.playlists.set(id, info)
     return info
   }
 
   /** Video nejdřív rychle přes oEmbed, jinak přes yt-dlp (ten pozná i proč nejde stáhnout). */
-  private async video(id: string, onStage?: OnStage): Promise<VideoInfo> {
+  private async video(id: string, run: PreviewRun): Promise<VideoInfo> {
     if (this.deps.quickInfo) {
-      onStage?.('quick')
+      run.onStage?.('quick')
       const quick = await this.deps.quickInfo(id)
       if (quick) return quick
     }
-    return this.deps.downloader.info(youtubeVideoUrl(id), false, onStage)
+    return this.deps.downloader.info(youtubeVideoUrl(id), false, run.onStage, run.signal)
   }
 
   async preview(link: YoutubeLink, onStage?: OnStage): Promise<KidsPreviewResult> {
+    // Nový náhled zruší předchozí – dva yt-dlp by na slabém počítači zabraly celý procesor.
+    this.previewRun?.abort()
+    const controller = new AbortController()
+    this.previewRun = controller
+    const run: PreviewRun = {
+      // Zrušený náhled už nehlásí, co dělá (patřilo by to k novému).
+      onStage: (stage) => {
+        if (!controller.signal.aborted) onStage?.(stage)
+      },
+      signal: controller.signal
+    }
     try {
       const [video, playlist] = await Promise.all([
-        link.videoId ? this.video(link.videoId, onStage) : null,
-        link.playlistId ? this.playlist(link.playlistId, onStage).catch(() => null) : null
+        link.videoId ? this.video(link.videoId, run) : null,
+        link.playlistId ? this.playlist(link.playlistId, run).catch(() => null) : null
       ])
+      if (controller.signal.aborted) return { ok: false, message: PREVIEW_CANCELED }
       const main = video ?? playlist
       if (!main) return { ok: false, message: 'Playlist se nepodařilo načíst.' }
       const videoId = link.videoId ?? playlist?.entries[0]?.id ?? null
@@ -129,6 +149,8 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
       }
     } catch (error) {
       return { ok: false, message: (error as Error).message }
+    } finally {
+      if (this.previewRun === controller) this.previewRun = null
     }
   }
 

@@ -673,7 +673,11 @@ void app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
   })
-  app.on('will-quit', () => db.close())
+  app.on('will-quit', () => {
+    // Náhledy a stahování z YouTube nesmí běžet dál bez aplikace.
+    kidsDownloader.stopAll()
+    db.close()
+  })
 })
 
 app.on('window-all-closed', () => {

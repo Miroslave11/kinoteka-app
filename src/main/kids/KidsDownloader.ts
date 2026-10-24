@@ -47,6 +47,9 @@ const INFO_TIMEOUT_MS = 3 * 60 * 1000
 /** Zkušební spuštění yt-dlp předem (Windows Defender si nový program prověří). */
 const WARM_UP_TIMEOUT_MS = 2 * 60 * 1000
 
+/** Náhled zrušený novějším náhledem. */
+export const PREVIEW_CANCELED = 'Náhled byl zrušen.'
+
 const withoutExtension = (path: string): string => path.replace(/\.[^.\\/]+$/, '')
 
 /** Stáhne jedno video z YouTube do složky s dětskými videi (vždy jen jedno najednou). */
@@ -55,6 +58,8 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
   private child: ChildProcess | null = null
   private canceled = false
   private warm: Promise<void> | null = null
+  /** Všechny běžící yt-dlp (náhledy, stahování) – při zavření aplikace se ukončí. */
+  private readonly children = new Set<ChildProcess>()
 
   constructor(private readonly options: KidsDownloaderOptions) {
     super()
@@ -65,10 +70,24 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
   }
 
   private spawnYtDlp(exe: string, args: string[]): ChildProcess {
-    return (this.options.spawn ?? nodeSpawn)(exe, args, {
+    const child = (this.options.spawn ?? nodeSpawn)(exe, args, {
       windowsHide: true,
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8' }
     })
+    this.children.add(child)
+    const forget = (): void => void this.children.delete(child)
+    child.on('error', forget)
+    child.on('close', forget)
+    return child
+  }
+
+  /**
+   * Ukončí všechny běžící yt-dlp (při zavření aplikace). Jinak by běžely dál bez okna
+   * a na slabém počítači zabíraly procesor.
+   */
+  stopAll(): void {
+    for (const child of this.children) killTree(child, this.options.spawn ?? nodeSpawn)
+    this.children.clear()
   }
 
   private async prepareTool(): Promise<string> {
@@ -81,17 +100,29 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     }
   }
 
-  /** Počká na konec procesu; po `timeoutMs` ho i s podprocesy ukončí a vrátí 'timeout'. */
-  private finished(child: ChildProcess, timeoutMs: number): Promise<number | null | 'timeout'> {
+  /**
+   * Počká na konec procesu. Po `timeoutMs` nebo zrušení (`signal`) ho i s podprocesy
+   * ukončí a vrátí 'timeout' / 'canceled'.
+   */
+  private finished(
+    child: ChildProcess,
+    timeoutMs: number,
+    signal?: AbortSignal
+  ): Promise<number | null | 'timeout' | 'canceled'> {
     return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        resolve('timeout')
-        killTree(child, this.options.spawn ?? nodeSpawn)
-      }, timeoutMs)
-      const done = (code: number | null): void => {
+      const settle = (result: number | null | 'timeout' | 'canceled'): void => {
         clearTimeout(timer)
-        resolve(code)
+        signal?.removeEventListener('abort', onAbort)
+        resolve(result)
       }
+      const stop = (reason: 'timeout' | 'canceled'): void => {
+        settle(reason)
+        killTree(child, this.options.spawn ?? nodeSpawn)
+      }
+      const onAbort = (): void => stop('canceled')
+      const timer = setTimeout(() => stop('timeout'), timeoutMs)
+      signal?.addEventListener('abort', onAbort)
+      const done = (code: number | null): void => settle(code)
       child.on('error', () => done(-1))
       child.on('close', done)
     })
@@ -116,17 +147,20 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
   async info(
     url: string,
     playlist: boolean,
-    onStage?: (stage: KidsPreviewStage) => void
+    onStage?: (stage: KidsPreviewStage) => void,
+    signal?: AbortSignal
   ): Promise<VideoInfo> {
     onStage?.('tool')
     const exe = await this.prepareTool()
+    if (signal?.aborted) throw new Error(PREVIEW_CANCELED)
     onStage?.('info')
     const child = this.spawnYtDlp(exe, buildInfoArgs(url, this.options.nodePath, playlist))
     const stdout: Buffer[] = []
     const output: string[] = []
     child.stdout!.on('data', (chunk: Buffer) => stdout.push(chunk))
     createInterface({ input: child.stderr! }).on('line', (line) => output.push(line))
-    const code = await this.finished(child, INFO_TIMEOUT_MS)
+    const code = await this.finished(child, INFO_TIMEOUT_MS, signal)
+    if (code === 'canceled') throw new Error(PREVIEW_CANCELED)
     if (code === 'timeout')
       throw new Error('YouTube neodpověděl ani za 3 minuty. Zkus to prosím znovu.')
     let info: VideoInfo | null

@@ -132,6 +132,30 @@ describe('KidsDownloadQueue', () => {
     expect(stages[0]).toBe('quick')
   })
 
+  it('nový náhled zruší předchozí (dva yt-dlp nikdy vedle sebe)', async () => {
+    const { queue, downloader } = setup({ quick: async () => null })
+    const signals: AbortSignal[] = []
+    downloader.info.mockImplementation(
+      (_url: string, _playlist: boolean, _onStage?: unknown, signal?: AbortSignal) => {
+        signals.push(signal!)
+        if (signals.length > 1) return Promise.resolve(PEPPA_VIDEO)
+        return new Promise((_resolve, reject) =>
+          signal!.addEventListener('abort', () => reject(new Error('Náhled byl zrušen.')))
+        )
+      }
+    )
+    const stages: string[] = []
+    const first = queue.preview({ videoId: 'aaaaaaaaaaa', playlistId: null }, (s) =>
+      stages.push(`1:${s}`)
+    )
+    await vi.waitFor(() => expect(signals).toHaveLength(1))
+    const second = await queue.preview({ videoId: 'bbbbbbbbbbb', playlistId: null })
+    expect(await first).toEqual({ ok: false, message: 'Náhled byl zrušen.' })
+    expect(signals[0]!.aborted).toBe(true)
+    expect(second).toMatchObject({ ok: true, preview: { title: 'Bláto | Prasátko Peppa' } })
+    expect(signals[1]!.aborted).toBe(false)
+  })
+
   it('oEmbed video nezná → náhled přes yt-dlp', async () => {
     const { queue, downloader } = setup({ quick: async () => null })
     const result = await queue.preview({ videoId: 'aaaaaaaaaaa', playlistId: null })
