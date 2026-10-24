@@ -89,7 +89,6 @@ describe('KidsDownloader', () => {
       thumbnail: 'data:image/jpeg;base64,/9j/'
     })
     expect(phases).toEqual(['tool', 'starting', 'video', 'audio', 'merging'])
-    expect(kids.lastFile).toBe(join(root, 'Kids', 'Peppa Pig – Muddy Puddles [abcdefghijk].mp4'))
     // yt-dlp spustí Electron jako Node.
     expect(spawnImpl.mock.calls[0]![2].env).toMatchObject({ ELECTRON_RUN_AS_NODE: '1' })
     expect(kids.busy).toBe(false)
@@ -111,7 +110,6 @@ describe('KidsDownloader', () => {
       ok: false,
       message: 'Video není dostupné (smazané nebo blokované).'
     })
-    expect(kids.lastFile).toBeNull()
   })
 
   it('yt-dlp nejde stáhnout → chyba, nic se nespustí', async () => {

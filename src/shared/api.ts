@@ -18,7 +18,13 @@ import type { PreviewStatus } from './posterPalette'
 import type { AudioDevice, AudioSettings } from './audio'
 import type { DeletionPlan, DeletionResult } from './deletion'
 import type { JournalEntry, ManualEntry } from './journal'
-import type { KidsDownloadProgress, KidsDownloadResult, KidsStatus } from './kids'
+import type {
+  KidsDownloadProgress,
+  KidsDownloadResult,
+  KidsScanResult,
+  KidsStatus,
+  KidsTitle
+} from './kids'
 import type {
   OnlineDownloadResult,
   OnlineSearchResult,
@@ -145,8 +151,12 @@ export interface KinotekaApi {
     /** Stáhne video z YouTube do složky s dětskými videi (průběh hlásí `onProgress`). */
     download(url: string): Promise<KidsDownloadResult>
     onProgress(listener: (progress: KidsDownloadProgress) => void): () => void
-    /** Přehraje naposledy stažené video. */
-    playLast(): Promise<OpenFileResult>
+    /** Tituly (podsložky) s videi; videa, která nejde zařadit, jsou v titulu „Ostatní“. */
+    listTitles(): Promise<KidsTitle[]>
+    /** Projde složku, nová videa zařadí do titulů. */
+    scan(): Promise<KidsScanResult>
+    onChanged(listener: () => void): () => void
+    playVideo(videoId: number): Promise<OpenFileResult>
     openFolder(): Promise<void>
   }
   library: {

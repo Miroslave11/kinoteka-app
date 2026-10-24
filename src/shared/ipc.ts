@@ -62,6 +62,9 @@ export const IpcChannel = {
   KidsStatus: 'kids:status',
   KidsDownload: 'kids:download',
   KidsDownloadProgress: 'kids:download-progress',
-  KidsPlayLast: 'kids:play-last',
+  KidsListTitles: 'kids:list-titles',
+  KidsScan: 'kids:scan',
+  KidsChanged: 'kids:changed',
+  KidsPlayVideo: 'kids:play-video',
   KidsOpenFolder: 'kids:open-folder'
 } as const

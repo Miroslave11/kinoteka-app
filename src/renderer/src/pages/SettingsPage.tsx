@@ -1,10 +1,11 @@
-import { useSearchParams } from 'react-router'
+﻿import { useSearchParams } from 'react-router'
 import { useAmbientPalette } from '../app/palette'
 import AboutApp from '../library/AboutApp'
 import AppearanceSettings from '../library/AppearanceSettings'
 import LibrarySettings from '../library/LibrarySettings'
 import ImdbSettings from '../library/ImdbSettings'
 import KidsDownloadTest from '../library/KidsDownloadTest'
+import KidsLibraryTest from '../library/KidsLibraryTest'
 import MetadataSettings from '../library/MetadataSettings'
 import PlayerTest from '../library/PlayerTest'
 import SoundSettings from '../library/SoundSettings'
@@ -20,7 +21,7 @@ const SECTIONS: [Section, string][] = [
   ['titulky', 'Titulky'],
   ['vzhled', 'Vzhled'],
   ['prehravac', 'Přehrávač'],
-  ['deti', 'Děti (test stahování)'],
+  ['deti', 'Děti (test)'],
   ['o-aplikaci', 'O aplikaci']
 ]
 
@@ -57,7 +58,12 @@ export default function SettingsPage(): React.JSX.Element {
           {section === 'titulky' && <SubtitlePrefs />}
           {section === 'vzhled' && <AppearanceSettings />}
           {section === 'prehravac' && <PlayerTest />}
-          {section === 'deti' && <KidsDownloadTest />}
+          {section === 'deti' && (
+            <>
+              <KidsDownloadTest />
+              <KidsLibraryTest />
+            </>
+          )}
           {section === 'o-aplikaci' && <AboutApp />}
         </div>
       </div>
