@@ -96,15 +96,40 @@ async function serveKidsImage(
   }
 }
 
+/** Náhledy z YouTube (náhled odkazu a fronta stahování) – pár posledních v paměti. */
+const youtubeThumbnails = new Map<string, Uint8Array>()
+const YOUTUBE_THUMBNAIL_CACHE = 100
+
+async function serveYoutubeThumbnail(fetchImpl: typeof fetch, pathname: string): Promise<Response> {
+  const id = pathname.slice(1)
+  if (!/^[\w-]{11}$/.test(id)) return new Response(null, { status: 404 })
+  let data = youtubeThumbnails.get(id)
+  if (!data) {
+    try {
+      const response = await fetchImpl(`https://i.ytimg.com/vi/${id}/mqdefault.jpg`)
+      if (!response.ok) return new Response(null, { status: 404 })
+      data = new Uint8Array(await response.arrayBuffer())
+    } catch {
+      return new Response(null, { status: 404 })
+    }
+    if (youtubeThumbnails.size >= YOUTUBE_THUMBNAIL_CACHE)
+      youtubeThumbnails.delete(youtubeThumbnails.keys().next().value!)
+    youtubeThumbnails.set(id, data)
+  }
+  return new Response(data, { headers: { 'Content-Type': 'image/jpeg' } })
+}
+
 /**
  * kinoteka-media://tmdb/w500/abc.jpg → obrázek z cache (případně stažený z TMDB)
  * kinoteka-media://clips/12-0.mp4   → klip na pozadí
  * kinoteka-media://kids/video/7     → obrázek dětského videa
+ * kinoteka-media://ytthumb/<id>     → náhled videa z YouTube (před stažením)
  */
 export function handleMediaProtocol(
   images: ImageCache,
   clipsDir: string,
-  kidsThumbnail: (videoId: number) => string | null
+  kidsThumbnail: (videoId: number) => string | null,
+  fetchImpl: typeof fetch
 ): void {
   protocol.handle(MEDIA_SCHEME, async (request) => {
     const url = new URL(request.url)
@@ -112,6 +137,7 @@ export function handleMediaProtocol(
       return serveClip(clipsDir, url.pathname.slice(1), request.headers.get('Range'))
     }
     if (url.hostname === 'kids') return serveKidsImage(kidsThumbnail, url.pathname)
+    if (url.hostname === 'ytthumb') return serveYoutubeThumbnail(fetchImpl, url.pathname)
     if (url.hostname !== 'tmdb') return new Response(null, { status: 404 })
     const image = await images.get(url.pathname)
     if (!image) return new Response(null, { status: 404 })

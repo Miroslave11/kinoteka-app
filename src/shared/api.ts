@@ -20,8 +20,9 @@ import type { DeletionPlan, DeletionResult } from './deletion'
 import type { JournalEntry, ManualEntry } from './journal'
 import type {
   KidsChallenge,
-  KidsDownloadProgress,
-  KidsDownloadResult,
+  KidsDownloadRequest,
+  KidsPreviewResult,
+  KidsQueueItem,
   KidsMode,
   KidsUnlockResult,
   KidsScanResult,
@@ -152,9 +153,17 @@ export interface KinotekaApi {
   }
   kids: {
     status(): Promise<KidsStatus>
-    /** Stáhne video z YouTube do složky s dětskými videi (průběh hlásí `onProgress`). */
-    download(url: string): Promise<KidsDownloadResult>
-    onProgress(listener: (progress: KidsDownloadProgress) => void): () => void
+    /** Náhled odkazu na video nebo playlist s návrhem titulu (část Pro rodiče). */
+    preview(url: string): Promise<KidsPreviewResult>
+    /** Zařadí video nebo celý playlist do fronty stahování. */
+    enqueue(
+      request: KidsDownloadRequest
+    ): Promise<{ ok: true; added: number; skipped: number } | { ok: false; message: string }>
+    queue(): Promise<KidsQueueItem[]>
+    /** Čekající video odebere, stahované zruší. */
+    removeFromQueue(id: number): Promise<void>
+    clearFinished(): Promise<void>
+    onQueueChanged(listener: (items: KidsQueueItem[]) => void): () => void
     getSettings(): Promise<KidsSettings>
     /** Uloží nastavení dětské části a vrátí ověřenou podobu. */
     saveSettings(value: KidsSettings): Promise<KidsSettings>

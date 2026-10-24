@@ -6,9 +6,11 @@ import {
   DEFAULT_KIDS_SETTINGS,
   isValidPin,
   parseKidsSettings,
-  parseYoutubeUrl,
+  parseDownloadRequest,
+  parseYoutubeLink,
   type KidsChallenge,
-  type KidsDownloadResult,
+  type KidsPreviewResult,
+  type KidsQueueItem,
   type KidsMode,
   type KidsScanResult,
   type KidsSettings,
@@ -18,6 +20,7 @@ import {
 import { broadcast } from '../broadcast'
 import type { SettingsRepository } from '../settings/SettingsRepository'
 import type { KidsDownloader } from './KidsDownloader'
+import type { KidsDownloadQueue } from './KidsDownloadQueue'
 import type { KidsGuard } from './KidsGuard'
 import type { KidsLibrary } from './KidsLibrary'
 import type { KidsRepository } from './KidsRepository'
@@ -39,6 +42,7 @@ export interface KidsIpcDeps {
   settings: SettingsRepository
   tool: YtDlpTool
   downloader: KidsDownloader
+  queue: KidsDownloadQueue
   library: KidsLibrary
   repository: KidsRepository
   guard: KidsGuard
@@ -50,6 +54,7 @@ export function registerKidsIpc({
   settings,
   tool,
   downloader,
+  queue,
   library,
   repository,
   guard,
@@ -121,38 +126,36 @@ export function registerKidsIpc({
   ipcMain.handle(IpcChannel.KidsListTitles, (): KidsTitle[] => repository.list())
   ipcMain.handle(IpcChannel.KidsScan, (): Promise<KidsScanResult> => library.scan())
 
+  // ---------- stahování z YouTube (část Pro rodiče) ----------
+  const denied = { ok: false as const, message: 'Stahovat můžou jen rodiče.' }
   ipcMain.handle(
-    IpcChannel.KidsDownload,
-    async (event, value: unknown): Promise<KidsDownloadResult> => {
-      const url = typeof value === 'string' ? parseYoutubeUrl(value) : null
-      if (!url) return { ok: false, message: 'Tohle není odkaz na video z YouTube.' }
-      const youtubeId = new URL(url).searchParams.get('v')!
-      const existing = repository.videoByYoutubeId(youtubeId)
-      if (existing) {
-        return {
-          ok: false,
-          message: existing.title
-            ? `Tohle video už ve složce je – v titulu „${existing.title}“.`
-            : 'Tohle video už ve složce je.'
-        }
-      }
-      const sender = event.sender
-      const forward = (progress: unknown): void => {
-        if (!sender.isDestroyed()) sender.send(IpcChannel.KidsDownloadProgress, progress)
-      }
-      downloader.on('progress', forward)
-      let result: KidsDownloadResult
-      try {
-        result = await downloader.download(url)
-      } finally {
-        downloader.off('progress', forward)
-      }
-      if (!result.ok) return result
-      // Nové video se zařadí do titulu (a přesune do jeho podsložky).
-      await library.scan()
-      return { ...result, videoId: repository.videoByYoutubeId(youtubeId)?.id ?? null }
+    IpcChannel.KidsPreview,
+    async (_event, value: unknown): Promise<KidsPreviewResult> => {
+      if (!guard.parentAccess()) return denied
+      const link = typeof value === 'string' ? parseYoutubeLink(value) : null
+      if (!link) return { ok: false, message: 'Tohle není odkaz na video ani playlist z YouTube.' }
+      return queue.preview(link)
     }
   )
+  ipcMain.handle(IpcChannel.KidsEnqueue, async (_event, value: unknown) => {
+    if (!guard.parentAccess()) return denied
+    const request = parseDownloadRequest(value)
+    return request ? queue.enqueue(request) : { ok: false, message: 'Neplatný požadavek.' }
+  })
+  ipcMain.handle(IpcChannel.KidsQueue, (): KidsQueueItem[] => queue.items)
+  ipcMain.handle(IpcChannel.KidsQueueRemove, (_event, id: unknown) =>
+    forParent(() => (Number.isInteger(id) ? queue.remove(id as number) : undefined), undefined)
+  )
+  ipcMain.handle(IpcChannel.KidsQueueClear, () => forParent(() => queue.clearFinished(), undefined))
+
+  // Průběh stahování chodí často – do oken nejvýš 4× za sekundu.
+  let timer: NodeJS.Timeout | null = null
+  queue.on('changed', () => {
+    timer ??= setTimeout(() => {
+      timer = null
+      broadcast(IpcChannel.KidsQueueChanged, queue.items)
+    }, 250)
+  })
 
   // Přehrává se podle id – okno nikdy neposílá cestu k souboru.
   ipcMain.handle(IpcChannel.KidsPlayVideo, (event, id: unknown) =>

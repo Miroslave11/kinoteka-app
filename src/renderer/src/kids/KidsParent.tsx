@@ -1,6 +1,7 @@
 import { Download, Home, List, Lock, Settings2 } from 'lucide-react'
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router'
 import { useKids } from './KidsData'
+import KidsParentDownload from './KidsParentDownload'
 import KidsParentSettings from './KidsParentSettings'
 
 /**
@@ -53,16 +54,8 @@ export default function KidsParent(): React.JSX.Element {
         </div>
       </header>
       <Routes>
-        <Route path="/" element={<Navigate to="nastaveni" replace />} />
-        <Route
-          path="/stahovani"
-          element={
-            <div className="k-panel">
-              Stahování z YouTube se sem přesune v dalším kroku. Zatím je v Kinotéce v Nastavení →
-              Děti (test).
-            </div>
-          }
-        />
+        <Route path="/" element={<Navigate to="stahovani" replace />} />
+        <Route path="/stahovani" element={<KidsParentDownload />} />
         <Route
           path="/tituly"
           element={<div className="k-panel">Správa titulů přijde v dalším kroku.</div>}

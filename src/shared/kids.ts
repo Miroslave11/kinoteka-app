@@ -154,11 +154,15 @@ export interface KidsStatus {
 const YOUTUBE_HOSTS = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com']
 const VIDEO_ID = /^[\w-]{11}$/
 
-/**
- * Odkaz na jedno video z YouTube převede na kanonickou adresu
- * (`https://www.youtube.com/watch?v=…`); cokoli jiného vrátí null.
- */
-export function parseYoutubeUrl(text: string): string | null {
+const PLAYLIST_ID = /^[\w-]{10,64}$/
+
+/** Odkaz z YouTube: video, playlist, nebo video v playlistu (`watch?v=…&list=…`). */
+export interface YoutubeLink {
+  videoId: string | null
+  playlistId: string | null
+}
+
+export function parseYoutubeLink(text: string): YoutubeLink | null {
   let url: URL
   try {
     url = new URL(text.trim())
@@ -167,7 +171,7 @@ export function parseYoutubeUrl(text: string): string | null {
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
   const host = url.hostname.toLowerCase()
-  let id: string | null = null
+  let id: string | null
   if (host === 'youtu.be') id = url.pathname.slice(1).split('/')[0] ?? null
   else if (YOUTUBE_HOSTS.includes(host)) {
     if (url.pathname === '/watch') id = url.searchParams.get('v')
@@ -175,6 +179,92 @@ export function parseYoutubeUrl(text: string): string | null {
       const match = /^\/(?:shorts|live|embed)\/([^/]+)/.exec(url.pathname)
       id = match?.[1] ?? null
     }
-  }
-  return id && VIDEO_ID.test(id) ? `https://www.youtube.com/watch?v=${id}` : null
+  } else return null
+  const list = url.searchParams.get('list')
+  const videoId = id && VIDEO_ID.test(id) ? id : null
+  // Mixy („RD…“) jsou nekonečné, automaticky generované – stáhne se jen video.
+  const playlistId = list && PLAYLIST_ID.test(list) && !list.startsWith('RD') ? list : null
+  return videoId || playlistId ? { videoId, playlistId } : null
 }
+
+/** Nejvíc videí z jednoho playlistu (ochrana před omylem vloženým obřím seznamem). */
+export const MAX_PLAYLIST_VIDEOS = 200
+
+export const youtubeVideoUrl = (id: string): string => `https://www.youtube.com/watch?v=${id}`
+export const youtubePlaylistUrl = (id: string): string =>
+  `https://www.youtube.com/playlist?list=${id}`
+
+/**
+ * Odkaz na jedno video z YouTube převede na kanonickou adresu
+ * (`https://www.youtube.com/watch?v=…`); cokoli jiného vrátí null.
+ */
+export function parseYoutubeUrl(text: string): string | null {
+  const link = parseYoutubeLink(text)
+  return link?.videoId ? youtubeVideoUrl(link.videoId) : null
+}
+
+export type KidsQuality = '1080' | '720'
+
+/** Náhled odkazu před stažením (část Pro rodiče). */
+export interface KidsPreview {
+  /** Jedno video, nebo celý playlist (odkaz bez videa). */
+  kind: 'video' | 'playlist'
+  videoId: string | null
+  title: string
+  channel: string | null
+  durationSec: number | null
+  thumbnailUrl: string | null
+  /** Playlist, ze kterého video je (nabídka „Celý playlist“), nebo stahovaný playlist. */
+  playlist: { id: string; title: string; count: number } | null
+  /** Navržený titul: existující (podle jména a klíčových slov), nebo nový podle kanálu. */
+  suggestedTitle: string | null
+  suggestedExisting: boolean
+  /** Video už ve složce je (v tomto titulu). */
+  alreadyIn: string | null
+}
+
+export type KidsPreviewResult = { ok: true; preview: KidsPreview } | { ok: false; message: string }
+
+export interface KidsDownloadRequest {
+  /** Stáhnout jen video, nebo celý playlist. */
+  kind: 'video' | 'playlist'
+  videoId: string | null
+  playlistId: string | null
+  /** Do kterého titulu (podsložky) uložit. */
+  title: string
+  quality: KidsQuality
+}
+
+/** Ověří požadavek na stažení z okna. */
+export function parseDownloadRequest(value: unknown): KidsDownloadRequest | null {
+  if (typeof value !== 'object' || value === null) return null
+  const input = value as Record<string, unknown>
+  const id = (key: string, pattern: RegExp): string | null =>
+    typeof input[key] === 'string' && pattern.test(input[key]) ? input[key] : null
+  const videoId = id('videoId', VIDEO_ID)
+  const playlistId = id('playlistId', PLAYLIST_ID)
+  const kind =
+    input['kind'] === 'playlist' ? 'playlist' : input['kind'] === 'video' ? 'video' : null
+  const title = typeof input['title'] === 'string' ? input['title'].trim() : ''
+  const quality = input['quality'] === '720' ? '720' : input['quality'] === '1080' ? '1080' : null
+  if (!kind || !quality || !title || title.length > 120) return null
+  if (kind === 'video' ? !videoId : !playlistId) return null
+  return { kind, videoId, playlistId, title, quality }
+}
+
+export type KidsQueueStatus = 'waiting' | 'downloading' | 'done' | 'skipped' | 'error'
+
+export interface KidsQueueItem {
+  id: number
+  videoId: string
+  name: string
+  title: string
+  status: KidsQueueStatus
+  progress: KidsDownloadProgress | null
+  /** Chyba nebo důvod přeskočení. */
+  message: string | null
+}
+
+/** Obrázek videa z YouTube přes aplikaci (okno nesmí načítat cizí adresy). */
+export const youtubeThumbnailUrl = (videoId: string): string =>
+  `kinoteka-media://ytthumb/${videoId}`
