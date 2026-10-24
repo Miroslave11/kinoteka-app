@@ -40,6 +40,7 @@ import type {
 } from './onlineSubtitles'
 import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
+import type { UpdateState } from './update'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
 export interface AppInfo {
@@ -62,6 +63,16 @@ export interface KinotekaApi {
     info(): Promise<AppInfo>
     /** Otevře v Průzkumníkovi složku s daty (databáze, cache) nebo se záznamy (logy). */
     openFolder(which: 'data' | 'logs'): Promise<void>
+  }
+  /** Automatické aktualizace (jen v nainstalované aplikaci). */
+  update: {
+    state(): Promise<UpdateState>
+    /** Zkontroluje novou verzi hned. */
+    check(): Promise<UpdateState>
+    /** Ukončí aplikaci a nainstaluje připravenou verzi; false = žádná připravená není. */
+    install(): Promise<boolean>
+    setAutoCheck(enabled: boolean): Promise<void>
+    onChanged(listener: (state: UpdateState) => void): () => void
   }
   player: {
     /** Otevře dialog pro výběr souboru a spustí přehrávání v tomto okně. */

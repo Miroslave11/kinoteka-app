@@ -1,0 +1,41 @@
+name: Vydání
+
+# Tag v1.2.3 → instalátor a latest.yml jako KONCEPT vydání v Miroslave11/kinoteka-vydani.
+# Aplikace si aktualizaci stáhne až po ručním zveřejnění konceptu.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    name: Instalátor do kinoteka-vydani
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalace závislostí
+        run: npm ci
+
+      - name: Testy
+        run: npm test
+
+      - name: Verze v package.json odpovídá tagu
+        shell: bash
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+
+      - name: Cache mpv a ffmpeg
+        uses: actions/cache@v6
+        with:
+          path: resources/bin
+          key: bin-${{ hashFiles('scripts/fetch-mpv.mjs', 'scripts/fetch-ffmpeg.mjs') }}
+
+      - name: Sestavení a nahrání konceptu vydání
+        env:
+          # Klíč s právem zápisu jen do repozitáře kinoteka-vydani (Settings → Secrets → Actions).
+          GH_TOKEN: ${{ secrets.KINOTEKA_VYDANI_TOKEN }}
+        run: npm run fetch:bin && npm run build && npx electron-builder --win --publish always

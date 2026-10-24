@@ -3,6 +3,12 @@ export const IpcChannel = {
   AppInfo: 'app:info',
   AppOpenFolder: 'app:open-folder',
 
+  UpdateState: 'update:state',
+  UpdateChanged: 'update:changed',
+  UpdateCheck: 'update:check',
+  UpdateInstall: 'update:install',
+  UpdateSetAutoCheck: 'update:set-auto-check',
+
   PlayerOpenFile: 'player:open-file',
   PlayerPlayFile: 'player:play-file',
   PlayerCommand: 'player:command',

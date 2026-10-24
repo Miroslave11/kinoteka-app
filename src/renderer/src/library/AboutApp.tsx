@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
-import { FolderOpen } from 'lucide-react'
+import { Download, FolderOpen, RefreshCw } from 'lucide-react'
 import type { AppInfo } from '../../../shared/api'
+import type { UpdateState } from '../../../shared/update'
+import { useUpdateState } from '../components/UpdateBanner'
 import { IMDB_ATTRIBUTION } from '../../../shared/metadata'
 
 /** Nastavení → O aplikaci: verze, uvedení zdrojů dat a licencí, složky s daty. */
 export default function AboutApp(): React.JSX.Element {
   const { app, versions } = window.kinoteka
   const [info, setInfo] = useState<AppInfo | null>(null)
+  const update = useUpdateState()
 
   useEffect(() => {
     void app.info().then(setInfo)
@@ -38,6 +41,8 @@ export default function AboutApp(): React.JSX.Element {
           </button>
         </div>
       </section>
+
+      {update && <UpdateCard state={update} />}
 
       <section className="card">
         <h2>Zdroje dat</h2>
@@ -83,5 +88,62 @@ export default function AboutApp(): React.JSX.Element {
         </p>
       </section>
     </div>
+  )
+}
+
+/** Popis stavu aktualizací jednou větou. */
+function describe(state: UpdateState): string {
+  switch (state.status) {
+    case 'unsupported':
+      return 'Ve vývojové verzi se aktualizace nehledají – jen v nainstalované Kinotéce.'
+    case 'idle':
+      return 'Zatím nezkontrolováno.'
+    case 'checking':
+      return 'Hledám novou verzi…'
+    case 'latest':
+      return 'Máš nejnovější verzi.'
+    case 'downloading':
+      return `Stahuji verzi ${state.version ?? ''}… ${state.percent ?? 0} %`
+    case 'ready':
+      return `Verze ${state.version ?? ''} je stažená – nainstaluje se při zavření Kinotéky.`
+    case 'error':
+      return state.message ?? 'Aktualizace se nepovedla.'
+  }
+}
+
+/** Nastavení → O aplikaci: automatické aktualizace z veřejného repozitáře s vydáními. */
+function UpdateCard({ state }: { state: UpdateState }): React.JSX.Element {
+  const { update } = window.kinoteka
+  const unsupported = state.status === 'unsupported'
+  const busy = state.status === 'checking' || state.status === 'downloading'
+  return (
+    <section className="card">
+      <h2>Aktualizace</h2>
+      <p className={`notice ${state.status === 'error' ? 'is-error' : ''}`}>{describe(state)}</p>
+      <label className="toggle-row">
+        <input
+          type="checkbox"
+          checked={state.autoCheck}
+          disabled={unsupported}
+          onChange={() => void update.setAutoCheck(!state.autoCheck)}
+        />
+        <span>Automaticky hledat novou verzi (po spuštění a každých 6 hodin)</span>
+      </label>
+      <div className="actions">
+        {state.status === 'ready' ? (
+          <button className="btn sm primary" onClick={() => void update.install()}>
+            <Download size={16} /> Restartovat a nainstalovat
+          </button>
+        ) : (
+          <button
+            className="btn sm"
+            disabled={unsupported || busy}
+            onClick={() => void update.check()}
+          >
+            <RefreshCw size={16} className={busy ? 'spin' : ''} /> Zkontrolovat teď
+          </button>
+        )}
+      </div>
+    </section>
   )
 }

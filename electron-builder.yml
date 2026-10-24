@@ -40,3 +40,12 @@ nsis:
   shortcutName: Kinotéka
   # Knihovna, deník a nastavení zůstanou i po odinstalaci (pro přeinstalaci nebo aktualizaci).
   deleteAppDataOnUninstall: false
+
+# Automatické aktualizace: vydání (instalátor + latest.yml) jdou do veřejného repozitáře
+# jen s instalátory – zdrojový kód zůstává v soukromém repozitáři. Nahrává je CI z tagu v*
+# jako koncept; aktualizace dorazí až po ručním zveřejnění konceptu na GitHubu.
+publish:
+  provider: github
+  owner: Miroslave11
+  repo: kinoteka-vydani
+  releaseType: draft
