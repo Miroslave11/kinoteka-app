@@ -7,6 +7,7 @@ import {
   DEFAULT_FILTERS,
   filterOptions,
   filterTitles,
+  journalState,
   mergeSeasons,
   searchTitles,
   upNext,
@@ -364,5 +365,25 @@ describe('sledování', () => {
       watch: { progress: { position: 600 } }
     })
     expect(watchForFile([series], 999)).toBeNull()
+  })
+
+  it('pozná, že film nebo vybrané díly už v deníku jsou', () => {
+    const film = movie(1, 'Prázdnota', 2020, [file({ id: 5 })]) as TitleItem
+    expect(journalState(film, [])).toBeNull()
+    const seen = { ...EMPTY_WATCH_STATE, watchCount: 2, lastWatchedAt: '2026-10-22' }
+    expect(journalState({ ...film, watch: seen } as TitleItem, [])).toEqual(seen)
+
+    const series = show([
+      ep(1, 1, { watchCount: 2, lastWatchedAt: '2026-10-20' }),
+      ep(1, 2, { watchCount: 1, lastWatchedAt: '2026-10-21' }),
+      ep(1, 3)
+    ])
+    expect(journalState(series, [101, 102])).toEqual({
+      progress: null,
+      watchCount: 1,
+      lastWatchedAt: '2026-10-21'
+    })
+    expect(journalState(series, [102, 103])).toBeNull()
+    expect(journalState(series, [])).toBeNull()
   })
 })

@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { formatSize } from '../../../shared/library'
 import { useApp } from '../app/AppContext'
 import { filesOf } from '../app/catalogData'
+import { countOf } from '../../../shared/plural'
 
 export default function TopBar(): React.JSX.Element {
   const { titles, folders } = useApp()
@@ -54,7 +55,7 @@ export default function TopBar(): React.JSX.Element {
       <div className="status">
         <i className={`dot ${offline ? 'off' : ''}`} />
         {offline ? `${offline} knihovna offline · ` : 'Knihovna aktuální · '}
-        {files.length} souborů · {formatSize(totalSize)}
+        {countOf(files.length, 'soubor', 'soubory', 'souborů')} · {formatSize(totalSize)}
       </div>
     </div>
   )

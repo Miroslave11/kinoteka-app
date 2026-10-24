@@ -4,6 +4,7 @@ import { useApp } from '../app/AppContext'
 import { searchTitles } from '../app/catalogData'
 import { useAmbientPalette } from '../app/palette'
 import Poster from '../components/Poster'
+import { countOf } from '../../../shared/plural'
 
 /** Hledání (Ctrl+K): shoda v názvu (i originálním) a zvlášť shoda v hercích a tvůrcích. */
 export default function SearchPage(): React.JSX.Element {
@@ -18,8 +19,7 @@ export default function SearchPage(): React.JSX.Element {
     <div className="page">
       <h1>Hledání</h1>
       <p className="subtitle">
-        „{query}“ · {total}{' '}
-        {total === 1 ? 'výsledek' : total >= 2 && total <= 4 ? 'výsledky' : 'výsledků'}
+        „{query}“ · {countOf(total, 'výsledek', 'výsledky', 'výsledků')}
       </p>
       {total === 0 && (
         <p className="empty">Nic nenalezeno. Hledat jde podle názvu, originálního názvu i herců.</p>

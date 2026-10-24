@@ -81,7 +81,7 @@ function renderPage(): void {
 describe('BrowsePage', () => {
   it('zobrazí filmy z knihovny a filtruje podle štítku', async () => {
     renderPage()
-    expect(await screen.findByText('2 filmů')).toBeTruthy()
+    expect(await screen.findByText('2 filmy')).toBeTruthy()
     expect(screen.getAllByText('Prázdnota').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'CZ titulky' }))

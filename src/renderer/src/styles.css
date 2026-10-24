@@ -1996,6 +1996,10 @@ p.info-chip {
   grid-template-columns: 110px minmax(0, 1fr);
 }
 
+.watched-dialog .watched-already {
+  margin: 14px 0 0;
+}
+
 .watched-dialog textarea {
   resize: vertical;
   font: inherit;

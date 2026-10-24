@@ -10,6 +10,7 @@ import {
 } from '../app/catalogData'
 import { useAmbientPalette } from '../app/palette'
 import Poster from '../components/Poster'
+import { countOf } from '../../../shared/plural'
 
 const SORTS: [SortKey, string][] = [
   ['added', 'Naposledy přidané'],
@@ -47,7 +48,9 @@ export default function BrowsePage({ kind }: { kind: 'movie' | 'show' }): React.
       <h1>{kind === 'movie' ? 'Filmy' : 'Seriály'}</h1>
       <p className="subtitle">
         {visible.length === ofKind.length
-          ? `${ofKind.length} ${kind === 'movie' ? 'filmů' : 'seriálů'}`
+          ? kind === 'movie'
+            ? countOf(ofKind.length, 'film', 'filmy', 'filmů')
+            : countOf(ofKind.length, 'seriál', 'seriály', 'seriálů')
           : `${visible.length} z ${ofKind.length}`}
       </p>
 

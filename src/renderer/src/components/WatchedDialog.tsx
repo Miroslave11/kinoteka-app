@@ -3,7 +3,13 @@ import { Check, X } from 'lucide-react'
 import { episodeCode } from '../../../shared/playback'
 import { normalizeSearch } from '../../../shared/search'
 import { useApp } from '../app/AppContext'
-import { displayName, episodeLabel, type TitleItem } from '../app/catalogData'
+import {
+  displayName,
+  episodeLabel,
+  journalState,
+  watchedTitle,
+  type TitleItem
+} from '../app/catalogData'
 
 /** Teď jako hodnota pro `<input type="datetime-local">` (místní čas). */
 function nowLocal(): string {
@@ -60,6 +66,16 @@ export default function WatchedDialog({
   const chosen: WatchedTarget | null =
     target ??
     (picked ? { titleId: picked.id, episodeIds: episodes, label: displayName(picked) } : null)
+
+  // Už zapsané se omylem nepřidá znovu; další zhlédnutí jde zapsat jen výslovně.
+  const chosenTitle = chosen && titles.find((t) => t.id === chosen.titleId)
+  const already = chosen && chosenTitle ? journalState(chosenTitle, chosen.episodeIds) : null
+  const what =
+    chosenTitle?.kind === 'movie'
+      ? 'Tento film už v deníku je'
+      : chosen?.episodeIds.length === 1
+        ? 'Tento díl už v deníku je'
+        : 'Tyto díly už v deníku jsou'
 
   const save = async (): Promise<void> => {
     if (!chosen || !watchedAt) return
@@ -166,13 +182,37 @@ export default function WatchedDialog({
           />
         </div>
 
+        {already && (
+          <p className="info-chip watched-already">
+            {what} ({watchedTitle(already).toLowerCase()}). Pokud jsi to viděl znovu, zapiš další
+            zhlédnutí.
+          </p>
+        )}
+
         <div className="dialog-foot">
-          <button className="btn sm" onClick={onClose}>
-            Zrušit
-          </button>
-          <button className="btn sm primary" disabled={!chosen || busy} onClick={() => void save()}>
-            <Check size={16} /> Zapsat do deníku
-          </button>
+          {already ? (
+            <>
+              <button className="btn sm" disabled={busy} onClick={() => void save()}>
+                Zapsat další zhlédnutí
+              </button>
+              <button className="btn sm primary" onClick={onClose}>
+                Zavřít
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn sm" onClick={onClose}>
+                Zrušit
+              </button>
+              <button
+                className="btn sm primary"
+                disabled={!chosen || busy}
+                onClick={() => void save()}
+              >
+                <Check size={16} /> Zapsat do deníku
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
