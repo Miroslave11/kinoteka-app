@@ -85,6 +85,23 @@ export interface DownloadArgsOptions {
   quality?: KidsQuality
 }
 
+/** Nejdelší cesta, kterou yt-dlp (Python) na Windows zvládne zapsat (MAX_PATH bez koncové nuly). */
+const MAX_PATH_CHARS = 259
+/** Rezerva za příponami: ` [id]`, `.f137.mp4.part`, `.temp.mp4`, `.part-Frag123` a podobně. */
+const FILE_NAME_RESERVE = 50
+const MAX_TITLE_BYTES = 150
+const MIN_TITLE_BYTES = 20
+
+/**
+ * Nejdelší název videa v souboru (v bajtech, což je pro znaky mimo ASCII i emoji vždy víc než
+ * znaků v cestě Windows) tak, aby se celá cesta vešla do 260 znaků. Dlouhý název s emoji
+ * ve složce se stejně dlouhým názvem jinak skončí chybou „No such file or directory“.
+ */
+export function titleBytesFor(folder: string): number {
+  const room = MAX_PATH_CHARS - folder.length - 1 - FILE_NAME_RESERVE
+  return Math.max(MIN_TITLE_BYTES, Math.min(MAX_TITLE_BYTES, room))
+}
+
 export function buildDownloadArgs(options: DownloadArgsOptions): string[] {
   return [
     ...baseArgs(options.nodePath),
@@ -104,7 +121,7 @@ export function buildDownloadArgs(options: DownloadArgsOptions): string[] {
     '-P',
     options.folder,
     '-o',
-    '%(title).150B [%(id)s].%(ext)s',
+    `%(title).${titleBytesFor(options.folder)}B [%(id)s].%(ext)s`,
     '--newline',
     '--progress-template',
     `download:${PROGRESS_PREFIX} %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s %(progress.speed)s %(progress.eta)s %(info.vcodec)s`,
@@ -154,6 +171,8 @@ export function errorMessage(output: string[]): string {
   if (has(/Unsupported URL|is not a valid URL/i)) return 'Tohle není odkaz na video z YouTube.'
   if (has(/getaddrinfo|Failed to resolve|timed out|Connection|Unable to download/i))
     return 'YouTube nejde stáhnout – zkontroluj připojení k internetu.'
+  if (has(/Errno 2|No such file or directory|File name too long|path.*too long/i))
+    return 'Cesta k souboru je moc dlouhá – zkrať název titulu nebo zvol kratší složku s dětskými videi.'
   if (has(/Requested format is not available/i))
     return 'YouTube teď video nenabízí ke stažení. Zkus to později (případně se aktualizuje yt-dlp).'
   const last = errors.split('\n').filter(Boolean).at(-1)

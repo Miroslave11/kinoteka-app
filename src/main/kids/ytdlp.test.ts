@@ -6,6 +6,7 @@ import {
   parseInfo,
   parseProgressLine,
   sha256For,
+  titleBytesFor,
   YTDLP_FORMAT
 } from './ytdlp'
 
@@ -42,6 +43,28 @@ describe('buildDownloadArgs', () => {
       'C:\\Temp\\yt.txt',
       'https://www.youtube.com/watch?v=jNQXAC9IVRw'
     ])
+  })
+
+  it('název souboru se zkrátí podle délky složky, aby cesta nepřesáhla 260 znaků', () => {
+    const long = `C:\\Mirek_data\\Detska videa\\${'Tlapková patrola '.repeat(5).trim()}`
+    const shortened = buildDownloadArgs({
+      url: 'https://www.youtube.com/watch?v=LdmMMvNKlJw',
+      folder: long,
+      ffmpegDir: 'C:\\App\\bin\\ffmpeg',
+      nodePath: 'C:\\App\\Kinotéka.exe',
+      pathFile: 'C:\\Temp\\yt.txt'
+    })
+    const template = shortened[shortened.indexOf('-o') + 1]!
+    const bytes = Number(/%\(title\)\.(\d+)B/.exec(template)![1])
+    expect(bytes).toBeLessThan(150)
+    expect(long.length + 1 + bytes + 50).toBeLessThanOrEqual(259)
+  })
+})
+
+describe('titleBytesFor', () => {
+  it('krátká složka nechá nejvýš 150 bajtů, extrémně dlouhá aspoň 20', () => {
+    expect(titleBytesFor('C:\\Videa\\Kids')).toBe(150)
+    expect(titleBytesFor('C:\\' + 'x'.repeat(300))).toBe(20)
   })
 })
 
@@ -87,6 +110,9 @@ describe('errorMessage', () => {
       ])
     ).toMatch(/připojení k internetu/)
     expect(errorMessage(['ERROR: Sign in to confirm your age'])).toMatch(/věkem/)
+    expect(errorMessage(["ERROR: [Errno 2] No such file or directory: 'C:\\\\x.webp'"])).toMatch(
+      /moc dlouhá/
+    )
   })
 
   it('neznámá chyba – poslední řádek bez předpon, jinak obecná zpráva', () => {
