@@ -55,6 +55,27 @@ export function isWatched(title: TitleItem): boolean {
   return episodes.length > 0 && episodes.every((e) => e.watch.watchCount > 0)
 }
 
+/**
+ * Je film, nebo jsou všechny vybrané díly, už v deníku? Vrací stav zhlédnutí
+ * (u dílů nejmenší počet a poslední datum), jinak null. Celý seriál bez dílů se nehlídá.
+ */
+export function journalState(title: TitleItem, episodeIds: number[]): WatchState | null {
+  if (title.kind === 'movie') return title.watch.watchCount > 0 ? title.watch : null
+  const chosen = title.seasons.flatMap((s) => s.episodes).filter((e) => episodeIds.includes(e.id))
+  if (chosen.length === 0 || chosen.some((e) => e.watch.watchCount === 0)) return null
+  return {
+    progress: null,
+    watchCount: Math.min(...chosen.map((e) => e.watch.watchCount)),
+    lastWatchedAt: chosen.reduce<string | null>(
+      (last, e) =>
+        e.watch.lastWatchedAt && (!last || e.watch.lastWatchedAt > last)
+          ? e.watch.lastWatchedAt
+          : last,
+      null
+    )
+  }
+}
+
 /** Názvy, pod kterými jde titul najít (soubor, TMDB, originál, alternativní). */
 const titleNames = (title: TitleItem): string[] =>
   [
