@@ -57,5 +57,11 @@ export const IpcChannel = {
   DeletionExecute: 'deletion:execute',
 
   PreviewStatus: 'preview:status',
-  PreviewSetClipsEnabled: 'preview:set-clips-enabled'
+  PreviewSetClipsEnabled: 'preview:set-clips-enabled',
+
+  KidsStatus: 'kids:status',
+  KidsDownload: 'kids:download',
+  KidsDownloadProgress: 'kids:download-progress',
+  KidsPlayLast: 'kids:play-last',
+  KidsOpenFolder: 'kids:open-folder'
 } as const

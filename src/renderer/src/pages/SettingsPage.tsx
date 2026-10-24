@@ -4,12 +4,14 @@ import AboutApp from '../library/AboutApp'
 import AppearanceSettings from '../library/AppearanceSettings'
 import LibrarySettings from '../library/LibrarySettings'
 import ImdbSettings from '../library/ImdbSettings'
+import KidsDownloadTest from '../library/KidsDownloadTest'
 import MetadataSettings from '../library/MetadataSettings'
 import PlayerTest from '../library/PlayerTest'
 import SoundSettings from '../library/SoundSettings'
 import SubtitlePrefs from '../library/SubtitlePrefs'
 
-type Section = 'knihovna' | 'metadata' | 'zvuk' | 'titulky' | 'vzhled' | 'prehravac' | 'o-aplikaci'
+type Section =
+  'knihovna' | 'metadata' | 'zvuk' | 'titulky' | 'vzhled' | 'prehravac' | 'deti' | 'o-aplikaci'
 
 const SECTIONS: [Section, string][] = [
   ['knihovna', 'Knihovna'],
@@ -18,6 +20,7 @@ const SECTIONS: [Section, string][] = [
   ['titulky', 'Titulky'],
   ['vzhled', 'Vzhled'],
   ['prehravac', 'Přehrávač'],
+  ['deti', 'Děti (test stahování)'],
   ['o-aplikaci', 'O aplikaci']
 ]
 
@@ -54,6 +57,7 @@ export default function SettingsPage(): React.JSX.Element {
           {section === 'titulky' && <SubtitlePrefs />}
           {section === 'vzhled' && <AppearanceSettings />}
           {section === 'prehravac' && <PlayerTest />}
+          {section === 'deti' && <KidsDownloadTest />}
           {section === 'o-aplikaci' && <AboutApp />}
         </div>
       </div>

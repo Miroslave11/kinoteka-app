@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { IpcChannel } from '../shared/ipc'
 import { VIDEO_EXTENSIONS } from '../shared/library'
 import { parseClassification } from '../shared/classification'
@@ -23,6 +23,9 @@ import { DeletionService } from './deletion/DeletionService'
 import { registerJournalIpc } from './journal/journalIpc'
 import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
+import { KidsDownloader } from './kids/KidsDownloader'
+import { kidsFolder, registerKidsIpc } from './kids/kidsIpc'
+import { YtDlpTool } from './kids/YtDlpTool'
 import { openDatabase } from './db/database'
 import { makeClip, posterPixels } from './media/ffmpeg'
 import { runFfprobe } from './media/ffprobe'
@@ -419,6 +422,19 @@ void app.whenReady().then(() => {
     baseUrl: app.isPackaged ? undefined : process.env['KINOTEKA_DEV_OPENSUBTITLES_URL']
   })
   registerOnlineSubtitlesIpc(onlineSubtitles)
+  // Dětská část: stahování z YouTube přes yt-dlp (stáhne se do dat aplikace při prvním použití).
+  const ytDlp = new YtDlpTool({
+    dir: join(app.getPath('userData'), 'tools', 'yt-dlp'),
+    fetch: chromiumFetch
+  })
+  const kidsDownloader = new KidsDownloader({
+    tool: () => ytDlp.ensure(),
+    folder: () => kidsFolder(settings),
+    ffmpegDir: dirname(ffmpeg),
+    nodePath: process.execPath,
+    tempDir: join(app.getPath('temp'), 'kinoteka')
+  })
+  registerKidsIpc(settings, ytDlp, kidsDownloader, play)
   ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))
   ipcMain.handle(IpcChannel.SubtitlesSaveSettings, (_event, value: unknown) =>
     saveSubtitleSettings(settings, value)

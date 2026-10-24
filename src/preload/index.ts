@@ -78,6 +78,13 @@ const api: KinotekaApi = {
     status: () => ipcRenderer.invoke(IpcChannel.PreviewStatus),
     setClipsEnabled: (enabled) => ipcRenderer.invoke(IpcChannel.PreviewSetClipsEnabled, enabled)
   },
+  kids: {
+    status: () => ipcRenderer.invoke(IpcChannel.KidsStatus),
+    download: (url) => ipcRenderer.invoke(IpcChannel.KidsDownload, url),
+    onProgress: (listener) => subscribe(IpcChannel.KidsDownloadProgress, listener),
+    playLast: () => ipcRenderer.invoke(IpcChannel.KidsPlayLast),
+    openFolder: () => ipcRenderer.invoke(IpcChannel.KidsOpenFolder)
+  },
   library: {
     listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),
     listFiles: () => ipcRenderer.invoke(IpcChannel.LibraryListFiles),

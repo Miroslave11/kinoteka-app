@@ -18,6 +18,7 @@ import type { PreviewStatus } from './posterPalette'
 import type { AudioDevice, AudioSettings } from './audio'
 import type { DeletionPlan, DeletionResult } from './deletion'
 import type { JournalEntry, ManualEntry } from './journal'
+import type { KidsDownloadProgress, KidsDownloadResult, KidsStatus } from './kids'
 import type {
   OnlineDownloadResult,
   OnlineSearchResult,
@@ -138,6 +139,15 @@ export interface KinotekaApi {
     /** Stav klipů na pozadí; null, když chybí ffmpeg. */
     status(): Promise<PreviewStatus | null>
     setClipsEnabled(enabled: boolean): Promise<void>
+  }
+  kids: {
+    status(): Promise<KidsStatus>
+    /** Stáhne video z YouTube do složky s dětskými videi (průběh hlásí `onProgress`). */
+    download(url: string): Promise<KidsDownloadResult>
+    onProgress(listener: (progress: KidsDownloadProgress) => void): () => void
+    /** Přehraje naposledy stažené video. */
+    playLast(): Promise<OpenFileResult>
+    openFolder(): Promise<void>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>
