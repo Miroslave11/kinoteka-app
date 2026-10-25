@@ -1,9 +1,11 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openDatabase } from '../db/database'
+import type { UpdateKey } from '../../shared/update'
 import { SettingsRepository } from '../settings/SettingsRepository'
 import {
   AppUpdater,
+  KEY_INVALID_MESSAGE,
   UPDATE_CHECK_INTERVAL_MS,
   UPDATE_START_DELAY_MS,
   updateErrorMessage,
@@ -97,7 +99,52 @@ describe('AppUpdater', () => {
   })
 })
 
+describe('AppUpdater – klíč pro aktualizace', () => {
+  const withKey = (checkKey: () => Promise<UpdateKey>): { app: AppUpdater; fake: FakeUpdater } => {
+    const fake = new FakeUpdater()
+    const app = new AppUpdater(
+      new SettingsRepository(openDatabase(':memory:')),
+      fake,
+      undefined,
+      checkKey
+    )
+    return { app, fake }
+  }
+
+  it('bez klíče (vývoj) je stav „none“', () => {
+    expect(setup().app.state().key).toEqual({ status: 'none', expiresAt: null })
+  })
+
+  it('při kontrole ověří klíč a ukáže jeho platnost', async () => {
+    const { app } = withKey(async () => ({ status: 'ok', expiresAt: '2027-10-25T08:00:00.000Z' }))
+    expect(app.state().key.status).toBe('unknown')
+    expect((await app.check()).key).toEqual({ status: 'ok', expiresAt: '2027-10-25T08:00:00.000Z' })
+  })
+
+  it('výpadek sítě nesmaže dřív ověřený klíč', async () => {
+    const checkKey = vi.fn<() => Promise<UpdateKey>>()
+    checkKey.mockResolvedValueOnce({ status: 'ok', expiresAt: null })
+    checkKey.mockResolvedValueOnce({ status: 'unknown', expiresAt: null })
+    const { app } = withKey(checkKey)
+    await app.check()
+    expect((await app.check()).key.status).toBe('ok')
+  })
+
+  it('s neplatným klíčem je chyba aktualizace srozumitelná', async () => {
+    const { app, fake } = withKey(async () => ({ status: 'invalid', expiresAt: null }))
+    await app.check()
+    fake.emit('error', new Error('HttpError: 404 Not Found'))
+    expect(app.state().message).toBe(KEY_INVALID_MESSAGE)
+  })
+})
+
 describe('updateErrorMessage', () => {
+  it('odmítnutý klíč', () => {
+    expect(updateErrorMessage(new Error('HttpError: 401 Unauthorized "Bad credentials"'))).toBe(
+      KEY_INVALID_MESSAGE
+    )
+  })
+
   it('zatím žádné vydání a neznámá chyba', () => {
     expect(
       updateErrorMessage(new Error('Cannot find latest.yml in the latest release artifacts'))
