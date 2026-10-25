@@ -1477,6 +1477,38 @@ option {
   width: 80px;
 }
 
+/* ---------- ústřední melodie ---------- */
+.theme-dialog {
+  width: min(600px, 100%);
+}
+
+.theme-dialog p + p {
+  margin-top: 8px;
+}
+
+.theme-volume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.theme-volume input {
+  flex: 1;
+  max-width: 280px;
+}
+
+.theme-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.theme-dialog > .muted.small:last-of-type {
+  margin-top: 14px;
+  line-height: 1.5;
+}
+
 .results {
   display: flex;
   flex-direction: column;

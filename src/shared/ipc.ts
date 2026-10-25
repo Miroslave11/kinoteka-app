@@ -68,6 +68,14 @@ export const IpcChannel = {
   DeletionPlan: 'deletion:plan',
   DeletionExecute: 'deletion:execute',
 
+  ThemeGetSettings: 'theme:get-settings',
+  ThemeSaveSettings: 'theme:save-settings',
+  ThemeInfo: 'theme:info',
+  ThemePickFile: 'theme:pick-file',
+  ThemeSetYoutube: 'theme:set-youtube',
+  ThemeSetNone: 'theme:set-none',
+  ThemeReset: 'theme:reset',
+
   PreviewStatus: 'preview:status',
   PreviewSetClipsEnabled: 'preview:set-clips-enabled',
 

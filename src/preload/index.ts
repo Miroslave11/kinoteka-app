@@ -89,6 +89,15 @@ const api: KinotekaApi = {
     setEnabled: (enabled) => ipcRenderer.invoke(IpcChannel.ImdbSetEnabled, enabled),
     updateNow: () => ipcRenderer.invoke(IpcChannel.ImdbUpdateNow)
   },
+  theme: {
+    getSettings: () => ipcRenderer.invoke(IpcChannel.ThemeGetSettings),
+    saveSettings: (value) => ipcRenderer.invoke(IpcChannel.ThemeSaveSettings, value),
+    info: (titleId) => ipcRenderer.invoke(IpcChannel.ThemeInfo, titleId),
+    pickFile: (titleId) => ipcRenderer.invoke(IpcChannel.ThemePickFile, titleId),
+    setYoutube: (titleId, link) => ipcRenderer.invoke(IpcChannel.ThemeSetYoutube, titleId, link),
+    setNone: (titleId) => ipcRenderer.invoke(IpcChannel.ThemeSetNone, titleId),
+    reset: (titleId) => ipcRenderer.invoke(IpcChannel.ThemeReset, titleId)
+  },
   preview: {
     status: () => ipcRenderer.invoke(IpcChannel.PreviewStatus),
     setClipsEnabled: (enabled) => ipcRenderer.invoke(IpcChannel.PreviewSetClipsEnabled, enabled)

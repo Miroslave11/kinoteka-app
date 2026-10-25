@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, ExternalLink, MonitorPlay, RefreshCw, SearchCheck } from 'lucide-react'
+import { ArrowLeft, ExternalLink, MonitorPlay, Music, RefreshCw, SearchCheck } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { IMDB_TITLE_URL } from '../../../shared/metadata'
 import { displayName, displayYear, type TitleItem } from '../app/catalogData'
@@ -9,6 +9,8 @@ import BackgroundClips from './BackgroundClips'
 import FixMatchDialog from './FixMatchDialog'
 import ImdbBadge from './ImdbBadge'
 import Stars from './Stars'
+import ThemeDialog from './ThemeDialog'
+import ThemeMusic from './ThemeMusic'
 
 interface DetailHeaderProps {
   title: TitleItem
@@ -34,6 +36,8 @@ export default function DetailHeader({
 }: DetailHeaderProps): React.JSX.Element {
   const navigate = useNavigate()
   const [fixing, setFixing] = useState(false)
+  const [choosingTheme, setChoosingTheme] = useState(false)
+  const [themeVersion, setThemeVersion] = useState(0)
   const { metadata, imdb } = title
   const name = displayName(title)
   const original =
@@ -119,6 +123,9 @@ export default function DetailHeader({
             <button className="link" onClick={() => setFixing(true)}>
               <SearchCheck size={15} /> Opravit shodu
             </button>
+            <button className="link" onClick={() => setChoosingTheme(true)}>
+              <Music size={15} /> Melodie…
+            </button>
             {metadata && (
               <button
                 className="link"
@@ -172,6 +179,14 @@ export default function DetailHeader({
       )}
 
       {fixing && <FixMatchDialog title={title} onClose={() => setFixing(false)} />}
+      {choosingTheme && (
+        <ThemeDialog
+          title={title}
+          onClose={() => setChoosingTheme(false)}
+          onChanged={() => setThemeVersion((v) => v + 1)}
+        />
+      )}
+      <ThemeMusic titleId={title.id} version={themeVersion} />
     </>
   )
 }

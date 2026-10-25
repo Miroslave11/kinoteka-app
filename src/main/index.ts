@@ -62,6 +62,9 @@ import {
 import { OnlineSubtitlesService } from './subtitles/OnlineSubtitlesService'
 import { loadSubtitleSettings, saveSubtitleSettings } from './subtitles/subtitleSettings'
 import { registerUpdateIpc } from './update/updateIpc'
+import { ThemeDownloader } from './themes/ThemeDownloader'
+import { registerThemesIpc } from './themes/themesIpc'
+import { ThemeService } from './themes/ThemeService'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
 import { SettingsRepository } from './settings/SettingsRepository'
 import { WindowMode } from './windowMode'
@@ -516,7 +519,8 @@ void app.whenReady().then(() => {
       video: (id) => kidsRepository.thumbnailPath(id),
       title: (id) => kidsRepository.customCoverPath(id)
     },
-    chromiumFetch
+    chromiumFetch,
+    (titleId) => themes.path(titleId)
   )
 
   // Barvy z plakátů a klipy na pozadí – potřebují ffmpeg.
@@ -604,6 +608,19 @@ void app.whenReady().then(() => {
     nodePath: process.execPath,
     tempDir: join(app.getPath('temp'), 'kinoteka')
   })
+  // Ústřední melodie: ruční volba, soubor vedle filmu; z odkazu stahuje yt-dlp z dětské části.
+  const themeDownloader = new ThemeDownloader({
+    tool: () => ytDlp.ensure(),
+    ffmpegDir: dirname(ffmpeg),
+    nodePath: process.execPath
+  })
+  const themes = new ThemeService({
+    db,
+    dir: join(app.getPath('userData'), 'themes'),
+    download: (url, dir, name) => themeDownloader.download(url, dir, name)
+  })
+  registerThemesIpc(settings, themes)
+  void themes.removeOrphans()
   const kidsLibrary = new KidsLibrary(kidsRepository, {
     folder: () => kidsFolder(settings),
     busy: () => kidsDownloader.busy,
@@ -703,6 +720,7 @@ void app.whenReady().then(() => {
   app.on('will-quit', () => {
     // Náhledy a stahování z YouTube nesmí běžet dál bez aplikace.
     kidsDownloader.stopAll()
+    themeDownloader.stopAll()
     db.close()
   })
 })

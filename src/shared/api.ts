@@ -43,6 +43,7 @@ import type {
 } from './onlineSubtitles'
 import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
+import type { ThemeInfo, ThemeResult, ThemeSettings } from './theme'
 import type { UpdateState } from './update'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
@@ -183,6 +184,21 @@ export interface KinotekaApi {
     setEnabled(enabled: boolean): Promise<void>
     /** Stáhne datový soubor IMDb hned (jinak jednou týdně). */
     updateNow(): Promise<void>
+  }
+  /** Ústřední melodie na stránce filmu a seriálu. */
+  theme: {
+    getSettings(): Promise<ThemeSettings>
+    saveSettings(value: ThemeSettings): Promise<ThemeSettings>
+    /** Melodie titulu; null = neplatné id. */
+    info(titleId: number): Promise<ThemeInfo | null>
+    /** Vybere zvukový soubor v dialogu; null = výběr zrušen. */
+    pickFile(titleId: number): Promise<ThemeResult | null>
+    /** Stáhne melodii z videa na YouTube. */
+    setYoutube(titleId: number, link: string): Promise<ThemeResult>
+    /** Titul bude bez melodie. */
+    setNone(titleId: number): Promise<ThemeInfo | null>
+    /** Zruší ruční volbu (znovu platí soubor vedle filmu). */
+    reset(titleId: number): Promise<ThemeInfo | null>
   }
   preview: {
     /** Stav klipů na pozadí; null, když chybí ffmpeg. */
