@@ -10,7 +10,7 @@ export const formatFor = (quality: KidsQuality): string =>
 export const YTDLP_FORMAT = formatFor('1080')
 
 /** Společné volby: bez aktualizace a konfigurace, certifikáty Windows, JavaScript z Electronu. */
-const baseArgs = (nodePath: string): string[] => [
+export const baseArgs = (nodePath: string): string[] => [
   '--no-update',
   '--ignore-config',
   '--encoding',

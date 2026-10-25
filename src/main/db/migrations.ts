@@ -266,5 +266,19 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE kids_title ADD COLUMN artwork TEXT NOT NULL DEFAULT '[]';
   -- obrázek vybraný rodičem: „tmdb:/abc.jpg“ nebo „file:<cesta>“ (přednost před cover_video_id)
   ALTER TABLE kids_title ADD COLUMN cover_image TEXT;
+  `,
+
+  // 17 – ústřední melodie titulu vybraná ručně (soubor, odkaz z YouTube, nebo bez melodie)
+  `
+  CREATE TABLE title_theme (
+    title_id INTEGER PRIMARY KEY REFERENCES title (id) ON DELETE CASCADE,
+    -- 'file' = vybraný soubor, 'youtube' = stažený z odkazu, 'none' = bez melodie
+    source TEXT NOT NULL,
+    -- název souboru ve složce themes (NULL u 'none')
+    file TEXT,
+    -- odkaz, ze kterého se melodie stáhla
+    url TEXT,
+    updated_at TEXT NOT NULL
+  );
   `
 ]

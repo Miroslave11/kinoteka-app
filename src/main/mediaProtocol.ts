@@ -37,13 +37,22 @@ export function parseRange(
 
 const CLIP_NAME = /^\d+-\d+\.mp4$/
 
-async function serveClip(
-  clipsDir: string,
-  name: string,
+const AUDIO_TYPES: Record<string, string> = {
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.ogg': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.flac': 'audio/flac',
+  '.wav': 'audio/wav',
+  '.webm': 'audio/webm'
+}
+
+/** Soubor po částech (Range) – video a zvuk v okně jde přetáčet a načítat průběžně. */
+async function serveFile(
+  file: string,
+  contentType: string,
   rangeHeader: string | null
 ): Promise<Response> {
-  if (!CLIP_NAME.test(name)) return new Response(null, { status: 404 })
-  const file = join(clipsDir, name)
   let size: number
   try {
     size = (await stat(file)).size
@@ -60,7 +69,7 @@ async function serveClip(
     return new Response(data, {
       status: range ? 206 : 200,
       headers: {
-        'Content-Type': 'video/mp4',
+        'Content-Type': contentType,
         'Accept-Ranges': 'bytes',
         'Content-Length': String(data.length),
         ...(range ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {})
@@ -69,6 +78,24 @@ async function serveClip(
   } finally {
     await handle.close()
   }
+}
+
+function serveClip(clipsDir: string, name: string, rangeHeader: string | null): Promise<Response> {
+  if (!CLIP_NAME.test(name)) return Promise.resolve(new Response(null, { status: 404 }))
+  return serveFile(join(clipsDir, name), 'video/mp4', rangeHeader)
+}
+
+/** Ústřední melodie titulu podle id – cestu zná jen hlavní proces. */
+async function serveTheme(
+  themePath: (titleId: number) => Promise<string | null>,
+  pathname: string,
+  rangeHeader: string | null
+): Promise<Response> {
+  const match = /^\/(\d+)$/.exec(pathname)
+  const file = match ? await themePath(Number(match[1])) : null
+  const type = file && AUDIO_TYPES[extname(file).toLowerCase()]
+  if (!file || !type) return new Response(null, { status: 404 })
+  return serveFile(file, type, rangeHeader)
 }
 
 const IMAGE_TYPES: Record<string, string> = {
@@ -129,17 +156,22 @@ async function serveYoutubeThumbnail(fetchImpl: typeof fetch, pathname: string):
  * kinoteka-media://kids/video/7     → obrázek dětského videa
  * kinoteka-media://kids/title/3     → vlastní obrázek dětského titulu
  * kinoteka-media://ytthumb/<id>     → náhled videa z YouTube (před stažením)
+ * kinoteka-media://theme/12         → ústřední melodie titulu
  */
 export function handleMediaProtocol(
   images: ImageCache,
   clipsDir: string,
   kidsImages: KidsImages,
-  fetchImpl: typeof fetch
+  fetchImpl: typeof fetch,
+  themePath: (titleId: number) => Promise<string | null>
 ): void {
   protocol.handle(MEDIA_SCHEME, async (request) => {
     const url = new URL(request.url)
     if (url.hostname === 'clips') {
       return serveClip(clipsDir, url.pathname.slice(1), request.headers.get('Range'))
+    }
+    if (url.hostname === 'theme') {
+      return serveTheme(themePath, url.pathname, request.headers.get('Range'))
     }
     if (url.hostname === 'kids') return serveKidsImage(kidsImages, url.pathname)
     if (url.hostname === 'ytthumb') return serveYoutubeThumbnail(fetchImpl, url.pathname)

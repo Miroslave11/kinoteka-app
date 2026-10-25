@@ -8,6 +8,7 @@ import {
   type PcmChannels
 } from '../../../shared/audio'
 import LanguageList from './LanguageList'
+import ThemeSettings from './ThemeSettings'
 
 /** Nastavení → Zvuk: výstup, passthrough do receiveru a preferované jazyky. */
 export default function SoundSettings(): React.JSX.Element {
@@ -118,6 +119,8 @@ export default function SoundSettings(): React.JSX.Element {
           onChange={(languages) => save({ languages })}
         />
       </section>
+
+      <ThemeSettings />
     </div>
   )
 }
