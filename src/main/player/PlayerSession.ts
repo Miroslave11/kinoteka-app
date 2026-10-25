@@ -178,7 +178,7 @@ export class PlayerSession {
     const { mainWindow } = options
     const videoWindow = new BaseWindow(createVideoWindowOptions(mainWindow.getBounds()))
     if (mainWindow.isMaximized()) videoWindow.maximize()
-    if (mainWindow.isFullScreen()) videoWindow.setFullScreen(true)
+    const fullscreen = mainWindow.isFullScreen()
 
     const ipcPath = `\\\\.\\pipe\\kinoteka-mpv-${process.pid}-${Date.now()}`
     const args = buildMpvArgs({
@@ -216,6 +216,9 @@ export class PlayerSession {
     }
 
     videoWindow.show()
+    // Celá obrazovka až u zobrazeného okna: skryté okno by na ní Windows nenechal – zůstalo by
+    // jen velké jako obrazovka a hlavní panel Windows by byl dál vidět.
+    if (fullscreen) videoWindow.setFullScreen(true)
     mainWindow.hide()
 
     const overlay = new BrowserWindow({
