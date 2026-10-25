@@ -75,6 +75,9 @@ export const IpcChannel = {
   ThemeSetYoutube: 'theme:set-youtube',
   ThemeSetNone: 'theme:set-none',
   ThemeReset: 'theme:reset',
+  ThemeStatus: 'theme:status',
+  ThemeStatusChanged: 'theme:status-changed',
+  ThemeDownloaded: 'theme:downloaded',
 
   PreviewStatus: 'preview:status',
   PreviewSetClipsEnabled: 'preview:set-clips-enabled',

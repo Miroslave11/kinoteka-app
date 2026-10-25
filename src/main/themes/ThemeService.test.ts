@@ -170,3 +170,48 @@ describe('ThemeService', () => {
     expect(readdirSync(themesDir)).toEqual([])
   })
 })
+
+describe('ThemeService s automatickými melodiemi', () => {
+  it('automatická melodie hraje, jen když není ruční volba ani soubor u filmu', async () => {
+    const id = addTitle('movie', 'Matrix')
+    addFile(id, 'Matrix (1999).mkv')
+    mkdirSync(themesDir)
+    writeFileSync(join(themesDir, 'auto-1.m4a'), 'auto')
+    const prefer = vi.fn()
+    const service = new ThemeService({
+      db,
+      dir: themesDir,
+      download,
+      auto: {
+        file: () => ({ file: 'auto-1.m4a', url: 'https://www.youtube.com/watch?v=SLBACEP6LsI' }),
+        files: () => ['auto-1.m4a'],
+        prefer
+      }
+    })
+
+    expect(await service.info(id)).toMatchObject({
+      source: 'auto',
+      link: 'https://www.youtube.com/watch?v=SLBACEP6LsI'
+    })
+    touch('Matrix (1999).theme.mp3')
+    expect((await service.info(id)).source).toBe('local')
+    expect((await service.setNone(id)).source).toBe('none')
+
+    await service.removeOrphans()
+    expect(readdirSync(themesDir)).toEqual(['auto-1.m4a'])
+    expect(prefer).not.toHaveBeenCalled()
+  })
+
+  it('titul bez melodie pošle do stahování přednostně', async () => {
+    const id = addTitle('movie', 'Matrix')
+    const prefer = vi.fn()
+    const service = new ThemeService({
+      db,
+      dir: themesDir,
+      download,
+      auto: { file: () => null, files: () => [], prefer }
+    })
+    await service.info(id)
+    expect(prefer).toHaveBeenCalledWith(id)
+  })
+})

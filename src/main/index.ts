@@ -63,7 +63,9 @@ import { OnlineSubtitlesService } from './subtitles/OnlineSubtitlesService'
 import { loadSubtitleSettings, saveSubtitleSettings } from './subtitles/subtitleSettings'
 import { registerUpdateIpc } from './update/updateIpc'
 import { ThemeDownloader } from './themes/ThemeDownloader'
-import { registerThemesIpc } from './themes/themesIpc'
+import { AutoThemes } from './themes/AutoThemes'
+import { themerrYoutubeUrl } from './themes/themerr'
+import { loadThemeSettings, registerThemesIpc } from './themes/themesIpc'
 import { ThemeService } from './themes/ThemeService'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
 import { SettingsRepository } from './settings/SettingsRepository'
@@ -614,13 +616,27 @@ void app.whenReady().then(() => {
     ffmpegDir: dirname(ffmpeg),
     nodePath: process.execPath
   })
-  const themes = new ThemeService({
+  const themesDir = join(app.getPath('userData'), 'themes')
+  // Automaticky: odkaz z ThemerrDB podle ID z TMDB (ve vývoji jde přesměrovat na falešný server).
+  const themerrUrl = app.isPackaged ? undefined : process.env['KINOTEKA_DEV_THEMERR_URL']
+  const autoThemes: AutoThemes = new AutoThemes({
     db,
-    dir: join(app.getPath('userData'), 'themes'),
-    download: (url, dir, name) => themeDownloader.download(url, dir, name)
+    dir: themesDir,
+    enabled: () => loadThemeSettings(settings).autoDownload,
+    lookup: (kind, tmdbId) => themerrYoutubeUrl(chromiumFetch, kind, tmdbId, themerrUrl),
+    download: (url, dir, name) => themeDownloader.download(url, dir, name),
+    hasLocalTheme: (titleId) => themes.hasLocalTheme(titleId)
   })
-  registerThemesIpc(settings, themes)
-  void themes.removeOrphans()
+  const themes: ThemeService = new ThemeService({
+    db,
+    dir: themesDir,
+    download: (url, dir, name) => themeDownloader.download(url, dir, name),
+    auto: autoThemes
+  })
+  registerThemesIpc(settings, themes, autoThemes)
+  // Nepoužívané melodie pryč, pak stahování toho, co chybí (nové tituly hlásí metadata).
+  void themes.removeOrphans().then(() => autoThemes.run())
+  metadata.on('changed', () => void autoThemes.run())
   const kidsLibrary = new KidsLibrary(kidsRepository, {
     folder: () => kidsFolder(settings),
     busy: () => kidsDownloader.busy,

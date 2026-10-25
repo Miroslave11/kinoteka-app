@@ -7,8 +7,12 @@ const SOURCE_TEXT: Record<string, string> = {
   local: 'Hraje melodie uložená u souborů titulu.',
   file: 'Hraje zvukový soubor vybraný v aplikaci.',
   youtube: 'Hraje melodie stažená z YouTube.',
+  auto: 'Hraje melodie stažená automaticky (odkaz z databáze ThemerrDB).',
   none: 'Titul je bez melodie.'
 }
+
+const NO_THEME_TEXT =
+  'Melodie zatím není. Při zapnutém automatickém stahování ji aplikace zkusí najít sama.'
 
 /** „Melodie…“: vlastní soubor, odkaz z YouTube, nebo bez melodie. */
 export default function ThemeDialog({
@@ -88,9 +92,9 @@ export default function ThemeDialog({
         </header>
         <p className="muted">
           {title.kind === 'movie' ? 'Film' : 'Seriál'} „{displayName(title)}“.{' '}
-          {info ? (SOURCE_TEXT[info.source ?? ''] ?? 'Melodie zatím není.') : 'Zjišťuji…'}
+          {info ? (SOURCE_TEXT[info.source ?? ''] ?? NO_THEME_TEXT) : 'Zjišťuji…'}
         </p>
-        {info?.source === 'youtube' && info.link && (
+        {(info?.source === 'youtube' || info?.source === 'auto') && info.link && (
           <p className="small">
             <a href={info.link} target="_blank" rel="noreferrer">
               {info.link}

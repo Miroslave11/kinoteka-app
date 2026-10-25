@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, ExternalLink, MonitorPlay, Music, RefreshCw, SearchCheck } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { IMDB_TITLE_URL } from '../../../shared/metadata'
@@ -38,6 +38,15 @@ export default function DetailHeader({
   const [fixing, setFixing] = useState(false)
   const [choosingTheme, setChoosingTheme] = useState(false)
   const [themeVersion, setThemeVersion] = useState(0)
+
+  // Melodie stažená na pozadí, zatímco je stránka otevřená, začne hrát hned.
+  useEffect(
+    () =>
+      window.kinoteka.theme.onDownloaded((titleId) => {
+        if (titleId === title.id) setThemeVersion((v) => v + 1)
+      }),
+    [title.id]
+  )
   const { metadata, imdb } = title
   const name = displayName(title)
   const original =

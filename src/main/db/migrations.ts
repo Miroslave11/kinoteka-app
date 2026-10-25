@@ -280,5 +280,20 @@ export const MIGRATIONS: readonly string[] = [
     url TEXT,
     updated_at TEXT NOT NULL
   );
+  `,
+
+  // 18 – ústřední melodie stažená automaticky (odkaz z ThemerrDB podle ID z TMDB)
+  `
+  CREATE TABLE title_theme_auto (
+    title_id INTEGER PRIMARY KEY REFERENCES title (id) ON DELETE CASCADE,
+    -- ID z TMDB, pro které se hledalo (po opravě shody se hledá znovu)
+    tmdb_id INTEGER NOT NULL,
+    -- 'done' = staženo, 'none' = ThemerrDB melodii nezná, 'local' = titul má vlastní soubor,
+    -- 'error' = stažení nevyšlo
+    status TEXT NOT NULL,
+    file TEXT,
+    url TEXT,
+    updated_at TEXT NOT NULL
+  );
   `
 ]

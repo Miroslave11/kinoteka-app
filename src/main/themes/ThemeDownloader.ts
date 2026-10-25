@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process'
 import { readFile, rm } from 'node:fs/promises'
+import { constants, setPriority } from 'node:os'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { killTree } from '../kids/KidsDownloader'
@@ -78,6 +79,12 @@ export class ThemeDownloader {
       }
     )
     this.children.add(child)
+    // Na pozadí nesmí brzdit přehrávání ani práci s aplikací (podprocesy prioritu zdědí).
+    try {
+      if (child.pid) setPriority(child.pid, constants.priority.PRIORITY_BELOW_NORMAL)
+    } catch {
+      // Proces už skončil – nevadí.
+    }
     const output: string[] = []
     createInterface({ input: child.stdout! }).on('line', (line) => output.push(line))
     createInterface({ input: child.stderr! }).on('line', (line) => output.push(line))

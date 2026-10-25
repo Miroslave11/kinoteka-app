@@ -43,7 +43,7 @@ import type {
 } from './onlineSubtitles'
 import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
-import type { ThemeInfo, ThemeResult, ThemeSettings } from './theme'
+import type { ThemeInfo, ThemeResult, ThemeSettings, ThemeStatus } from './theme'
 import type { UpdateState } from './update'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
@@ -199,6 +199,11 @@ export interface KinotekaApi {
     setNone(titleId: number): Promise<ThemeInfo | null>
     /** Zruší ruční volbu (znovu platí soubor vedle filmu). */
     reset(titleId: number): Promise<ThemeInfo | null>
+    /** Automatické stahování: kolik titulů čeká, kolik má melodii. */
+    status(): Promise<ThemeStatus>
+    onStatusChanged(listener: (status: ThemeStatus) => void): () => void
+    /** Titul dostal automaticky staženou melodii. */
+    onDownloaded(listener: (titleId: number) => void): () => void
   }
   preview: {
     /** Stav klipů na pozadí; null, když chybí ffmpeg. */
