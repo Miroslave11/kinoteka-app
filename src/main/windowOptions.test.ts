@@ -23,6 +23,11 @@ describe('createMainWindowOptions', () => {
     expect(options.show).toBe(false)
     expect(options.backgroundColor).toBe('#07080c')
   })
+
+  it('nastartuje v okně, nebo na celé obrazovce podle uložené volby', () => {
+    expect(options.fullscreen).toBe(false)
+    expect(createMainWindowOptions('C:/app/preload.js', true).fullscreen).toBe(true)
+  })
 })
 
 describe('createOverlayWindowOptions', () => {

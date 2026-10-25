@@ -55,6 +55,12 @@ export interface AppInfo {
   logsPath: string
 }
 
+/** Režim hlavního okna. */
+export interface WindowState {
+  /** Celá obrazovka – bez lišty okna a hlavního panelu Windows. */
+  fullscreen: boolean
+}
+
 /** API, které preload zpřístupní oknům jako `window.kinoteka`. */
 export interface KinotekaApi {
   versions: {
@@ -66,6 +72,14 @@ export interface KinotekaApi {
     info(): Promise<AppInfo>
     /** Otevře v Průzkumníkovi složku s daty (databáze, cache) nebo se záznamy (logy). */
     openFolder(which: 'data' | 'logs'): Promise<void>
+    /** Ukončí aplikaci (na celé obrazovce chybí tlačítko Zavřít). */
+    quit(): Promise<void>
+  }
+  /** Celá obrazovka, nebo okno (ikona v horní liště, F11, Esc). */
+  appWindow: {
+    state(): Promise<WindowState>
+    setFullscreen(fullscreen: boolean): Promise<void>
+    onChanged(listener: (state: WindowState) => void): () => void
   }
   /** Automatické aktualizace (jen v nainstalované aplikaci). */
   update: {

@@ -306,6 +306,20 @@ option {
   backdrop-filter: blur(16px);
 }
 
+/* Celá obrazovka a Ukončit – stejně kulaté a skleněné jako stav knihovny vedle. */
+.icon-btn.topbar-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgb(0 0 0 / 0.3);
+  backdrop-filter: blur(16px);
+}
+
+.icon-btn.topbar-btn:hover {
+  color: var(--text);
+}
+
 /* ---------- stránky ---------- */
 .page {
   padding: 96px 36px 48px;

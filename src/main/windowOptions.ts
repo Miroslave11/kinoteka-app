@@ -18,12 +18,16 @@ function secureWebPreferences(preloadPath: string): WebPreferences {
   }
 }
 
-export function createMainWindowOptions(preloadPath: string): BrowserWindowConstructorOptions {
+export function createMainWindowOptions(
+  preloadPath: string,
+  fullscreen = false
+): BrowserWindowConstructorOptions {
   return {
     width: 1440,
     height: 900,
     minWidth: 1024,
     minHeight: 640,
+    fullscreen,
     show: false,
     title: 'Kinotéka',
     backgroundColor: APP_BACKGROUND,
