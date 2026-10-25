@@ -96,7 +96,10 @@ const api: KinotekaApi = {
     pickFile: (titleId) => ipcRenderer.invoke(IpcChannel.ThemePickFile, titleId),
     setYoutube: (titleId, link) => ipcRenderer.invoke(IpcChannel.ThemeSetYoutube, titleId, link),
     setNone: (titleId) => ipcRenderer.invoke(IpcChannel.ThemeSetNone, titleId),
-    reset: (titleId) => ipcRenderer.invoke(IpcChannel.ThemeReset, titleId)
+    reset: (titleId) => ipcRenderer.invoke(IpcChannel.ThemeReset, titleId),
+    status: () => ipcRenderer.invoke(IpcChannel.ThemeStatus),
+    onStatusChanged: (listener) => subscribe(IpcChannel.ThemeStatusChanged, listener),
+    onDownloaded: (listener) => subscribe(IpcChannel.ThemeDownloaded, listener)
   },
   preview: {
     status: () => ipcRenderer.invoke(IpcChannel.PreviewStatus),

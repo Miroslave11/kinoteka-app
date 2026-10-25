@@ -1,7 +1,9 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { IpcChannel } from '../../shared/ipc'
 import { THEME_EXTENSIONS, parseThemeSettings, type ThemeSettings } from '../../shared/theme'
+import { broadcast } from '../broadcast'
 import type { SettingsRepository } from '../settings/SettingsRepository'
+import type { AutoThemes } from './AutoThemes'
 import type { ThemeService } from './ThemeService'
 
 const SETTINGS_KEY = 'themes.settings'
@@ -12,14 +14,23 @@ export function loadThemeSettings(settings: SettingsRepository): ThemeSettings {
 
 const isId = (value: unknown): value is number => Number.isInteger(value)
 
-/** Ústřední melodie: nastavení a melodie titulu (stránka filmu a seriálu). */
-export function registerThemesIpc(settings: SettingsRepository, themes: ThemeService): void {
+/** Ústřední melodie: nastavení, melodie titulu (stránka filmu a seriálu), stahování. */
+export function registerThemesIpc(
+  settings: SettingsRepository,
+  themes: ThemeService,
+  auto: AutoThemes
+): void {
+  auto.on('changed', () => broadcast(IpcChannel.ThemeStatusChanged, auto.status()))
+  auto.on('downloaded', (titleId) => broadcast(IpcChannel.ThemeDownloaded, titleId))
   ipcMain.handle(IpcChannel.ThemeGetSettings, () => loadThemeSettings(settings))
   ipcMain.handle(IpcChannel.ThemeSaveSettings, (_event, value: unknown) => {
     const parsed = parseThemeSettings(value)
     settings.set(SETTINGS_KEY, parsed)
+    if (parsed.autoDownload) void auto.run()
+    else broadcast(IpcChannel.ThemeStatusChanged, auto.status())
     return parsed
   })
+  ipcMain.handle(IpcChannel.ThemeStatus, () => auto.status())
   ipcMain.handle(IpcChannel.ThemeInfo, (_event, titleId: unknown) =>
     isId(titleId) ? themes.info(titleId) : null
   )

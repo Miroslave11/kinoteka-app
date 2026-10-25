@@ -15,6 +15,13 @@ export interface ThemeServiceOptions {
   dir: string
   /** Stáhne zvuk z odkazu do `dir` jako `<name>.<přípona>` a vrátí název souboru. */
   download: (url: string, dir: string, name: string) => Promise<string>
+  /** Automaticky stažené melodie (ThemerrDB); bez nich jen ruční volba a soubory u filmů. */
+  auto?: {
+    file(titleId: number): { file: string; url: string | null } | null
+    files(): string[]
+    /** Titul nemá žádnou melodii – ať se stáhne přednostně. */
+    prefer(titleId: number): void
+  }
 }
 
 const NONE: ThemeInfo = { url: null, source: null, link: null }
@@ -36,8 +43,9 @@ interface Choice {
 
 /**
  * Ústřední melodie titulů. Přednost má ruční volba v aplikaci, pak soubor
- * „<název souboru filmu>.theme.mp3“ vedle filmu a nakonec „theme.mp3“ ve složce,
- * ve které jsou jen soubory tohoto titulu (složka seriálu, případně složka nad sériemi).
+ * „<název souboru filmu>.theme.mp3“ vedle filmu, „theme.mp3“ ve složce, ve které jsou jen
+ * soubory tohoto titulu (složka seriálu, případně složka nad sériemi), a nakonec melodie
+ * stažená automaticky.
  */
 export class ThemeService {
   /** Poslední nalezená cesta k melodii podle titulu – pro kinoteka-media://theme/<id>. */
@@ -53,7 +61,19 @@ export class ThemeService {
       if (await exists(path)) return this.found(titleId, path, choice.source, choice.url)
     }
     const local = await this.localTheme(titleId)
-    return local ? this.found(titleId, local, 'local', null) : this.found(titleId, null, null, null)
+    if (local) return this.found(titleId, local, 'local', null)
+    const auto = this.options.auto?.file(titleId)
+    if (auto) {
+      const path = join(this.options.dir, auto.file)
+      if (await exists(path)) return this.found(titleId, path, 'auto', auto.url)
+    }
+    if (!choice) this.options.auto?.prefer(titleId)
+    return this.found(titleId, null, null, null)
+  }
+
+  /** Má titul vlastní melodii uloženou u souborů? */
+  async hasLocalTheme(titleId: number): Promise<boolean> {
+    return (await this.localTheme(titleId)) !== null
   }
 
   /** Cesta k melodii titulu (pro přehrávání); null = žádná. */
@@ -109,12 +129,13 @@ export class ThemeService {
 
   /** Smaže melodie, které už žádný titul nepoužívá (titul zmizel z knihovny). */
   async removeOrphans(): Promise<void> {
-    const used = new Set(
-      this.options.db
+    const used = new Set([
+      ...this.options.db
         .prepare('SELECT file FROM title_theme WHERE file IS NOT NULL')
         .all()
-        .map((row) => String(row['file']))
-    )
+        .map((row) => String(row['file'])),
+      ...(this.options.auto?.files() ?? [])
+    ])
     let names: string[]
     try {
       names = await readdir(this.options.dir)
