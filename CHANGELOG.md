@@ -1,5 +1,19 @@
 # Změny
 
+## 1.2.0 – 2026-10-25
+
+### Celá obrazovka
+
+- Kinotéka jde přepnout na celou obrazovku – zmizí lišta okna i hlavní panel Windows. Přepíná se ikonou vpravo v horní liště nebo klávesou F11, Esc celou obrazovku opustí (když není otevřený dialog).
+- Na celé obrazovce je vedle ikony tlačítko Ukončit. Kinotéka si poslední režim pamatuje a příště v něm nastartuje; po zavření filmu zůstane knihovna na celé obrazovce.
+
+### Ústřední melodie
+
+- Na stránce filmu nebo seriálu potichu zahraje jeho ústřední melodie: začne po chvilce, hraje jednou a zeslábne při odchodu ze stránky, spuštění filmu nebo minimalizaci okna.
+- Melodie se stahují samy na pozadí: odkaz se najde v komunitní databázi ThemerrDB podle údajů z TMDB a z YouTube se stáhne jen zvuk ze začátku (asi 1 MB na titul). Otevřený titul jde na řadu přednostně.
+- Odkaz „Melodie…“ v detailu: vlastní zvukový soubor, odkaz z YouTube, nebo bez melodie. Vlastní melodii jde uložit i vedle filmu jako `Název souboru filmu.theme.mp3` (u seriálu `theme.mp3` ve složce seriálu).
+- Nastavení → Zvuk → Ústřední melodie: zapnutí, hlasitost (výchozí 25 %), automatické stahování a jeho stav.
+
 ## 1.1.2 – 2026-10-24
 
 ### Přehrávání
