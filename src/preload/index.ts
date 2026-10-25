@@ -16,7 +16,13 @@ const api: KinotekaApi = {
   },
   app: {
     info: () => ipcRenderer.invoke(IpcChannel.AppInfo),
-    openFolder: (which) => ipcRenderer.invoke(IpcChannel.AppOpenFolder, which)
+    openFolder: (which) => ipcRenderer.invoke(IpcChannel.AppOpenFolder, which),
+    quit: () => ipcRenderer.invoke(IpcChannel.AppQuit)
+  },
+  appWindow: {
+    state: () => ipcRenderer.invoke(IpcChannel.WindowState),
+    setFullscreen: (fullscreen) => ipcRenderer.invoke(IpcChannel.WindowSetFullscreen, fullscreen),
+    onChanged: (listener) => subscribe(IpcChannel.WindowChanged, listener)
   },
   update: {
     state: () => ipcRenderer.invoke(IpcChannel.UpdateState),

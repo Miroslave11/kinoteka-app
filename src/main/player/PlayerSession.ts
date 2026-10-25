@@ -538,10 +538,13 @@ export class PlayerSession {
     this.options.onEnd(error ? { error } : {})
   }
 
-  /** Hlavní okno se vrátí tam, kde naposledy bylo okno s videem. */
+  /**
+   * Hlavní okno se vrátí tam, kde naposledy bylo okno s videem. Knihovna na celé obrazovce
+   * na ní zůstane, ať se video mezitím zmenšilo do okna, nebo ne.
+   */
   private restoreMainWindow(): void {
     if (this.mainWindow.isDestroyed()) return
-    if (!this.videoWindow.isDestroyed()) {
+    if (!this.videoWindow.isDestroyed() && !this.mainWindow.isFullScreen()) {
       const maximized = this.videoWindow.isMaximized()
       if (!maximized && !this.videoWindow.isFullScreen()) {
         this.mainWindow.setBounds(this.videoWindow.getBounds())

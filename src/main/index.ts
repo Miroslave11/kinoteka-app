@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell } from 'el
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import type { WindowState } from '../shared/api'
 import { IpcChannel } from '../shared/ipc'
 import { DEFAULT_KIDS_SETTINGS, parseKidsSettings, type KidsSettings } from '../shared/kids'
 import { VIDEO_EXTENSIONS } from '../shared/library'
@@ -63,6 +64,7 @@ import { loadSubtitleSettings, saveSubtitleSettings } from './subtitles/subtitle
 import { registerUpdateIpc } from './update/updateIpc'
 import { hardenWebContents, loadRendererPage, preloadPath } from './rendererPage'
 import { SettingsRepository } from './settings/SettingsRepository'
+import { WindowMode } from './windowMode'
 import { createMainWindowOptions } from './windowOptions'
 
 // S DirectComposition kreslí Chromium obsah oken nad všechna vnořená nativní okna,
@@ -92,15 +94,29 @@ let session: PlayerSession | null = null
 let playback: PlaybackRepository
 let tracker: PlaybackTracker
 let settings: SettingsRepository
+let windowMode: WindowMode
 
 /** fetch přes síť Chromia (net.fetch), který neumí objekt URL – převede ho na text. */
 const chromiumFetch: typeof fetch = (input, init) =>
   net.fetch(input instanceof URL ? input.toString() : input, init)
 
 function createMainWindow(): BrowserWindow {
-  const win = new BrowserWindow(createMainWindowOptions(preloadPath()))
+  const win = new BrowserWindow(
+    createMainWindowOptions(preloadPath(), windowMode.startFullscreen())
+  )
   mainWindow = win
   win.once('ready-to-show', () => win.show())
+  windowMode.attach(win, (state) => {
+    if (!win.isDestroyed()) win.webContents.send(IpcChannel.WindowChanged, state)
+  })
+  // F11 přepíná celou obrazovku; preventDefault zastaví i stejnou zkratku výchozí nabídky,
+  // která by režim hned přepnula zpátky.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.key !== 'F11') return
+    if (input.alt || input.control || input.shift || input.meta) return
+    event.preventDefault()
+    if (!input.isAutoRepeat) windowMode.toggle(win)
+  })
   hardenWebContents(win)
   void loadRendererPage(win, 'index')
   return win
@@ -662,6 +678,14 @@ void app.whenReady().then(() => {
     if (typeof enabled === 'boolean') autoScan.setEnabled(enabled)
   })
   registerPlayerIpc()
+  windowMode = new WindowMode(settings)
+  ipcMain.handle(IpcChannel.WindowState, (event): WindowState => ({
+    fullscreen: BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false
+  }))
+  ipcMain.handle(IpcChannel.WindowSetFullscreen, (event, fullscreen: unknown) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (win && win === mainWindow && typeof fullscreen === 'boolean') win.setFullScreen(fullscreen)
+  })
 
   const win = createMainWindow()
 

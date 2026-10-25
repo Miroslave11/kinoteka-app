@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { Search } from 'lucide-react'
+import { Expand, Power, Search, Shrink } from 'lucide-react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { formatSize } from '../../../shared/library'
 import { useApp } from '../app/AppContext'
+import { useFullscreen } from '../app/fullscreen'
 import { filesOf } from '../app/catalogData'
 import { countOf } from '../../../shared/plural'
 
@@ -12,6 +13,7 @@ export default function TopBar(): React.JSX.Element {
   const location = useLocation()
   const [params] = useSearchParams()
   const input = useRef<HTMLInputElement>(null)
+  const [fullscreen, setFullscreen] = useFullscreen()
   const query = location.pathname === '/hledat' ? (params.get('q') ?? '') : ''
 
   // Ctrl+K přesune kurzor do vyhledávání.
@@ -57,6 +59,24 @@ export default function TopBar(): React.JSX.Element {
         {offline ? `${offline} knihovna offline · ` : 'Knihovna aktuální · '}
         {countOf(files.length, 'soubor', 'soubory', 'souborů')} · {formatSize(totalSize)}
       </div>
+      <button
+        className="icon-btn topbar-btn"
+        onClick={() => setFullscreen(!fullscreen)}
+        title={fullscreen ? 'Zobrazit v okně (F11)' : 'Celá obrazovka (F11)'}
+        aria-label={fullscreen ? 'Zobrazit v okně' : 'Celá obrazovka'}
+      >
+        {fullscreen ? <Shrink size={18} /> : <Expand size={18} />}
+      </button>
+      {fullscreen && (
+        <button
+          className="icon-btn topbar-btn"
+          onClick={() => void window.kinoteka.app.quit()}
+          title="Ukončit Kinotéku"
+          aria-label="Ukončit Kinotéku"
+        >
+          <Power size={18} />
+        </button>
+      )}
     </div>
   )
 }

@@ -14,7 +14,7 @@ function bundledVersion(tool: 'mpv' | 'ffmpeg'): string | null {
   }
 }
 
-/** Nastavení → O aplikaci: verze a otevření složek s daty a záznamy. */
+/** Nastavení → O aplikaci: verze a otevření složek s daty a záznamy; ukončení aplikace. */
 export function registerAppInfoIpc(): void {
   ipcMain.handle(IpcChannel.AppInfo, (): AppInfo => ({
     version: app.getVersion(),
@@ -27,4 +27,5 @@ export function registerAppInfoIpc(): void {
     if (which !== 'data' && which !== 'logs') return
     await shell.openPath(app.getPath(which === 'data' ? 'userData' : 'logs'))
   })
+  ipcMain.handle(IpcChannel.AppQuit, () => app.quit())
 }

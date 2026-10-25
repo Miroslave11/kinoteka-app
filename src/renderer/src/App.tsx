@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect } from 'react'
 import { HashRouter, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { AppProvider, useApp } from './app/AppContext'
+import { useEscapeLeavesFullscreen } from './app/fullscreen'
 import FileDetailsDialog from './components/FileDetailsDialog'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -30,6 +31,7 @@ function Shell(): React.JSX.Element {
   const navigate = useNavigate()
   const { error, setError, detailsFileId, showDetails } = useApp()
   const kidsArea = location.pathname === '/deti' || location.pathname.startsWith('/deti/')
+  useEscapeLeavesFullscreen()
 
   // Zamčený dětský režim (i po restartu): mimo část Děti se okno vrátí zpět do ní.
   useEffect(() => {

@@ -2,6 +2,11 @@
 export const IpcChannel = {
   AppInfo: 'app:info',
   AppOpenFolder: 'app:open-folder',
+  AppQuit: 'app:quit',
+
+  WindowState: 'window:state',
+  WindowSetFullscreen: 'window:set-fullscreen',
+  WindowChanged: 'window:changed',
 
   UpdateState: 'update:state',
   UpdateChanged: 'update:changed',
