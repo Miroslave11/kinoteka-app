@@ -1,5 +1,15 @@
 # Změny
 
+## 1.2.1 – 2026-10-25
+
+### Přehrávání
+
+- Film spuštěný z celé obrazovky je hned opravdu na celé obrazovce i na vedlejším monitoru nebo projektoru – hlavní panel Windows už nezůstane vidět přes obraz.
+
+### Aktualizace
+
+- Kinotéka se umí aktualizovat i ze soukromého repozitáře s vydáními: má v sobě klíč, který smí vydání jen číst. Nastavení → O aplikaci ukazuje, do kdy klíč platí; 30 dní před vypršením upozorní i pruh nahoře.
+
 ## 1.2.0 – 2026-10-25
 
 ### Celá obrazovka
