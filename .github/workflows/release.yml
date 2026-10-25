@@ -24,6 +24,14 @@ jobs:
       - name: Testy
         run: npm test
 
+      # Vydání jsou v soukromém repozitáři – verze bez klíče pro čtení by se už nikdy
+      # neaktualizovala, proto bez něj vydání nevznikne.
+      - name: Klíč pro aktualizace je nastavený
+        shell: bash
+        env:
+          KINOTEKA_UPDATE_TOKEN: ${{ secrets.KINOTEKA_UPDATE_TOKEN }}
+        run: test -n "$KINOTEKA_UPDATE_TOKEN" || { echo "Chybí secret KINOTEKA_UPDATE_TOKEN"; exit 1; }
+
       - name: Verze v package.json odpovídá tagu
         shell: bash
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
@@ -48,4 +56,6 @@ jobs:
         env:
           # Klíč s právem zápisu jen do repozitáře kinoteka-vydani (Settings → Secrets → Actions).
           GH_TOKEN: ${{ secrets.KINOTEKA_VYDANI_TOKEN }}
+          # Klíč jen pro čtení kinoteka-vydani – vloží se do aplikace (aktualizace ze soukromého repa).
+          KINOTEKA_UPDATE_TOKEN: ${{ secrets.KINOTEKA_UPDATE_TOKEN }}
         run: npm run fetch:bin && npm run build && npx electron-builder --win --publish always

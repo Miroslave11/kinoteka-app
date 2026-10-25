@@ -41,9 +41,10 @@ nsis:
   # Knihovna, deník a nastavení zůstanou i po odinstalaci (pro přeinstalaci nebo aktualizaci).
   deleteAppDataOnUninstall: false
 
-# Automatické aktualizace: vydání (instalátor + latest.yml) jdou do veřejného repozitáře
-# jen s instalátory – zdrojový kód zůstává v soukromém repozitáři. Nahrává je CI z tagu v*
-# jako koncept; aktualizace dorazí až po ručním zveřejnění konceptu na GitHubu.
+# Automatické aktualizace: vydání (instalátor + latest.yml) jdou do soukromého repozitáře
+# jen s instalátory (zdrojový kód je v jiném soukromém repozitáři). Nahrává je CI z tagu v*
+# jako koncept; aktualizace dorazí až po ručním zveřejnění konceptu na GitHubu. Aplikace
+# vydání čte klíčem jen pro čtení, který do ní vloží workflow Vydání (src/main/update).
 publish:
   provider: github
   owner: Miroslave11

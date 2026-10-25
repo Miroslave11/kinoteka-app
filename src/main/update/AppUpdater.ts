@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import type { UpdateState } from '../../shared/update'
+import type { UpdateKey, UpdateState } from '../../shared/update'
 import type { SettingsRepository } from '../settings/SettingsRepository'
 
 const SETTING = 'update.autoCheck'
@@ -27,9 +27,13 @@ interface AppUpdaterEvents {
   changed: [UpdateState]
 }
 
+export const KEY_INVALID_MESSAGE =
+  'Klíč pro aktualizace je neplatný nebo vypršel – novou verzi je potřeba stáhnout a nainstalovat ručně.'
+
 /** Srozumitelná chyba z electron-updater (bez internetu, zatím žádné vydání, …). */
 export function updateErrorMessage(error: Error): string {
   const text = error.message
+  if (/\b401\b|Bad credentials/i.test(text)) return KEY_INVALID_MESSAGE
   if (/ERR_INTERNET_DISCONNECTED|ENOTFOUND|ETIMEDOUT|ECONNRESET|ERR_NAME_NOT_RESOLVED/i.test(text))
     return 'Aktualizace nejde zkontrolovat – zkontroluj připojení k internetu.'
   if (/latest\.yml|404|No published versions|Unable to find latest version/i.test(text))
@@ -41,12 +45,14 @@ export function updateErrorMessage(error: Error): string {
 
 /**
  * Automatické aktualizace: chvíli po startu a pak každých 6 hodin se zeptá na novou verzi
- * (veřejný repozitář Miroslave11/kinoteka-vydani), stáhne ji na pozadí a nainstaluje při
- * zavření aplikace – nebo hned po kliknutí na „Restartovat a nainstalovat“.
+ * (soukromý repozitář Miroslave11/kinoteka-vydani, čte se klíčem z aplikace), stáhne ji na
+ * pozadí a nainstaluje při zavření aplikace – nebo hned po kliknutí na „Restartovat a
+ * nainstalovat“. Při každé kontrole ověří i klíč (platnost, datum vypršení).
  */
 export class AppUpdater extends EventEmitter<AppUpdaterEvents> {
   private timer: NodeJS.Timeout | null = null
-  private current: Omit<UpdateState, 'autoCheck'>
+  private current: Omit<UpdateState, 'autoCheck' | 'key'>
+  private key: UpdateKey
 
   constructor(
     private readonly settings: SettingsRepository,
@@ -56,9 +62,12 @@ export class AppUpdater extends EventEmitter<AppUpdaterEvents> {
       setTimeout: typeof setTimeout
       setInterval: typeof setInterval
       clearInterval: typeof clearInterval
-    } = { setTimeout, setInterval, clearInterval }
+    } = { setTimeout, setInterval, clearInterval },
+    /** Ověření klíče pro aktualizace; bez něj aplikace klíč nemá. */
+    private readonly checkKey?: () => Promise<UpdateKey>
   ) {
     super()
+    this.key = { status: checkKey ? 'unknown' : 'none', expiresAt: null }
     this.current = {
       status: updater ? 'idle' : 'unsupported',
       version: null,
@@ -84,7 +93,9 @@ export class AppUpdater extends EventEmitter<AppUpdaterEvents> {
     updater.on('error', (error) => {
       // Připravená verze zůstane připravená – chyba další kontroly ji nesmaže.
       if (this.current.status === 'ready') return
-      this.set({ status: 'error', percent: null, message: updateErrorMessage(error) })
+      const message =
+        this.key.status === 'invalid' ? KEY_INVALID_MESSAGE : updateErrorMessage(error)
+      this.set({ status: 'error', percent: null, message })
     })
   }
 
@@ -93,7 +104,7 @@ export class AppUpdater extends EventEmitter<AppUpdaterEvents> {
   }
 
   state(): UpdateState {
-    return { ...this.current, autoCheck: this.autoCheck() }
+    return { ...this.current, autoCheck: this.autoCheck(), key: this.key }
   }
 
   start(): void {
@@ -118,6 +129,7 @@ export class AppUpdater extends EventEmitter<AppUpdaterEvents> {
   async check(): Promise<UpdateState> {
     const busy = ['checking', 'downloading', 'ready'].includes(this.current.status)
     if (this.updater && !busy) {
+      await this.verifyKey()
       // Chybu kontroly i stahování ohlásí událost „error“ – tady se jen nesmí propadnout dál.
       const result = await this.updater.checkForUpdates().catch(() => null)
       result?.downloadPromise?.catch(() => undefined)
@@ -132,6 +144,18 @@ export class AppUpdater extends EventEmitter<AppUpdaterEvents> {
     return true
   }
 
+  /** Platnost klíče (GitHub ji posílá v hlavičce); chyba sítě klíč nezneplatní. */
+  private async verifyKey(): Promise<void> {
+    if (!this.checkKey) return
+    const key = await this.checkKey().catch((): UpdateKey => ({
+      status: 'unknown',
+      expiresAt: null
+    }))
+    if (key.status === 'unknown' && this.key.status !== 'unknown') return
+    this.key = key
+    this.emit('changed', this.state())
+  }
+
   private async run(): Promise<void> {
     if (this.autoCheck()) await this.check()
   }
@@ -140,7 +164,7 @@ export class AppUpdater extends EventEmitter<AppUpdaterEvents> {
     this.timer = this.timers.setInterval(() => void this.run(), UPDATE_CHECK_INTERVAL_MS)
   }
 
-  private set(patch: Partial<Omit<UpdateState, 'autoCheck'>>): void {
+  private set(patch: Partial<Omit<UpdateState, 'autoCheck' | 'key'>>): void {
     this.current = { ...this.current, ...patch }
     this.emit('changed', this.state())
   }

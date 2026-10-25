@@ -15,9 +15,9 @@ Instalátor není podepsaný, Windows SmartScreen proto při prvním spuštění
 („Další informace“ → „Přesto spustit“). Knihovna, deník a nastavení jsou v `%APPDATA%\kinoteka`
 (stejná složka jako při vývoji, takže se po instalaci zachovají) a odinstalace je nemaže.
 
-Nainstalovaná Kinotéka se sama aktualizuje z veřejného repozitáře
-[kinoteka-vydani](https://github.com/Miroslave11/kinoteka-vydani), kde jsou jen instalátory
-(zdrojový kód zůstává soukromý).
+Nainstalovaná Kinotéka se sama aktualizuje ze soukromého repozitáře
+[kinoteka-vydani](https://github.com/Miroslave11/kinoteka-vydani), kde jsou jen instalátory.
+Čte ho klíčem jen pro čtení, který je vložený v aplikaci (viz níže).
 
 ## Spuštění bez instalace
 
@@ -58,10 +58,16 @@ a sestaví instalátor.
 3. Koncept zkontrolovat a zveřejnit – teprve potom si ho nainstalované Kinotéky stáhnou
    (po spuštění a každých 6 hodin) a nainstalují při zavření.
 
-Workflow potřebuje tajnou proměnnou `KINOTEKA_VYDANI_TOKEN` (Settings → Secrets and variables
-→ Actions): osobní klíč GitHubu (fine-grained) s právem _Contents: Read and write_ jen pro
-repozitář `kinoteka-vydani`. Když vyprší, stačí ho vyměnit – nainstalovaných aplikací se to
-netýká.
+Workflow potřebuje dvě tajné proměnné (Settings → Secrets and variables → Actions), obě jako
+osobní klíč GitHubu (fine-grained) jen pro repozitář `kinoteka-vydani`:
+
+- `KINOTEKA_VYDANI_TOKEN` – _Contents: Read and write_, nahrává vydání. Když vyprší, stačí ho
+  vyměnit – nainstalovaných aplikací se to netýká.
+- `KINOTEKA_UPDATE_TOKEN` – jen _Contents: Read-only_, vloží se do aplikace a ta jím čte
+  vydání. Bez něj workflow skončí chybou. Platnost ukazuje Nastavení → O aplikaci a 30 dní
+  před vypršením i pruh nahoře. **Výměna:** nový klíč do secretu, vydat novou verzi a
+  nainstalovat ji, dokud starý klíč platí. Po vypršení už Kinotéka novou verzi sama
+  nenajde – instalátor je pak potřeba stáhnout z GitHubu ručně.
 
 Aktualizace jdou vyzkoušet i ve vývoji proti vlastnímu serveru se souborem `latest.yml`:
 `KINOTEKA_DEV_UPDATE_URL=http://127.0.0.1:8767/ npm run dev`.
