@@ -70,4 +70,4 @@ jobs:
           name: Kinoteka-Setup
           path: dist/Kinoteka-Setup-*.exe
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
