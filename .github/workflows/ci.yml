@@ -63,11 +63,5 @@ jobs:
 
       - name: Sestavení instalátoru
         run: npm run dist
-
-      - name: Instalátor jako artefakt
-        uses: actions/upload-artifact@v7
-        with:
-          name: Kinoteka-Setup
-          path: dist/Kinoteka-Setup-*.exe
-          if-no-files-found: error
-          retention-days: 1
+      # Instalátor se jen sestaví (kontrola, že build funguje); nenahrává se jako artefakt,
+      # protože 195 MB rychle zaplní bezplatnou kvótu úložiště. Vydání dělá workflow release.yml.
