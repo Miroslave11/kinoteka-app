@@ -392,6 +392,7 @@ let ytCurrent: YtPlayItem | null = null
 let ytTracker: KidsTracker
 let ytRepository: YtRepository
 let ytDownloaderRef: KidsDownloader | null = null
+let ytQueueRef: KidsDownloadQueue | null = null
 
 /**
  * Video z části YT videa: běžný přehrávač s plným ovládáním, pozice se ukládá do vlastní
@@ -785,7 +786,9 @@ void app.whenReady().then(() => {
     makeThumbnail: existsSync(ffmpeg)
       ? (input, atSec, output) => videoThumbnail(ffmpeg, input, atSec, output)
       : undefined,
-    thumbnailDir: join(app.getPath('userData'), 'cache', 'yt')
+    thumbnailDir: join(app.getPath('userData'), 'cache', 'yt'),
+    trash: (path) => shell.trashItem(path),
+    downloadingInto: (folder): boolean => ytQueueRef?.isDownloadingInto(folder) ?? false
   })
   ytLibrary.on('changed', () => broadcast(IpcChannel.YtChanged))
   // Stahování do YT videí: vlastní yt-dlp proces (souběžně se stahováním pohádek), stejný nástroj.
@@ -812,6 +815,7 @@ void app.whenReady().then(() => {
     scan: () => ytLibrary.scan(),
     quickInfo: (videoId) => fetchOembed(chromiumFetch, videoId)
   })
+  ytQueueRef = ytQueue
   registerYtIpc({
     settings,
     library: ytLibrary,
