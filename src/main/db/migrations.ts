@@ -295,5 +295,33 @@ export const MIGRATIONS: readonly string[] = [
     url TEXT,
     updated_at TEXT NOT NULL
   );
+  `,
+  // 19 – YT videa: kategorie (podsložky složky YT) a videa v nich
+  `
+  CREATE TABLE yt_category (
+    id INTEGER PRIMARY KEY,
+    folder TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    -- klíčová slova pro zařazení (JSON pole textů)
+    keywords TEXT NOT NULL DEFAULT '[]',
+    -- záložní kategorie: 'music' = hudba bez jiné shody, 'other' = vše ostatní, NULL = běžná
+    role TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE yt_video (
+    id INTEGER PRIMARY KEY,
+    path TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    -- NULL = video v kořeni složky, které čeká na zařazení
+    category_id INTEGER REFERENCES yt_category (id) ON DELETE SET NULL,
+    youtube_id TEXT,
+    name TEXT NOT NULL,
+    channel TEXT,
+    duration REAL,
+    thumbnail TEXT,
+    size INTEGER NOT NULL,
+    mtime_ms INTEGER NOT NULL,
+    added_at TEXT NOT NULL
+  );
+  CREATE INDEX yt_video_category ON yt_video (category_id);
   `
 ]

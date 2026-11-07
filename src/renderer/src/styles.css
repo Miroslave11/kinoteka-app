@@ -2368,3 +2368,45 @@ p.info-chip {
 .kids-left + .toggle-row {
   margin-top: 14px;
 }
+
+/* ---------- Nastavení → YT videa ---------- */
+.yt-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.yt-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.03);
+  border: 1px solid var(--line);
+}
+
+.yt-cat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.yt-keywords {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  color: inherit;
+}
+
+.yt-cat-videos summary {
+  cursor: pointer;
+}
+
+.yt-cat-videos ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+}

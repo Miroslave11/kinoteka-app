@@ -9,9 +9,18 @@ import MetadataSettings from '../library/MetadataSettings'
 import PlayerTest from '../library/PlayerTest'
 import SoundSettings from '../library/SoundSettings'
 import SubtitlePrefs from '../library/SubtitlePrefs'
+import YtSettings from '../library/YtSettings'
 
 type Section =
-  'knihovna' | 'metadata' | 'zvuk' | 'titulky' | 'vzhled' | 'prehravac' | 'deti' | 'o-aplikaci'
+  | 'knihovna'
+  | 'metadata'
+  | 'zvuk'
+  | 'titulky'
+  | 'vzhled'
+  | 'prehravac'
+  | 'deti'
+  | 'yt'
+  | 'o-aplikaci'
 
 const SECTIONS: [Section, string][] = [
   ['knihovna', 'Knihovna'],
@@ -21,6 +30,7 @@ const SECTIONS: [Section, string][] = [
   ['vzhled', 'Vzhled'],
   ['prehravac', 'Přehrávač'],
   ['deti', 'Děti'],
+  ['yt', 'YT videa'],
   ['o-aplikaci', 'O aplikaci']
 ]
 
@@ -58,6 +68,7 @@ export default function SettingsPage(): React.JSX.Element {
           {section === 'vzhled' && <AppearanceSettings />}
           {section === 'prehravac' && <PlayerTest />}
           {section === 'deti' && <KidsSettings />}
+          {section === 'yt' && <YtSettings />}
           {section === 'o-aplikaci' && <AboutApp />}
         </div>
       </div>

@@ -1,10 +1,19 @@
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
-import { mkdir, readdir, readFile, rename, rm, stat } from 'node:fs/promises'
-import { basename, dirname, extname, join, relative, sep } from 'node:path'
+import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
+import { basename, dirname, join, relative, sep } from 'node:path'
 import type { KidsManageAction, KidsManageResult, KidsScanResult } from '../../shared/kids'
 import { isVideoFile } from '../../shared/library'
 import { diffScan, isIgnoredDir, listVideoFiles, type FoundFile } from '../library/scanner'
+import {
+  findSidecarImage,
+  infoText,
+  moveWithSidecars,
+  nameAndYoutubeId,
+  PARTIAL_DOWNLOAD as PARTIAL,
+  readInfoJson,
+  withoutExtension
+} from '../library/videoSidecars'
 import { deriveTitleName, matchTitle, safeFolderName, type VideoMeta } from './classify'
 import type { KidsRepository, StoredVideo, VideoRecord } from './KidsRepository'
 
@@ -38,32 +47,18 @@ export function fileError(error: unknown): string {
   return (error as Error).message
 }
 
-/** Rozpracované soubory yt-dlp: „x.f398.mp4“ (obraz bez zvuku), „x.temp.mp4“ (spojování). */
-const PARTIAL = /\.(f\d+|temp|part)\.[^.]+$/i
-const IMAGE_EXTENSIONS = ['.jpg', '.webp', '.png']
-
-const withoutExtension = (path: string): string => path.slice(0, path.length - extname(path).length)
-
 /** Údaje z `.info.json` vedle videa; bez něj aspoň název a YouTube ID ze jména souboru. */
 async function readVideoInfo(
   path: string
 ): Promise<VideoMeta & { youtubeId: string | null; duration: number | null }> {
-  const base = withoutExtension(path)
-  const fromName = /^(.*?)\s*\[([\w-]{11})\]$/.exec(basename(base))
-  const text = (value: unknown): string | null =>
-    typeof value === 'string' && value.trim() ? value.trim() : null
-  let info: Record<string, unknown> = {}
-  try {
-    info = JSON.parse(await readFile(`${base}.info.json`, 'utf8')) as Record<string, unknown>
-  } catch {
-    // Video odjinud než z YouTube – stačí jméno souboru.
-  }
+  const fromName = nameAndYoutubeId(path)
+  const info = (await readInfoJson(path)) ?? {}
   return {
-    title: text(info['title']) ?? fromName?.[1] ?? basename(base),
-    channel: text(info['channel']) ?? text(info['uploader']),
-    playlist: text(info['playlist_title']),
-    series: text(info['series']),
-    youtubeId: text(info['id']) ?? fromName?.[2] ?? null,
+    title: infoText(info['title']) ?? fromName.name,
+    channel: infoText(info['channel']) ?? infoText(info['uploader']),
+    playlist: infoText(info['playlist_title']),
+    series: infoText(info['series']),
+    youtubeId: infoText(info['id']) ?? fromName.youtubeId,
     duration: typeof info['duration'] === 'number' ? info['duration'] : null
   }
 }
@@ -193,7 +188,7 @@ export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
         if (!target) return 'Titul už neexistuje.'
         if (video.titleId === target.id) return null
         const targetDir = join(root, target.folder)
-        await this.moveWithSidecars(video.path, await readdir(dirname(video.path)), targetDir)
+        await moveWithSidecars(video.path, await readdir(dirname(video.path)), targetDir)
         await this.relocate(video, join(targetDir, basename(video.path)))
         return null
       }
@@ -270,8 +265,7 @@ export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
   ): Promise<VideoRecord> {
     const info = await readVideoInfo(file.path)
     const folder = relative(root, file.path).split(sep)
-    const base = withoutExtension(file.path)
-    const thumbnail = IMAGE_EXTENSIONS.map((ext) => base + ext).find((path) => existsSync(path))
+    const thumbnail = findSidecarImage(file.path)
     return {
       path: file.path,
       titleId: folder.length > 1 ? this.repository.ensureTitle(folder[0]!, this.now()) : null,
@@ -309,7 +303,7 @@ export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
       if (!target) continue
       const folder = safeFolderName(target)
       try {
-        await this.moveWithSidecars(path, names, join(root, folder))
+        await moveWithSidecars(path, names, join(root, folder))
         if (!titles.some((t) => t.name.toLowerCase() === folder.toLowerCase()))
           titles.push({ name: folder, keywords: [] })
         moved++
@@ -318,24 +312,6 @@ export class KidsLibrary extends EventEmitter<KidsLibraryEvents> {
       }
     }
     return moved
-  }
-
-  /** Přesune video i soubory se stejným začátkem jména (obrázek, údaje, titulky). */
-  private async moveWithSidecars(
-    path: string,
-    siblings: string[],
-    targetDir: string
-  ): Promise<void> {
-    await mkdir(targetDir, { recursive: true })
-    const base = basename(withoutExtension(path))
-    const related = siblings.filter(
-      (name) => name === basename(path) || name.startsWith(`${base}.`)
-    )
-    if (related.some((name) => existsSync(join(targetDir, name))))
-      throw new Error('V cílové složce už stejný soubor je.')
-    // Video poslední – kdyby se přesun přerušil, zůstane ve složce Kids a zkusí se znovu.
-    const ordered = [...related.filter((n) => n !== basename(path)), basename(path)]
-    for (const name of ordered) await rename(join(dirname(path), name), join(targetDir, name))
   }
 
   /** Doplní délku (ffprobe) a obrázek (ffmpeg) videím, ke kterým je YouTube nedal. */

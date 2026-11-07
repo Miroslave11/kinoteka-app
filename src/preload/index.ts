@@ -140,6 +140,15 @@ const api: KinotekaApi = {
     chooseTmdb: (titleId, choice) => ipcRenderer.invoke(IpcChannel.KidsChooseTmdb, titleId, choice),
     pickCover: (titleId) => ipcRenderer.invoke(IpcChannel.KidsPickCover, titleId)
   },
+  yt: {
+    status: () => ipcRenderer.invoke(IpcChannel.YtStatus),
+    listCategories: () => ipcRenderer.invoke(IpcChannel.YtListCategories),
+    scan: () => ipcRenderer.invoke(IpcChannel.YtScan),
+    onChanged: (listener) => subscribe(IpcChannel.YtChanged, () => listener()),
+    pickFolder: () => ipcRenderer.invoke(IpcChannel.YtPickFolder),
+    manage: (action) => ipcRenderer.invoke(IpcChannel.YtManage, action),
+    openFolder: () => ipcRenderer.invoke(IpcChannel.YtOpenFolder)
+  },
   library: {
     listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),
     listFiles: () => ipcRenderer.invoke(IpcChannel.LibraryListFiles),

@@ -150,6 +150,36 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     onStage?: (stage: KidsPreviewStage) => void,
     signal?: AbortSignal
   ): Promise<VideoInfo> {
+    const { code, json, output } = await this.runInfo(url, playlist, onStage, signal)
+    const info = code === 0 ? parseInfo(json) : null
+    if (!info) throw new Error(errorMessage(output))
+    return info
+  }
+
+  /**
+   * Všechny údaje o jednom videu z YouTube (`yt-dlp -J`: štítky, popis, kategorie…), bez
+   * stahování. Chyba spojení má `retry: true` (video samo je možná v pořádku).
+   */
+  async fullInfo(youtubeId: string): Promise<Record<string, unknown>> {
+    let result: Awaited<ReturnType<KidsDownloader['runInfo']>>
+    try {
+      result = await this.runInfo(`https://www.youtube.com/watch?v=${youtubeId}`, false)
+    } catch (error) {
+      throw Object.assign(error as Error, { retry: true })
+    }
+    const { code, json, output } = result
+    if (code === 0 && typeof json === 'object' && json !== null)
+      return json as Record<string, unknown>
+    const message = errorMessage(output)
+    throw Object.assign(new Error(message), { retry: /připojení/.test(message) })
+  }
+
+  private async runInfo(
+    url: string,
+    playlist: boolean,
+    onStage?: (stage: KidsPreviewStage) => void,
+    signal?: AbortSignal
+  ): Promise<{ code: number | null; json: unknown; output: string[] }> {
     onStage?.('tool')
     const exe = await this.prepareTool()
     if (signal?.aborted) throw new Error(PREVIEW_CANCELED)
@@ -163,14 +193,13 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     if (code === 'canceled') throw new Error(PREVIEW_CANCELED)
     if (code === 'timeout')
       throw new Error('YouTube neodpověděl ani za 3 minuty. Zkus to prosím znovu.')
-    let info: VideoInfo | null
+    let json: unknown = null
     try {
-      info = parseInfo(JSON.parse(Buffer.concat(stdout).toString('utf8')))
+      json = JSON.parse(Buffer.concat(stdout).toString('utf8'))
     } catch {
-      info = null
+      // Bez výstupu – chybu popíše výpis yt-dlp.
     }
-    if (code !== 0 || !info) throw new Error(errorMessage(output))
-    return info
+    return { code, json, output }
   }
 
   /** Zruší právě běžící stahování (ve frontě). */

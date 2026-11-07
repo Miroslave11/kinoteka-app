@@ -35,6 +35,9 @@ import { KidsLibrary } from './kids/KidsLibrary'
 import { KidsRepository } from './kids/KidsRepository'
 import { fetchOembed } from './kids/oembed'
 import { YtDlpTool } from './kids/YtDlpTool'
+import { YtLibrary } from './yt/YtLibrary'
+import { registerYtIpc, ytFolder } from './yt/ytIpc'
+import { YtRepository } from './yt/YtRepository'
 import { openDatabase } from './db/database'
 import { makeClip, posterPixels, videoThumbnail } from './media/ffmpeg'
 import { runFfprobe } from './media/ffprobe'
@@ -681,6 +684,29 @@ void app.whenReady().then(() => {
   })
   void kidsArtwork.run()
   void kidsLibrary.scan().catch((error: Error) => console.warn(`Složka Kids: ${error.message}`))
+
+  // YT videa: vlastní složka, podsložky = kategorie podle obsahu; údaje z YouTube přes yt-dlp.
+  const ytRepository = new YtRepository(db)
+  const ytLibrary = new YtLibrary(ytRepository, {
+    folder: () => ytFolder(settings),
+    fetchInfo: async (youtubeId) => {
+      try {
+        return { ok: true, info: await kidsDownloader.fullInfo(youtubeId) }
+      } catch (error) {
+        const { message, retry } = error as Error & { retry?: boolean }
+        return { ok: false, retry: retry ?? true, message }
+      }
+    },
+    probeDuration: async (path) =>
+      existsSync(ffprobe) ? (await runFfprobe(ffprobe, path)).durationSec || null : null,
+    makeThumbnail: existsSync(ffmpeg)
+      ? (input, atSec, output) => videoThumbnail(ffmpeg, input, atSec, output)
+      : undefined,
+    thumbnailDir: join(app.getPath('userData'), 'cache', 'yt')
+  })
+  ytLibrary.on('changed', () => broadcast(IpcChannel.YtChanged))
+  registerYtIpc({ settings, library: ytLibrary, repository: ytRepository })
+  void ytLibrary.scan().catch((error: Error) => console.warn(`Složka YT: ${error.message}`))
   ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))
   ipcMain.handle(IpcChannel.SubtitlesSaveSettings, (_event, value: unknown) =>
     saveSubtitleSettings(settings, value)
