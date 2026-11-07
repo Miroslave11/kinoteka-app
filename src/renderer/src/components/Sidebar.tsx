@@ -60,9 +60,6 @@ export default function Sidebar(): React.JSX.Element {
         <NavLink to="/serialy" className={link}>
           <Tv size={18} /> Seriály <span className="count">{shows.length}</span>
         </NavLink>
-        <NavLink to="/denik" className={link}>
-          <BookOpen size={18} /> Deník
-        </NavLink>
         <NavLink to="/deti" className={link}>
           <Smile size={18} /> Děti {kids !== null && <span className="count">{kids}</span>}
         </NavLink>
@@ -93,6 +90,9 @@ export default function Sidebar(): React.JSX.Element {
       <div className="side-bottom">
         <NavLink to="/nastaveni" className={link}>
           <Settings2 size={18} /> Nastavení
+        </NavLink>
+        <NavLink to="/denik" className={link}>
+          <BookOpen size={18} /> Deník
         </NavLink>
       </div>
     </aside>
