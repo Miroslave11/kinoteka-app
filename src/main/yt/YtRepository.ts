@@ -1,3 +1,9 @@
+import {
+  canResume,
+  progressOutcome,
+  progressRatio,
+  type PlaybackProgress
+} from '../../shared/playback'
 import type { YtCategory, YtCategoryRole, YtVideoSummary } from '../../shared/yt'
 import type { Database } from '../db/database'
 import type { StoredFile } from '../library/scanner'
@@ -181,21 +187,45 @@ export class YtRepository {
   }
 
   /**
-   * Kategorie s videi (i prázdné – jsou to složky, do kterých se řadí). Videa, která ještě
-   * čekají na zařazení, jsou na konci jako „Čeká na zařazení“.
+   * Kategorie s videi (i prázdné – jsou to složky, do kterých se řadí), videa nejnovější
+   * první. Videa, která ještě čekají na zařazení, jsou na konci jako „Čeká na zařazení“.
    */
   list(): YtCategory[] {
     const videos = new Map<number | null, YtVideoSummary[]>()
     const rows = this.db
-      .prepare('SELECT id, category_id, name, channel, duration FROM yt_video ORDER BY name')
+      .prepare(
+        `SELECT v.*, p.position, p.duration AS progress_duration, p.updated_at AS progress_at,
+           w.count AS watch_count, w.last_at AS watched_at
+         FROM yt_video v
+         LEFT JOIN yt_progress p ON p.video_id = v.id
+         LEFT JOIN yt_watch w ON w.video_id = v.id
+         ORDER BY v.added_at DESC, v.id DESC`
+      )
       .all()
     for (const row of rows) {
       const categoryId = row['category_id'] === null ? null : Number(row['category_id'])
+      const id = Number(row['id'])
+      const progress =
+        typeof row['position'] === 'number'
+          ? { position: row['position'], duration: Number(row['progress_duration']), updatedAt: '' }
+          : null
       const video: YtVideoSummary = {
-        id: Number(row['id']),
+        id,
         name: String(row['name']),
         channel: (row['channel'] as string | null) ?? null,
-        durationSec: typeof row['duration'] === 'number' ? Math.round(row['duration']) : null
+        durationSec: typeof row['duration'] === 'number' ? Math.round(row['duration']) : null,
+        youtubeId: (row['youtube_id'] as string | null) ?? null,
+        thumbnailUrl: row['thumbnail']
+          ? `kinoteka-media://yt/video/${id}?v=${Number(row['mtime_ms'])}`
+          : null,
+        addedAt: String(row['added_at']),
+        progress: canResume(progress) ? progressRatio(progress) : null,
+        watched: Number(row['watch_count'] ?? 0) > 0,
+        lastPlayedAt:
+          [row['progress_at'], row['watched_at']]
+            .filter((value): value is string => typeof value === 'string')
+            .sort()
+            .at(-1) ?? null
       }
       videos.set(categoryId, [...(videos.get(categoryId) ?? []), video])
     }
@@ -210,5 +240,68 @@ export class YtRepository {
     if (waiting)
       result.push({ id: null, name: 'Čeká na zařazení', keywords: [], role: null, videos: waiting })
     return result
+  }
+
+  // ---------- přehrávání ----------
+
+  /** Videa kategorie v pořadí na stránce (nejnovější první) – pro „předchozí / další“. */
+  queue(videoId: number): { id: number; path: string; name: string }[] {
+    const row = this.db.prepare('SELECT category_id FROM yt_video WHERE id = ?').get(videoId)
+    if (!row) return []
+    return this.db
+      .prepare(
+        `SELECT id, path, name FROM yt_video WHERE category_id IS ?
+         ORDER BY added_at DESC, id DESC`
+      )
+      .all(row['category_id'] ?? null)
+      .map((r) => ({ id: Number(r['id']), path: String(r['path']), name: String(r['name']) }))
+  }
+
+  progress(videoId: number): PlaybackProgress | null {
+    const row = this.db
+      .prepare('SELECT position, duration, updated_at FROM yt_progress WHERE video_id = ?')
+      .get(videoId)
+    return row
+      ? {
+          position: Number(row['position']),
+          duration: Number(row['duration']),
+          updatedAt: String(row['updated_at'])
+        }
+      : null
+  }
+
+  /** Uloží pozici; nad 90 % zapíše zhlédnutí a rozkoukání smaže. */
+  record(
+    videoId: number,
+    position: number,
+    duration: number,
+    now = new Date()
+  ): 'watched' | 'progress' | 'clear' {
+    const outcome = progressOutcome(position, duration)
+    if (outcome === 'progress') {
+      this.db
+        .prepare(
+          `INSERT INTO yt_progress (video_id, position, duration, updated_at) VALUES (?, ?, ?, ?)
+           ON CONFLICT (video_id) DO UPDATE SET position = excluded.position,
+             duration = excluded.duration, updated_at = excluded.updated_at`
+        )
+        .run(videoId, position, duration, now.toISOString())
+      return outcome
+    }
+    this.clearProgress(videoId)
+    if (outcome === 'watched') {
+      this.db
+        .prepare(
+          `INSERT INTO yt_watch (video_id, count, last_at) VALUES (?, 1, ?)
+           ON CONFLICT (video_id) DO UPDATE SET count = count + 1, last_at = excluded.last_at`
+        )
+        .run(videoId, now.toISOString())
+    }
+    return outcome
+  }
+
+  /** Zastavení (■): rozkoukání pryč, příště od začátku. */
+  clearProgress(videoId: number): void {
+    this.db.prepare('DELETE FROM yt_progress WHERE video_id = ?').run(videoId)
   }
 }

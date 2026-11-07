@@ -8,6 +8,15 @@ export interface YtVideoSummary {
   name: string
   channel: string | null
   durationSec: number | null
+  youtubeId: string | null
+  /** Obrázek videa (z YouTube, jinak snímek z videa); null = zástupné pozadí. */
+  thumbnailUrl: string | null
+  addedAt: string
+  /** Kolik je zhlédnuto (0–1) u rozkoukaného videa; null = není rozkoukané. */
+  progress: number | null
+  watched: boolean
+  /** Kdy se naposledy hrálo (pro řadu Pokračovat). */
+  lastPlayedAt: string | null
 }
 
 export interface YtCategory {

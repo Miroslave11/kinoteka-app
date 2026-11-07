@@ -15,6 +15,7 @@ import MovieDetailPage from './pages/MovieDetailPage'
 import SearchPage from './pages/SearchPage'
 import SettingsPage from './pages/SettingsPage'
 import ShowDetailPage from './pages/ShowDetailPage'
+import YtPage from './yt/YtPage'
 
 export default function App(): React.JSX.Element {
   return (
@@ -75,6 +76,7 @@ function Shell(): React.JSX.Element {
               <Route path="/serialy" element={<BrowsePage kind="show" />} />
               <Route path="/serialy/:id" element={<ShowDetailPage />} />
               <Route path="/denik" element={<JournalPage />} />
+              <Route path="/yt" element={<YtPage />} />
               <Route path="/hledat" element={<SearchPage />} />
               <Route path="/nastaveni" element={<SettingsPage />} />
             </Routes>
