@@ -1,5 +1,15 @@
 # Změny
 
+## 1.2.2 – 2026-11-07
+
+### Knihovny
+
+- Klik na název knihovny v levém menu ji znovu proskenuje – po připojení odpojeného disku nebo Synology (stav „offline“) už není nutné chodit do Nastavení. Během skenu tečka pulzuje.
+
+### Přehrávání
+
+- Tlačítko „Další díl“ je teď vedle tlačítka Vpřed o 30 s a nově je vedle tlačítka Zpět o 10 s tlačítko „Předchozí díl“ (klávesa P).
+
 ## 1.2.1 – 2026-10-25
 
 ### Přehrávání

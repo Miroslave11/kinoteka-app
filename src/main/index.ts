@@ -135,6 +135,8 @@ function resumePosition(item: PlaybackItem): number | undefined {
 
 const nextLabel = (item: PlaybackItem): string | null =>
   playback.nextEpisode(item)?.shortLabel ?? null
+const previousLabel = (item: PlaybackItem): string | null =>
+  playback.previousEpisode(item)?.shortLabel ?? null
 
 /** Titulky v jiném kódování než UTF-8 se převádějí do kopie v cache. */
 const subtitleCacheDir = (): string => join(app.getPath('userData'), 'cache', 'subtitles')
@@ -187,6 +189,7 @@ async function startPlayback(
     title: item?.label,
     startSec,
     next: item ? nextLabel(item) : null,
+    previous: item ? previousLabel(item) : null,
     audio: audioLaunchOptions(loadAudioSettings(settings)),
     tracks: trackChoicesFor(file, item),
     subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
@@ -197,7 +200,10 @@ async function startPlayback(
       if (session === started) tracker.update(position, duration)
     },
     onNext: () => {
-      if (session === started) playNext(started)
+      if (session === started) playSibling(started, 'next')
+    },
+    onPrevious: () => {
+      if (session === started) playSibling(started, 'previous')
     },
     onStop: () => {
       if (session === started) tracker.discard()
@@ -238,18 +244,20 @@ async function startPlayback(
   else tracker.finish()
 }
 
-/** „Další díl“ – načte se do běžícího přehrávače, okno se nezavře. */
-function playNext(current: PlayerSession): void {
+/** „Další / předchozí díl“ – načte se do běžícího přehrávače, okno se nezavře. */
+function playSibling(current: PlayerSession, direction: 'next' | 'previous'): void {
   const item = tracker.current
-  const next = item && playback.nextEpisode(item)
-  if (!next) return
-  tracker.start(next)
+  if (!item) return
+  const target = direction === 'next' ? playback.nextEpisode(item) : playback.previousEpisode(item)
+  if (!target) return
+  tracker.start(target)
   current.load({
-    file: next.path,
-    title: next.label,
-    startSec: resumePosition(next),
-    next: nextLabel(next),
-    tracks: trackChoicesFor(next.path, next)
+    file: target.path,
+    title: target.label,
+    startSec: resumePosition(target),
+    next: nextLabel(target),
+    previous: previousLabel(target),
+    tracks: trackChoicesFor(target.path, target)
   })
 }
 

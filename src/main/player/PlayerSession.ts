@@ -69,6 +69,8 @@ export interface PlayerSessionOptions {
   startSec?: number
   /** Popis dalšího dílu pro tlačítko „Další díl“. */
   next?: string | null
+  /** Popis předchozího dílu pro tlačítko „Předchozí díl“. */
+  previous?: string | null
   /** Volby zvuku pro mpv (passthrough, zařízení, kanály, jazyky). */
   audio: Pick<
     MpvLaunchOptions,
@@ -105,6 +107,7 @@ export interface LoadOptions {
   title: string
   startSec?: number
   next: string | null
+  previous?: string | null
   tracks: TrackChoices
   kids?: KidsPlayerInfo
 }
@@ -162,6 +165,7 @@ export class PlayerSession {
       ...INITIAL_PLAYER_STATE,
       title: options.title ?? basename(options.file),
       next: options.next ?? null,
+      previous: options.previous ?? null,
       kids: options.kids ?? null,
       fullscreen: videoWindow.isFullScreen()
     }
@@ -294,6 +298,7 @@ export class PlayerSession {
     this.update({
       title: options.title,
       next: options.next,
+      previous: options.previous ?? null,
       kids: options.kids ?? this.state.kids,
       position: 0,
       duration: 0,

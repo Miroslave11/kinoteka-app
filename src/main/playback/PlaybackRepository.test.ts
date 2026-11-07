@@ -123,6 +123,17 @@ describe('PlaybackRepository', () => {
     expect(playback.nextEpisode(playback.itemForFile(s2)!)).toBeUndefined()
   })
 
+  it('předchozí díl přeskočí nedostupné a vrací se do předchozí série', () => {
+    const e1 = addFile('Země gangů S01E01.mkv')
+    const e2 = addFile('Země gangů S01E02.mkv')
+    const s2 = addFile('Země gangů S02E01.mkv')
+    catalog.rebuild()
+    db.prepare('UPDATE media_file SET available = 0 WHERE id = ?').run(e2)
+
+    expect(playback.previousEpisode(playback.itemForFile(s2)!)?.fileId).toBe(e1)
+    expect(playback.previousEpisode(playback.itemForFile(e1)!)).toBeUndefined()
+  })
+
   it('pamatuje si zvukovou stopu pro celý seriál a přepíše ji novou volbou', () => {
     const file = addFile('Země gangů S01E01.mkv')
     catalog.rebuild()

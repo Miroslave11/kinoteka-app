@@ -23,6 +23,26 @@ export default function Sidebar(): React.JSX.Element {
   const { movies, shows, folders } = useApp()
   const link = ({ isActive }: { isActive: boolean }): string => (isActive ? 'on' : '')
   const kids = useKidsVideoCount()
+  const [scanning, setScanning] = useState<ReadonlySet<number>>(new Set())
+
+  /** Klik na knihovnu ji znovu proskenuje (hlavně aby se vrátil odpojený a znovu připojený disk). */
+  const rescan = async (id: number): Promise<void> => {
+    const toggle = (on: boolean): void =>
+      setScanning((current) => {
+        const next = new Set(current)
+        if (on) next.add(id)
+        else next.delete(id)
+        return next
+      })
+    toggle(true)
+    try {
+      await window.kinoteka.library.scan(id)
+    } catch {
+      // Výsledek skenu (i chyba) se projeví ve stavu složky po obnovení dat.
+    } finally {
+      toggle(false)
+    }
+  }
 
   return (
     <aside className="sidebar">
@@ -50,15 +70,25 @@ export default function Sidebar(): React.JSX.Element {
 
       <div className="side-sep">Knihovny</div>
       {folders.length === 0 && <div className="lib muted">žádná složka</div>}
-      {folders.map((folder) => (
-        <div key={folder.id} className="lib" title={folder.path}>
-          <i className={`dot ${folder.online ? '' : 'off'}`} />
-          <span>
-            {folder.name}
-            {folder.online ? '' : ' – offline'}
-          </span>
-        </div>
-      ))}
+      {folders.map((folder) => {
+        const busy = scanning.has(folder.id)
+        return (
+          <button
+            key={folder.id}
+            type="button"
+            className={`lib lib-btn ${busy ? 'is-scanning' : ''}`}
+            title={`${folder.path}\nKlikem znovu proskenovat`}
+            disabled={busy}
+            onClick={() => void rescan(folder.id)}
+          >
+            <i className={`dot ${folder.online ? '' : 'off'}`} />
+            <span>
+              {folder.name}
+              {busy ? ' – skenuji…' : folder.online ? '' : ' – offline'}
+            </span>
+          </button>
+        )
+      })}
 
       <div className="side-bottom">
         <NavLink to="/nastaveni" className={link}>
