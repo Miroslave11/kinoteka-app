@@ -162,3 +162,20 @@ describe('pořad na TMDB', () => {
     })
   })
 })
+
+describe('parseDownloadRequest – YT videa', () => {
+  it('prázdný název jen s allowAuto, kvalita 4K', () => {
+    const value = {
+      kind: 'video',
+      videoId: 'aaaaaaaaaaa',
+      playlistId: null,
+      title: '',
+      quality: '2160'
+    }
+    expect(parseDownloadRequest(value)).toBeNull()
+    expect(parseDownloadRequest(value, { allowAuto: true })).toMatchObject({
+      title: '',
+      quality: '2160'
+    })
+  })
+})

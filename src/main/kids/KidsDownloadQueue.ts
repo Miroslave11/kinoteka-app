@@ -31,10 +31,22 @@ export interface QueueDownloader {
   off: (event: 'progress', listener: (progress: KidsDownloadProgress) => void) => unknown
 }
 
+/** Údaje z náhledu, podle kterých se navrhuje, kam video uložit. */
+export interface SuggestMeta {
+  title: string
+  channel: string | null
+  playlist: string | null
+}
+
 export interface KidsDownloadQueueDeps {
   downloader: QueueDownloader
-  repository: Pick<KidsRepository, 'videoByYoutubeId' | 'titles'>
-  /** Složka Kids. */
+  /** Dětská část: titul a „už staženo“ podle databáze titulů. */
+  repository?: Pick<KidsRepository, 'videoByYoutubeId' | 'titles'>
+  /** Jiná část (YT videa): vlastní návrh podsložky; null = bez návrhu. */
+  suggest?: (meta: SuggestMeta) => { name: string | null; existing: boolean }
+  /** Jiná část: podsložka, ve které už video je (null = není staženo). */
+  alreadyIn?: (videoId: string) => string | null
+  /** Kořenová složka (Kids, YT); položka s prázdným `title` se stáhne přímo do ní. */
   folder: () => string
   /** Po každém staženém videu – zařazení do titulu v knihovně. */
   scan: () => Promise<unknown>
@@ -67,6 +79,31 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
 
   constructor(private readonly deps: KidsDownloadQueueDeps) {
     super()
+  }
+
+  /** Navržená podsložka pro video (titul podle jména a kanálu, nebo podle `deps.suggest`). */
+  private suggest(meta: SuggestMeta): { name: string | null; existing: boolean } {
+    if (this.deps.suggest) return this.deps.suggest(meta)
+    const titles = (this.deps.repository?.titles() ?? []).map((t) => ({
+      name: t.folder,
+      keywords: t.keywords
+    }))
+    const full = { ...meta, series: null }
+    const existing = matchTitle(full, titles)
+    // Nový titul raději podle kanálu („Prasátko Peppa“) než podle názvu playlistu.
+    return existing
+      ? { name: existing, existing: true }
+      : {
+          name: deriveTitleName({ ...full, playlist: null }) ?? deriveTitleName(full),
+          existing: false
+        }
+  }
+
+  /** Podsložka, ve které už video je; null = ještě není staženo. */
+  private alreadyIn(videoId: string): string | null {
+    if (this.deps.alreadyIn) return this.deps.alreadyIn(videoId)
+    const found = this.deps.repository?.videoByYoutubeId(videoId)
+    return found ? (found.title ?? 'Ostatní') : null
   }
 
   get items(): KidsQueueItem[] {
@@ -116,17 +153,11 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
       if (video && link.videoId) this.names.set(link.videoId, video.title)
       for (const entry of playlist?.entries ?? []) this.names.set(entry.id, entry.title)
 
-      const titles = this.deps.repository
-        .titles()
-        .map((t) => ({ name: t.folder, keywords: t.keywords }))
-      const meta = {
+      const suggestion = this.suggest({
         title: main.title,
         channel: main.channel,
-        playlist: playlist?.title ?? null,
-        series: null
-      }
-      const existing = matchTitle(meta, titles)
-      const already = link.videoId ? this.deps.repository.videoByYoutubeId(link.videoId) : null
+        playlist: playlist?.title ?? null
+      })
       return {
         ok: true,
         preview: {
@@ -140,11 +171,9 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
             playlist && link.playlistId
               ? { id: link.playlistId, title: playlist.title, count: playlist.entries.length }
               : null,
-          // Nový titul raději podle kanálu („Prasátko Peppa“) než podle názvu playlistu.
-          suggestedTitle:
-            existing ?? deriveTitleName({ ...meta, playlist: null }) ?? deriveTitleName(meta),
-          suggestedExisting: existing !== null,
-          alreadyIn: already ? (already.title ?? 'Ostatní') : null
+          suggestedTitle: suggestion.name,
+          suggestedExisting: suggestion.existing,
+          alreadyIn: link.videoId ? this.alreadyIn(link.videoId) : null
         }
       }
     } catch (error) {
@@ -158,7 +187,8 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
   async enqueue(
     request: KidsDownloadRequest
   ): Promise<{ ok: true; added: number; skipped: number } | { ok: false; message: string }> {
-    const title = safeFolderName(request.title)
+    // Prázdný název = přímo do kořenové složky (YT videa: zařadí se podle obsahu).
+    const title = request.title ? safeFolderName(request.title) : ''
     let ids: string[]
     if (request.kind === 'playlist' && request.playlistId) {
       try {
@@ -177,7 +207,7 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
         (item) =>
           item.videoId === videoId && (item.status === 'waiting' || item.status === 'downloading')
       )
-      if (queued || this.deps.repository.videoByYoutubeId(videoId)) continue
+      if (queued || this.alreadyIn(videoId) !== null) continue
       const item: KidsQueueItem = {
         id: this.nextId++,
         videoId,
@@ -237,7 +267,7 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
         this.current = item
         item.status = 'downloading'
         this.emit('changed')
-        const folder = join(this.deps.folder(), item.title)
+        const folder = item.title ? join(this.deps.folder(), item.title) : this.deps.folder()
         const result = await this.deps.downloader.download(youtubeVideoUrl(item.videoId), {
           folder,
           quality: this.qualities.get(item.id)

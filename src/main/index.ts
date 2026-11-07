@@ -37,6 +37,7 @@ import { fetchOembed } from './kids/oembed'
 import { YtDlpTool } from './kids/YtDlpTool'
 import { YtLibrary } from './yt/YtLibrary'
 import { ytPlayItem, type YtPlayItem } from './yt/ytPlayback'
+import { matchCategory, metaFromInfo } from './yt/ytClassify'
 import { registerYtIpc, ytFolder } from './yt/ytIpc'
 import { YtRepository } from './yt/YtRepository'
 import { openDatabase } from './db/database'
@@ -390,6 +391,7 @@ function loadKids(current: PlayerSession, videoId: number): void {
 let ytCurrent: YtPlayItem | null = null
 let ytTracker: KidsTracker
 let ytRepository: YtRepository
+let ytDownloaderRef: KidsDownloader | null = null
 
 /**
  * Video z části YT videa: běžný přehrávač s plným ovládáním, pozice se ukládá do vlastní
@@ -786,7 +788,38 @@ void app.whenReady().then(() => {
     thumbnailDir: join(app.getPath('userData'), 'cache', 'yt')
   })
   ytLibrary.on('changed', () => broadcast(IpcChannel.YtChanged))
-  registerYtIpc({ settings, library: ytLibrary, repository: ytRepository, play: playYt })
+  // Stahování do YT videí: vlastní yt-dlp proces (souběžně se stahováním pohádek), stejný nástroj.
+  const ytDownloader = new KidsDownloader({
+    tool: () => ytDlp.ensure(),
+    folder: () => ytFolder(settings),
+    ffmpegDir: dirname(ffmpeg),
+    nodePath: process.execPath,
+    tempDir: join(app.getPath('temp'), 'kinoteka')
+  })
+  ytDownloaderRef = ytDownloader
+  const ytQueue = new KidsDownloadQueue({
+    downloader: ytDownloader,
+    folder: () => ytFolder(settings),
+    // Návrh jen podle názvu a kanálu (štítky z YouTube jsou až v údajích staženého videa).
+    suggest: (meta) => {
+      const name = matchCategory(
+        metaFromInfo({ title: meta.title, channel: meta.channel }, meta.title),
+        ytRepository.categories()
+      )
+      return { name, existing: name !== null }
+    },
+    alreadyIn: (videoId) => ytRepository.categoryOfYoutubeId(videoId),
+    scan: () => ytLibrary.scan(),
+    quickInfo: (videoId) => fetchOembed(chromiumFetch, videoId)
+  })
+  registerYtIpc({
+    settings,
+    library: ytLibrary,
+    repository: ytRepository,
+    play: playYt,
+    downloader: ytDownloader,
+    queue: ytQueue
+  })
   void ytLibrary.scan().catch((error: Error) => console.warn(`Složka YT: ${error.message}`))
   ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))
   ipcMain.handle(IpcChannel.SubtitlesSaveSettings, (_event, value: unknown) =>
@@ -851,6 +884,7 @@ void app.whenReady().then(() => {
   app.on('will-quit', () => {
     // Náhledy a stahování z YouTube nesmí běžet dál bez aplikace.
     kidsDownloader.stopAll()
+    ytDownloaderRef?.stopAll()
     themeDownloader.stopAll()
     db.close()
   })

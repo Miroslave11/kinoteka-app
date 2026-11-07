@@ -121,5 +121,13 @@ export const IpcChannel = {
   YtPickFolder: 'yt:pick-folder',
   YtManage: 'yt:manage',
   YtOpenFolder: 'yt:open-folder',
-  YtPlayVideo: 'yt:play-video'
+  YtPlayVideo: 'yt:play-video',
+  YtPreview: 'yt:preview',
+  YtPreviewStage: 'yt:preview-stage',
+  YtWarmUp: 'yt:warm-up',
+  YtEnqueue: 'yt:enqueue',
+  YtQueue: 'yt:queue',
+  YtQueueRemove: 'yt:queue-remove',
+  YtQueueClear: 'yt:queue-clear',
+  YtQueueChanged: 'yt:queue-changed'
 } as const

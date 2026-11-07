@@ -286,6 +286,18 @@ export interface KinotekaApi {
     openFolder(): Promise<void>
     /** Přehraje video (rozkoukané od uložené pozice, předchozí / další v kategorii). */
     playVideo(videoId: number): Promise<OpenFileResult>
+    /** Náhled odkazu s návrhem kategorie (podle názvu a kanálu). */
+    preview(url: string): Promise<KidsPreviewResult>
+    onPreviewStage(listener: (stage: KidsPreviewStage) => void): () => void
+    warmUp(): Promise<void>
+    /** Video nebo playlist do fronty; prázdný `title` = zařadit podle obsahu po stažení. */
+    enqueue(
+      request: KidsDownloadRequest
+    ): Promise<{ ok: true; added: number; skipped: number } | { ok: false; message: string }>
+    queue(): Promise<KidsQueueItem[]>
+    removeFromQueue(id: number): Promise<void>
+    clearFinished(): Promise<void>
+    onQueueChanged(listener: (items: KidsQueueItem[]) => void): () => void
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>

@@ -148,7 +148,15 @@ const api: KinotekaApi = {
     pickFolder: () => ipcRenderer.invoke(IpcChannel.YtPickFolder),
     manage: (action) => ipcRenderer.invoke(IpcChannel.YtManage, action),
     openFolder: () => ipcRenderer.invoke(IpcChannel.YtOpenFolder),
-    playVideo: (videoId) => ipcRenderer.invoke(IpcChannel.YtPlayVideo, videoId)
+    playVideo: (videoId) => ipcRenderer.invoke(IpcChannel.YtPlayVideo, videoId),
+    preview: (url) => ipcRenderer.invoke(IpcChannel.YtPreview, url),
+    onPreviewStage: (listener) => subscribe(IpcChannel.YtPreviewStage, listener),
+    warmUp: () => ipcRenderer.invoke(IpcChannel.YtWarmUp),
+    enqueue: (request) => ipcRenderer.invoke(IpcChannel.YtEnqueue, request),
+    queue: () => ipcRenderer.invoke(IpcChannel.YtQueue),
+    removeFromQueue: (id) => ipcRenderer.invoke(IpcChannel.YtQueueRemove, id),
+    clearFinished: () => ipcRenderer.invoke(IpcChannel.YtQueueClear),
+    onQueueChanged: (listener) => subscribe(IpcChannel.YtQueueChanged, listener)
   },
   library: {
     listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Play } from 'lucide-react'
+import { CheckCircle2, Download, Play } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { formatTime } from '../../../shared/player'
 import { countOf } from '../../../shared/plural'
@@ -7,6 +7,7 @@ import type { YtCategory, YtVideoSummary } from '../../../shared/yt'
 import { useApp } from '../app/AppContext'
 import { placeholderStyle, useAmbientPalette } from '../app/palette'
 import Artwork from '../components/Artwork'
+import YtDownload from './YtDownload'
 import { continueRow, filterKey, totalVideos, visibleCategories } from './ytData'
 
 /** Obrázek videa: uložený vedle videa (nebo snímek z něj), jinak náhled z YouTube. */
@@ -61,6 +62,7 @@ export default function YtPage(): React.JSX.Element {
   const { yt } = window.kinoteka
   const [categories, setCategories] = useState<YtCategory[] | null>(null)
   const [params, setParams] = useSearchParams()
+  const [downloading, setDownloading] = useState(false)
   useAmbientPalette(null)
 
   const reload = useCallback(async () => setCategories(await yt.listCategories()), [yt])
@@ -81,33 +83,51 @@ export default function YtPage(): React.JSX.Element {
   const select = (category: YtCategory | null): void =>
     setParams(category ? { kategorie: filterKey(category) } : {}, { replace: true })
 
+  const dialog = downloading && (
+    <YtDownload categories={categories ?? []} onClose={() => setDownloading(false)} />
+  )
+  const downloadButton = (
+    <button className="btn primary" onClick={() => setDownloading(true)}>
+      <Download size={16} /> Stáhnout z YouTube
+    </button>
+  )
+
   if (categories !== null && total === 0) {
     return (
       <div className="page empty-home">
         <h1>YT videa</h1>
         <p className="subtitle">
-          Zatím tu nejsou žádná videa. Vlož je do složky s YT videi – zařadí se samy do kategorií
-          podle obsahu.
+          Zatím tu nejsou žádná videa. Stáhni je odkazem z YouTube, nebo je vlož do složky s YT
+          videi – zařadí se samy do kategorií podle obsahu.
         </p>
-        <Link className="btn primary" to="/nastaveni?sekce=yt">
-          Nastavení YT videí
-        </Link>
+        <div className="actions">
+          {downloadButton}
+          <Link className="btn" to="/nastaveni?sekce=yt">
+            Nastavení YT videí
+          </Link>
+        </div>
+        {dialog}
       </div>
     )
   }
 
   return (
     <div className="page yt-page">
-      <h1>YT videa</h1>
-      <p className="subtitle">
-        {countOf(total, 'video', 'videa', 'videí')} ·{' '}
-        {countOf(
-          visible.filter((c) => c.id !== null).length,
-          'kategorie',
-          'kategorie',
-          'kategorií'
-        )}
-      </p>
+      <div className="yt-head">
+        <div>
+          <h1>YT videa</h1>
+          <p className="subtitle">
+            {countOf(total, 'video', 'videa', 'videí')} ·{' '}
+            {countOf(
+              visible.filter((c) => c.id !== null).length,
+              'kategorie',
+              'kategorie',
+              'kategorií'
+            )}
+          </p>
+        </div>
+        {downloadButton}
+      </div>
 
       <div className="toolbar yt-chips">
         <button className={`chip ${selected ? '' : 'on'}`} onClick={() => select(null)}>
@@ -165,6 +185,7 @@ export default function YtPage(): React.JSX.Element {
           ))}
         </>
       )}
+      {dialog}
     </div>
   )
 }

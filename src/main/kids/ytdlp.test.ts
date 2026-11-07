@@ -7,6 +7,7 @@ import {
   parseProgressLine,
   sha256For,
   titleBytesFor,
+  formatFor,
   YTDLP_FORMAT
 } from './ytdlp'
 
@@ -177,5 +178,12 @@ describe('parseInfo', () => {
   it('bez názvu → null', () => {
     expect(parseInfo({ title: '' })).toBeNull()
     expect(parseInfo('nesmysl')).toBeNull()
+  })
+})
+
+describe('formatFor', () => {
+  it('do 1080p nejdřív H.264, 4K nejdřív VP9', () => {
+    expect(formatFor('720')).toMatch(/^bv\*\[height<=720\]\[vcodec\^=avc1\]/)
+    expect(formatFor('2160')).toMatch(/^bv\*\[height<=2160\]\[vcodec\^=vp09\]/)
   })
 })
