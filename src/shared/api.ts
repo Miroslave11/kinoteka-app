@@ -45,6 +45,7 @@ import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
 import type { ThemeInfo, ThemeResult, ThemeSettings, ThemeStatus } from './theme'
 import type { UpdateState } from './update'
+import type { YtCategory, YtManageAction, YtManageResult, YtScanResult, YtStatus } from './yt'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
 export interface AppInfo {
@@ -270,6 +271,19 @@ export interface KinotekaApi {
     chooseTmdb(titleId: number, choice: KidsTmdbChoice): Promise<KidsManageResult>
     /** Vlastní obrázek titulu vybraný v dialogu; null = výběr zrušen. */
     pickCover(titleId: number): Promise<KidsManageResult | null>
+  }
+  yt: {
+    status(): Promise<YtStatus>
+    /** Kategorie (podsložky) s videi; videa čekající na údaje z YouTube jsou na konci. */
+    listCategories(): Promise<YtCategory[]>
+    /** Projde složku, videa z jejího kořene zařadí do kategorií. */
+    scan(): Promise<YtScanResult>
+    onChanged(listener: () => void): () => void
+    /** Vybere jinou složku s YT videi; null = zrušeno. */
+    pickFolder(): Promise<string | null>
+    /** Nová kategorie, klíčová slova kategorie. */
+    manage(action: YtManageAction): Promise<YtManageResult>
+    openFolder(): Promise<void>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>
