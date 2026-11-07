@@ -1,5 +1,21 @@
 # Změny
 
+## 1.3.0 – 2026-11-07
+
+### YT videa (nová část)
+
+- Nová položka **YT videa** v levém menu: videa stažená z YouTube (hlavně klipy) ve vlastní složce, výchozí `C:\Mirek_data\09_Videa\YT`. Složka jde změnit v Nastavení → YT videa.
+- **Řazení podle obsahu:** každá podsložka je jedna kategorie (výchozí Města, Příroda, Koncerty a živě, Hudební klipy, Ostatní). Videa vložená přímo do složky se zařadí podle štítků, názvu, popisu a kanálu z YouTube a přesunou se i s obrázkem a údaji. Videím bez údajů, která mají v názvu ID z YouTube, se údaje dotáhnou samy.
+- **Kategorie a klíčová slova** jdou v Nastavení → YT videa upravit, přidat, přejmenovat i smazat (videa ze smazané kategorie se znovu zařadí).
+- **Stránka YT videa:** řada Pokračovat, filtr kategorií, řady videí s náhledem, délkou a průběhem.
+- **Přehrávání** v běžném přehrávači: rozkoukané video pokračuje, předchozí / další video v kategorii, Zastavit rozkoukání smaže. Do deníku se nic nezapisuje.
+- **Stáhnout z YouTube:** odkaz na video nebo playlist, náhled, kategorie (automaticky podle obsahu nebo ručně), kvalita 720p / 1080p / 4K, fronta s průběhem.
+- **Správa videí:** pravé tlačítko (nebo ⋯) na videu – přesunout do jiné kategorie, otevřít na YouTube, smazat do Koše.
+
+### Menu
+
+- Deník je teď poslední položkou levého menu (pod Nastavením).
+
 ## 1.2.2 – 2026-11-07
 
 ### Knihovny
