@@ -92,6 +92,22 @@ export class PlaybackRepository {
     return row ? toItem(row) : undefined
   }
 
+  /** Předchozí díl seriálu, který je na disku a dostupný. */
+  previousEpisode(item: PlaybackItem): PlaybackItem | undefined {
+    if (item.episodeId === null) return undefined
+    const row = this.db
+      .prepare(
+        `${ITEM_SELECT}
+         JOIN episode cur ON cur.id = ?
+         WHERE f.title_id = ? AND f.available = 1
+           AND (e.season < cur.season OR (e.season = cur.season AND e.episode < cur.episode))
+         ORDER BY e.season DESC, e.episode DESC, f.path
+         LIMIT 1`
+      )
+      .get(item.episodeId, item.titleId)
+    return row ? toItem(row) : undefined
+  }
+
   progress(titleId: number, episodeId: number | null): PlaybackProgress | null {
     const row = this.db
       .prepare('SELECT * FROM playback_progress WHERE title_id = ? AND episode_id IS ?')

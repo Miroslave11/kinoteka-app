@@ -11,7 +11,7 @@ const SHORTCUTS: [string, string][] = [
   ['A', 'Další zvuková stopa'],
   ['S', 'Titulky (dokola, i vypnuté)'],
   ['Z / X', 'Posun titulků −0,1 / +0,1 s'],
-  ['N', 'Další díl'],
+  ['N / P', 'Další / předchozí díl'],
   ['?', 'Tato nápověda'],
   ['Esc', 'Zavřít panel, opustit celou obrazovku, zpět']
 ]

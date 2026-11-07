@@ -9,6 +9,7 @@ import {
   Play,
   RotateCcw,
   RotateCw,
+  SkipBack,
   SkipForward,
   Square,
   Volume2,
@@ -232,6 +233,15 @@ export default function PlayerOverlay(): React.JSX.Element {
             {state.duration > 0 && <span className="ends"> · konec v {endsAt(state)}</span>}
           </div>
           <div className="center">
+            {state.previous && (
+              <button
+                className="icon-btn"
+                title={`Předchozí díl: ${state.previous} (P)`}
+                onClick={() => send({ type: 'play-previous' })}
+              >
+                <SkipBack size={20} />
+              </button>
+            )}
             <button
               className="icon-btn"
               title="Zpět o 10 s (←)"
@@ -264,15 +274,6 @@ export default function PlayerOverlay(): React.JSX.Element {
             >
               <RotateCw size={20} />
             </button>
-          </div>
-          <div className="right">
-            <button
-              className={`icon-btn ${panelOpen ? 'is-on' : ''}`}
-              title="Zvuk a titulky (A, S)"
-              onClick={() => setPanelOpen((open) => !open)}
-            >
-              <Subtitles size={20} />
-            </button>
             {state.next && (
               <button
                 className="icon-btn"
@@ -282,6 +283,15 @@ export default function PlayerOverlay(): React.JSX.Element {
                 <SkipForward size={20} />
               </button>
             )}
+          </div>
+          <div className="right">
+            <button
+              className={`icon-btn ${panelOpen ? 'is-on' : ''}`}
+              title="Zvuk a titulky (A, S)"
+              onClick={() => setPanelOpen((open) => !open)}
+            >
+              <Subtitles size={20} />
+            </button>
             <div
               className={`volume ${passthrough ? 'is-disabled' : ''}`}
               title={
@@ -394,6 +404,9 @@ function keyToCommand(event: KeyboardEvent, state: PlayerState): PlayerCommand |
     case 'n':
     case 'N':
       return state.next ? { type: 'play-next' } : null
+    case 'p':
+    case 'P':
+      return state.previous ? { type: 'play-previous' } : null
     case 'Escape':
       return { type: 'escape' }
     default:

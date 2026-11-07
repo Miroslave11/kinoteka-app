@@ -18,6 +18,8 @@ export interface PlayerState {
   video: VideoInfo | null
   /** Další díl seriálu („S01E03 · Název“); null = není. */
   next: string | null
+  /** Předchozí díl seriálu; null = není. */
+  previous: string | null
   /** Zvukové stopy souboru (vybraná má `selected`). */
   audioTracks: AudioTrack[]
   subtitleTracks: SubtitleTrack[]
@@ -70,6 +72,7 @@ export const INITIAL_PLAYER_STATE: PlayerState = {
   audio: null,
   video: null,
   next: null,
+  previous: null,
   audioTracks: [],
   subtitleTracks: [],
   subDelay: 0,
