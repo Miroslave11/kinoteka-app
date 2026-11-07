@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openDatabase } from '../db/database'
 import { YtLibrary, type FetchInfoResult } from './YtLibrary'
@@ -36,10 +36,18 @@ async function downloaded(
   return `${base}.mp4`
 }
 
-function library(fetchInfo?: (id: string) => Promise<FetchInfoResult>): YtLibrary {
+function library(
+  fetchInfo?: (id: string) => Promise<FetchInfoResult>,
+  downloadingInto?: string
+): YtLibrary {
   return new YtLibrary(repository, {
     folder: () => yt,
     fetchInfo,
+    trash: async (path) => {
+      await mkdir(join(root, 'Koš'), { recursive: true })
+      await rename(path, join(root, 'Koš', basename(path)))
+    },
+    downloadingInto: (folder) => folder === downloadingInto,
     probeDuration: vi.fn(async () => 42),
     makeThumbnail: vi.fn(async (_input: string, _at: number, output: string) => {
       await writeFile(output, 'frame')
@@ -237,5 +245,111 @@ describe('YtRepository – přehrávání', () => {
     repository.record(b!.id, 60, 200)
     repository.clearProgress(b!.id)
     expect(repository.progress(b!.id)).toBeNull()
+  })
+})
+
+describe('YtLibrary – správa', () => {
+  const idOf = (name: string): number => repository.list().find((c) => c.name === name)!.id!
+  const videoId = (name: string): number =>
+    repository
+      .list()
+      .flatMap((c) => c.videos)
+      .find((v) => v.name === name)!.id
+
+  it('přesun videa do jiné kategorie i s obrázkem a údaji, pozice zůstane', async () => {
+    const lib = library()
+    await lib.scan()
+    await downloaded(join(yt, 'Města'), 'Clip', 'aaaaaaaaaaa', { title: 'Clip' })
+    await lib.scan()
+    repository.record(videoId('Clip'), 80, 200)
+
+    expect(
+      await lib.manage({
+        kind: 'move-video',
+        videoId: videoId('Clip'),
+        categoryId: idOf('Příroda')
+      })
+    ).toEqual({ ok: true })
+    expect(summary()).toEqual([['Příroda', ['Clip']]])
+    expect((await readdir(join(yt, 'Příroda'))).sort()).toEqual([
+      'Clip [aaaaaaaaaaa].info.json',
+      'Clip [aaaaaaaaaaa].jpg',
+      'Clip [aaaaaaaaaaa].mp4'
+    ])
+    expect(repository.progress(videoId('Clip'))?.position).toBe(80)
+  })
+
+  it('přejmenování kategorie přejmenuje složku, videa zůstanou', async () => {
+    const lib = library()
+    await lib.scan()
+    await downloaded(join(yt, 'Města'), 'Clip', 'aaaaaaaaaaa', { title: 'Clip' })
+    await lib.scan()
+    const before = videoId('Clip')
+    expect(
+      await lib.manage({ kind: 'rename-category', categoryId: idOf('Města'), name: 'Velkoměsta' })
+    ).toEqual({ ok: true })
+    expect(existsSync(join(yt, 'Velkoměsta', 'Clip [aaaaaaaaaaa].mp4'))).toBe(true)
+    expect(summary()).toEqual([['Velkoměsta', ['Clip']]])
+    expect(videoId('Clip')).toBe(before)
+    // Další sken nic nerozbije (kategorie i video se najdou na novém místě).
+    await lib.scan()
+    expect(summary()).toEqual([['Velkoměsta', ['Clip']]])
+  })
+
+  it('přejmenování na existující kategorii nejde', async () => {
+    const lib = library()
+    await lib.scan()
+    expect(
+      await lib.manage({ kind: 'rename-category', categoryId: idOf('Města'), name: 'Příroda' })
+    ).toMatchObject({ ok: false })
+  })
+
+  it('smazání kategorie: videa se znovu zařadí, složka zmizí', async () => {
+    const lib = library()
+    await lib.scan()
+    await downloaded(join(yt, 'Koncerty a živě'), 'Ocean', 'aaaaaaaaaaa', {
+      title: 'Ocean',
+      tags: ['ocean']
+    })
+    await downloaded(join(yt, 'Koncerty a živě'), 'Talk', 'bbbbbbbbbbb', { title: 'Talk' })
+    await lib.scan()
+    expect(
+      await lib.manage({ kind: 'delete-category', categoryId: idOf('Koncerty a živě') })
+    ).toEqual({ ok: true })
+    expect(existsSync(join(yt, 'Koncerty a živě'))).toBe(false)
+    expect(summary()).toEqual([
+      ['Příroda', ['Ocean']],
+      ['Ostatní', ['Talk']]
+    ])
+  })
+
+  it('záložní kategorii ani kategorii, kam se stahuje, nejde smazat', async () => {
+    await library().scan()
+    expect(
+      await library().manage({ kind: 'delete-category', categoryId: idOf('Ostatní') })
+    ).toMatchObject({ ok: false })
+    expect(
+      await library(undefined, 'Města').manage({
+        kind: 'delete-category',
+        categoryId: idOf('Města')
+      })
+    ).toMatchObject({ ok: false })
+    expect(existsSync(join(yt, 'Města'))).toBe(true)
+  })
+
+  it('smazání videa do Koše i s obrázkem a údaji', async () => {
+    const lib = library()
+    await lib.scan()
+    await downloaded(join(yt, 'Města'), 'Clip', 'aaaaaaaaaaa', { title: 'Clip' })
+    await lib.scan()
+    expect(await lib.manage({ kind: 'trash-video', videoId: videoId('Clip') })).toEqual({
+      ok: true
+    })
+    expect(summary()).toEqual([])
+    expect((await readdir(join(root, 'Koš'))).sort()).toEqual([
+      'Clip [aaaaaaaaaaa].info.json',
+      'Clip [aaaaaaaaaaa].jpg',
+      'Clip [aaaaaaaaaaa].mp4'
+    ])
   })
 })

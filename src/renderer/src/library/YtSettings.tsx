@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FolderOpen, FolderSearch, Plus, RefreshCw } from 'lucide-react'
+import { FolderOpen, FolderSearch, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { plural } from '../../../shared/plural'
 import type { YtCategory, YtStatus } from '../../../shared/yt'
 
@@ -32,6 +32,78 @@ function KeywordsField({
         void onSave(text.split(',').map((k) => k.trim()))
       }}
     />
+  )
+}
+
+/** Přejmenování a smazání kategorie (smazání na druhé kliknutí). */
+function CategoryActions({
+  category,
+  manage
+}: {
+  category: YtCategory
+  manage: (action: Parameters<typeof window.kinoteka.yt.manage>[0]) => Promise<boolean>
+}): React.JSX.Element {
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(category.name)
+  const [confirming, setConfirming] = useState(false)
+  const id = category.id!
+
+  const rename = async (): Promise<void> => {
+    if (!name.trim() || name.trim() === category.name) return setEditing(false)
+    if (await manage({ kind: 'rename-category', categoryId: id, name })) setEditing(false)
+  }
+
+  if (editing)
+    return (
+      <span className="yt-cat-actions">
+        <input
+          className="field"
+          autoFocus
+          aria-label="Nový název kategorie"
+          value={name}
+          maxLength={80}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void rename()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+        />
+        <button className="btn sm primary" onClick={() => void rename()}>
+          Uložit
+        </button>
+        <button className="btn sm" onClick={() => setEditing(false)}>
+          Zrušit
+        </button>
+      </span>
+    )
+
+  return (
+    <span className="yt-cat-actions">
+      <button
+        className="btn sm"
+        title="Přejmenuje i podsložku"
+        onClick={() => {
+          setName(category.name)
+          setEditing(true)
+        }}
+      >
+        <Pencil size={14} /> Přejmenovat
+      </button>
+      {!category.role && (
+        <button
+          className={`btn sm ${confirming ? 'danger' : ''}`}
+          title="Podsložka zmizí, videa se znovu zařadí do ostatních kategorií"
+          onBlur={() => setConfirming(false)}
+          onClick={() =>
+            confirming
+              ? void manage({ kind: 'delete-category', categoryId: id })
+              : setConfirming(true)
+          }
+        >
+          <Trash2 size={14} /> {confirming ? 'Opravdu smazat?' : 'Smazat'}
+        </button>
+      )}
+    </span>
   )
 }
 
@@ -132,7 +204,8 @@ export default function YtSettings(): React.JSX.Element {
         <p className="muted small">
           Slova se hledají ve štítcích, názvu, popisu a kanálu videa (bez ohledu na diakritiku a
           velká písmena). Vyhraje kategorie s nejvíc shodami. Název kategorie se počítá jako klíčové
-          slovo. Už zařazená videa se nepřesouvají.
+          slovo. Už zařazená videa se samy nepřesouvají – ručně je přesuneš na stránce YT videa
+          (pravé tlačítko na videu). Smazaná kategorie svá videa zařadí znovu do ostatních.
         </p>
         <div className="yt-cats">
           {categories.map((category) => (
@@ -140,6 +213,7 @@ export default function YtSettings(): React.JSX.Element {
               <div className="yt-cat-head">
                 <strong>{category.name}</strong>
                 <span className="muted small">{videosLabel(category.videos.length)}</span>
+                {category.id !== null && <CategoryActions category={category} manage={manage} />}
               </div>
               {category.id === null ? (
                 <p className="muted small">Videa v kořeni složky, ke kterým se dotahují údaje.</p>

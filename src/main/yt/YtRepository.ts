@@ -29,6 +29,23 @@ export interface StoredCategory extends CategoryKeywords {
   folder: string
 }
 
+/** Soubor videa v databázi (pro přesun a mazání). */
+export interface StoredYtVideo {
+  id: number
+  path: string
+  categoryId: number | null
+  size: number
+  mtimeMs: number
+}
+
+const storedVideo = (row: Row): StoredYtVideo => ({
+  id: Number(row['id']),
+  path: String(row['path']),
+  categoryId: row['category_id'] === null ? null : Number(row['category_id']),
+  size: Number(row['size']),
+  mtimeMs: Number(row['mtime_ms'])
+})
+
 function parseList(value: unknown): string[] {
   try {
     const parsed = JSON.parse(String(value)) as unknown
@@ -81,6 +98,29 @@ export class YtRepository {
           now.toISOString()
         ).lastInsertRowid
     )
+  }
+
+  /** Nový název kategorie = nový název podsložky (složku přejmenuje knihovna). */
+  renameCategory(id: number, folder: string): void {
+    this.db.prepare('UPDATE yt_category SET folder = ? WHERE id = ?').run(folder, id)
+  }
+
+  deleteCategory(id: number): void {
+    this.db.prepare('DELETE FROM yt_category WHERE id = ?').run(id)
+  }
+
+  categoryVideos(categoryId: number): StoredYtVideo[] {
+    return this.db
+      .prepare('SELECT id, path, category_id, size, mtime_ms FROM yt_video WHERE category_id = ?')
+      .all(categoryId)
+      .map(storedVideo)
+  }
+
+  video(id: number): StoredYtVideo | null {
+    const row = this.db
+      .prepare('SELECT id, path, category_id, size, mtime_ms FROM yt_video WHERE id = ?')
+      .get(id)
+    return row ? storedVideo(row) : null
   }
 
   setKeywords(id: number, keywords: readonly string[]): void {

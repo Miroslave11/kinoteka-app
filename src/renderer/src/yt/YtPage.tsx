@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Download, Play } from 'lucide-react'
+import { CheckCircle2, Download, MoreHorizontal, Play } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { formatTime } from '../../../shared/player'
 import { countOf } from '../../../shared/plural'
@@ -8,6 +8,7 @@ import { useApp } from '../app/AppContext'
 import { placeholderStyle, useAmbientPalette } from '../app/palette'
 import Artwork from '../components/Artwork'
 import YtDownload from './YtDownload'
+import YtVideoMenu, { type YtMenuState } from './YtVideoMenu'
 import { continueRow, filterKey, totalVideos, visibleCategories } from './ytData'
 
 /** Obrázek videa: uložený vedle videa (nebo snímek z něj), jinak náhled z YouTube. */
@@ -17,20 +18,39 @@ const imageOf = (video: YtVideoSummary): string | null =>
 function VideoCard({
   video,
   detail,
-  onPlay
+  onPlay,
+  onMenu
 }: {
   video: YtVideoSummary
   detail: string | null
   onPlay: (id: number) => void
+  onMenu: (video: YtVideoSummary, x: number, y: number) => void
 }): React.JSX.Element {
   return (
     <button
       className="land yt-card"
       onClick={() => onPlay(video.id)}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        onMenu(video, event.clientX, event.clientY)
+      }}
       title={video.progress !== null ? 'Pokračovat' : 'Přehrát'}
     >
       <span className="land-img" style={placeholderStyle(video.name)}>
         <Artwork src={imageOf(video)} />
+        <span
+          className="yt-more"
+          role="button"
+          aria-label="Další možnosti"
+          title="Další možnosti"
+          onClick={(event) => {
+            event.stopPropagation()
+            const box = event.currentTarget.getBoundingClientRect()
+            onMenu(video, box.left, box.bottom + 4)
+          }}
+        >
+          <MoreHorizontal size={18} />
+        </span>
         <span className="land-play">
           <Play size={22} fill="currentColor" />
         </span>
@@ -63,6 +83,7 @@ export default function YtPage(): React.JSX.Element {
   const [categories, setCategories] = useState<YtCategory[] | null>(null)
   const [params, setParams] = useSearchParams()
   const [downloading, setDownloading] = useState(false)
+  const [menu, setMenu] = useState<YtMenuState | null>(null)
   useAmbientPalette(null)
 
   const reload = useCallback(async () => setCategories(await yt.listCategories()), [yt])
@@ -80,6 +101,15 @@ export default function YtPage(): React.JSX.Element {
     void yt.playVideo(id).then((result) => {
       if (!result.ok && result.reason === 'error') setError(result.message)
     })
+  const manage = (action: Parameters<typeof yt.manage>[0]): void =>
+    void yt.manage(action).then((result) => {
+      if (!result.ok) setError(result.message)
+    })
+  const openMenu = (video: YtVideoSummary, x: number, y: number): void => {
+    const owner = (categories ?? []).find((c) => c.videos.some((v) => v.id === video.id))
+    setMenu({ video, categoryId: owner?.id ?? null, x, y })
+  }
+  const closeMenu = useCallback(() => setMenu(null), [])
   const select = (category: YtCategory | null): void =>
     setParams(category ? { kategorie: filterKey(category) } : {}, { replace: true })
 
@@ -147,7 +177,13 @@ export default function YtPage(): React.JSX.Element {
       {selected ? (
         <div className="yt-grid">
           {selected.videos.map((video) => (
-            <VideoCard key={video.id} video={video} detail={video.channel} onPlay={play} />
+            <VideoCard
+              key={video.id}
+              video={video}
+              detail={video.channel}
+              onPlay={play}
+              onMenu={openMenu}
+            />
           ))}
         </div>
       ) : (
@@ -162,6 +198,7 @@ export default function YtPage(): React.JSX.Element {
                     video={video}
                     detail={[video.channel, video.categoryName].filter(Boolean).join(' · ')}
                     onPlay={play}
+                    onMenu={openMenu}
                   />
                 ))}
               </div>
@@ -178,7 +215,13 @@ export default function YtPage(): React.JSX.Element {
               </h3>
               <div className="strip">
                 {category.videos.map((video) => (
-                  <VideoCard key={video.id} video={video} detail={video.channel} onPlay={play} />
+                  <VideoCard
+                    key={video.id}
+                    video={video}
+                    detail={video.channel}
+                    onPlay={play}
+                    onMenu={openMenu}
+                  />
                 ))}
               </div>
             </section>
@@ -186,6 +229,16 @@ export default function YtPage(): React.JSX.Element {
         </>
       )}
       {dialog}
+      {menu && (
+        <YtVideoMenu
+          menu={menu}
+          categories={categories ?? []}
+          onPlay={play}
+          onMove={(videoId, categoryId) => manage({ kind: 'move-video', videoId, categoryId })}
+          onTrash={(videoId) => manage({ kind: 'trash-video', videoId })}
+          onClose={closeMenu}
+        />
+      )}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
-import { mkdir, readdir, stat, writeFile } from 'node:fs/promises'
-import { join, relative, sep } from 'node:path'
+import { mkdir, readdir, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, relative, sep } from 'node:path'
 import type { YtManageAction, YtManageResult, YtScanResult } from '../../shared/yt'
 import { isVideoFile } from '../../shared/library'
 import { safeFolderName } from '../kids/classify'
@@ -14,7 +14,8 @@ import {
   moveWithSidecars,
   nameAndYoutubeId,
   PARTIAL_DOWNLOAD,
-  readInfoJson
+  readInfoJson,
+  withoutExtension
 } from '../library/videoSidecars'
 import {
   DEFAULT_CATEGORIES,
@@ -23,7 +24,7 @@ import {
   matchCategory,
   metaFromInfo
 } from './ytClassify'
-import type { YtRepository, YtVideoRecord } from './YtRepository'
+import type { StoredYtVideo, YtRepository, YtVideoRecord } from './YtRepository'
 
 interface YtLibraryEvents {
   changed: []
@@ -45,7 +46,23 @@ export interface YtLibraryOptions {
   makeThumbnail?: (input: string, atSec: number, output: string) => Promise<void>
   /** Kam ukládat obrázky vytvořené z videí. */
   thumbnailDir: string
+  /** Do Koše (`shell.trashItem`). */
+  trash?: (path: string) => Promise<void>
+  /** Stahuje se (nebo na to čeká) něco do této podsložky – tu nejde přejmenovat ani smazat. */
+  downloadingInto?: (folder: string) => boolean
   now?: () => Date
+}
+
+/** Smaže prázdné složky (i vnořené); složku s čímkoli dalším nechá být. */
+async function removeEmptyTree(dir: string): Promise<void> {
+  let entries
+  try {
+    entries = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) if (entry.isDirectory()) await removeEmptyTree(join(dir, entry.name))
+  await rmdir(dir).catch(() => undefined)
 }
 
 /** Z údajů yt-dlp se uloží jen to, co aplikace potřebuje (celý výpis má stovky kB). */
@@ -120,11 +137,14 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
       result = { ok: false, message: fileError(error) }
     }
     this.emit('changed')
+    // Videa ze smazané kategorie leží v kořeni – zařadí je nový sken.
+    if (result.ok && action.kind === 'delete-category') await this.scan()
     return result
   }
 
   private async apply(action: YtManageAction): Promise<string | null> {
     const root = this.options.folder()
+    const BUSY = 'Do kategorie se právě stahuje – počkej, až stahování doběhne.'
     switch (action.kind) {
       case 'create-category': {
         const folder = safeFolderName(action.name)
@@ -138,7 +158,82 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
         this.repository.setKeywords(action.categoryId, action.keywords)
         return null
       }
+      case 'rename-category': {
+        const category = this.repository.category(action.categoryId)
+        if (!category) return 'Kategorie už neexistuje.'
+        const folder = safeFolderName(action.name)
+        if (folder === category.folder) return null
+        if (this.busy(category.folder)) return BUSY
+        const sameFolder = folder.toLowerCase() === category.folder.toLowerCase()
+        if (!sameFolder && existsSync(join(root, folder))) return 'Kategorie s tímto názvem už je.'
+        const from = join(root, category.folder)
+        const to = join(root, folder)
+        await rename(from, to)
+        this.repository.renameCategory(category.id, folder)
+        // Videa si nechají id – pozice i zhlédnutí zůstanou.
+        for (const video of this.repository.categoryVideos(category.id))
+          await this.relocate(video, join(to, relative(from, video.path)))
+        return null
+      }
+      case 'delete-category': {
+        const category = this.repository.category(action.categoryId)
+        if (!category) return null
+        if (category.role)
+          return 'Záložní kategorii nejde smazat – patří sem videa, která jinam nepasují.'
+        if (this.busy(category.folder)) return BUSY
+        const dir = join(root, category.folder)
+        for (const video of this.repository.categoryVideos(category.id)) {
+          await moveWithSidecars(video.path, await readdir(dirname(video.path)), root)
+          await this.relocate(video, join(root, basename(video.path)))
+        }
+        await removeEmptyTree(dir)
+        // Zbylo v ní něco jiného než videa (poznámky, obrázky) – do Koše, nic se neztratí.
+        if (existsSync(dir)) await this.trash(dir)
+        this.repository.deleteCategory(category.id)
+        return null
+      }
+      case 'move-video': {
+        const video = this.repository.video(action.videoId)
+        if (!video) return 'Video už ve složce není.'
+        const target = this.repository.category(action.categoryId)
+        if (!target) return 'Kategorie už neexistuje.'
+        if (video.categoryId === target.id) return null
+        const targetDir = join(root, target.folder)
+        await moveWithSidecars(video.path, await readdir(dirname(video.path)), targetDir)
+        await this.relocate(video, join(targetDir, basename(video.path)))
+        return null
+      }
+      case 'trash-video': {
+        const video = this.repository.video(action.videoId)
+        if (!video) return null
+        // Nejdřív video – když je otevřené v přehrávači, obrázek a údaje zůstanou u něj.
+        if (existsSync(video.path)) await this.trash(video.path)
+        const dir = dirname(video.path)
+        const base = basename(withoutExtension(video.path))
+        for (const name of await readdir(dir).catch(() => []))
+          if (name.startsWith(`${base}.`)) await this.trash(join(dir, name))
+        this.repository.removeVideos([video.id])
+        await rm(join(this.options.thumbnailDir, `${video.id}.jpg`), { force: true })
+        return null
+      }
     }
+  }
+
+  private busy(folder: string): boolean {
+    return this.options.downloadingInto?.(folder) ?? false
+  }
+
+  private async trash(path: string): Promise<void> {
+    if (!this.options.trash) throw new Error('Koš není k dispozici.')
+    await this.options.trash(path)
+  }
+
+  /** Video je na disku jinde – nový záznam (kategorie, obrázek), stejné id. */
+  private async relocate(video: StoredYtVideo, path: string): Promise<void> {
+    this.repository.updateVideo(
+      video.id,
+      await this.record(this.options.folder(), { path, size: video.size, mtimeMs: video.mtimeMs })
+    )
   }
 
   private async doScan(): Promise<YtScanResult> {

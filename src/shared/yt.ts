@@ -51,6 +51,13 @@ const MAX_CATEGORY_NAME = 80
 export type YtManageAction =
   | { kind: 'create-category'; name: string }
   | { kind: 'set-keywords'; categoryId: number; keywords: string[] }
+  /** Přejmenuje i podsložku. */
+  | { kind: 'rename-category'; categoryId: number; name: string }
+  /** Podsložka zmizí, její videa se znovu zařadí do ostatních kategorií. */
+  | { kind: 'delete-category'; categoryId: number }
+  /** Přesune video i s obrázkem a údaji do jiné kategorie. */
+  | { kind: 'move-video'; videoId: number; categoryId: number }
+  | { kind: 'trash-video'; videoId: number }
 
 export type YtManageResult = { ok: true } | { ok: false; message: string }
 
@@ -70,19 +77,29 @@ export function cleanYtKeywords(values: readonly unknown[]): string[] {
 export function parseYtManageAction(value: unknown): YtManageAction | null {
   if (typeof value !== 'object' || value === null) return null
   const input = value as Record<string, unknown>
-  const categoryId =
-    Number.isInteger(input['categoryId']) && (input['categoryId'] as number) > 0
-      ? (input['categoryId'] as number)
-      : null
+  const id = (key: string): number | null =>
+    Number.isInteger(input[key]) && (input[key] as number) > 0 ? (input[key] as number) : null
+  const categoryId = id('categoryId')
+  const videoId = id('videoId')
+  const name =
+    typeof input['name'] === 'string' && input['name'].trim().length <= MAX_CATEGORY_NAME
+      ? input['name'].trim()
+      : ''
   switch (input['kind']) {
-    case 'create-category': {
-      const name = typeof input['name'] === 'string' ? input['name'].trim() : ''
-      return name && name.length <= MAX_CATEGORY_NAME ? { kind: 'create-category', name } : null
-    }
+    case 'create-category':
+      return name ? { kind: 'create-category', name } : null
     case 'set-keywords':
       return categoryId && Array.isArray(input['keywords'])
         ? { kind: 'set-keywords', categoryId, keywords: cleanYtKeywords(input['keywords']) }
         : null
+    case 'rename-category':
+      return name && categoryId ? { kind: 'rename-category', categoryId, name } : null
+    case 'delete-category':
+      return categoryId ? { kind: 'delete-category', categoryId } : null
+    case 'move-video':
+      return videoId && categoryId ? { kind: 'move-video', videoId, categoryId } : null
+    case 'trash-video':
+      return videoId ? { kind: 'trash-video', videoId } : null
     default:
       return null
   }
