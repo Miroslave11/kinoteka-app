@@ -110,12 +110,26 @@ export interface KidsImages {
   video: (videoId: number) => string | null
   /** Vlastní obrázek titulu vybraný rodičem. */
   title: (titleId: number) => string | null
+  /** Obrázek videa z části YT videa. */
+  ytVideo: (videoId: number) => string | null
 }
 
-/** Obrázek dětského videa nebo titulu podle id. */
-async function serveKidsImage(kidsImages: KidsImages, pathname: string): Promise<Response> {
+/** Obrázek dětského videa nebo titulu (nebo YT videa) podle id. */
+async function serveKidsImage(
+  kidsImages: KidsImages,
+  pathname: string,
+  host: 'kids' | 'yt' = 'kids'
+): Promise<Response> {
   const match = /^\/(video|title)\/(\d+)$/.exec(pathname)
-  const file = match ? kidsImages[match[1] as 'video' | 'title'](Number(match[2])) : null
+  const pick =
+    host === 'yt'
+      ? match?.[1] === 'video'
+        ? kidsImages.ytVideo
+        : null
+      : match
+        ? kidsImages[match[1] as 'video' | 'title']
+        : null
+  const file = match && pick ? pick(Number(match[2])) : null
   const type = file && IMAGE_TYPES[extname(file).toLowerCase()]
   if (!file || !type) return new Response(null, { status: 404 })
   try {
@@ -155,6 +169,7 @@ async function serveYoutubeThumbnail(fetchImpl: typeof fetch, pathname: string):
  * kinoteka-media://clips/12-0.mp4   → klip na pozadí
  * kinoteka-media://kids/video/7     → obrázek dětského videa
  * kinoteka-media://kids/title/3     → vlastní obrázek dětského titulu
+ * kinoteka-media://yt/video/7       → obrázek YT videa
  * kinoteka-media://ytthumb/<id>     → náhled videa z YouTube (před stažením)
  * kinoteka-media://theme/12         → ústřední melodie titulu
  */
@@ -174,6 +189,7 @@ export function handleMediaProtocol(
       return serveTheme(themePath, url.pathname, request.headers.get('Range'))
     }
     if (url.hostname === 'kids') return serveKidsImage(kidsImages, url.pathname)
+    if (url.hostname === 'yt') return serveKidsImage(kidsImages, url.pathname, 'yt')
     if (url.hostname === 'ytthumb') return serveYoutubeThumbnail(fetchImpl, url.pathname)
     if (url.hostname !== 'tmdb') return new Response(null, { status: 404 })
     const image = await images.get(url.pathname)

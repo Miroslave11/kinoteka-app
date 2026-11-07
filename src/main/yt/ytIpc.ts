@@ -28,9 +28,18 @@ export interface YtIpcDeps {
   settings: SettingsRepository
   library: YtLibrary
   repository: YtRepository
+  /** Přehraje video v běžném přehrávači (rozkoukané od uložené pozice). */
+  play: (host: BrowserWindow | null, videoId: number) => Promise<unknown>
 }
 
-export function registerYtIpc({ settings, library, repository }: YtIpcDeps): void {
+export function registerYtIpc({ settings, library, repository, play }: YtIpcDeps): void {
+  // Přehrává se podle id – okno nikdy neposílá cestu k souboru.
+  ipcMain.handle(IpcChannel.YtPlayVideo, (event, id: unknown) =>
+    Number.isInteger(id)
+      ? play(BrowserWindow.fromWebContents(event.sender), id as number)
+      : { ok: false, reason: 'error', message: 'Video už ve složce není.' }
+  )
+
   ipcMain.handle(IpcChannel.YtStatus, (): YtStatus => ({
     folder: ytFolder(settings),
     pendingInfo: library.pendingInfo

@@ -52,7 +52,7 @@ const summary = (): [string, string[]][] =>
   repository
     .list()
     .filter((c) => c.videos.length > 0)
-    .map((c) => [c.name, c.videos.map((v) => v.name)])
+    .map((c) => [c.name, c.videos.map((v) => v.name).sort()])
 
 describe('YtLibrary', () => {
   it('v prázdné složce založí výchozí kategorie', async () => {
@@ -215,5 +215,27 @@ describe('YtLibrary', () => {
     const result = await library().scan()
     expect(result.videos).toBe(0)
     expect(existsSync(join(yt, 'Clip [aaaaaaaaaaa].f137.mp4'))).toBe(true)
+  })
+})
+
+describe('YtRepository – přehrávání', () => {
+  it('pozice, zhlédnutí, pořadí ve frontě (nejnovější první)', async () => {
+    await downloaded(join(yt, 'Města'), 'A', 'aaaaaaaaaaa', { title: 'A' })
+    await library().scan()
+    await downloaded(join(yt, 'Města'), 'B', 'bbbbbbbbbbb', { title: 'B' })
+    await library().scan()
+    const [b, a] = repository.list().find((c) => c.name === 'Města')!.videos
+    expect([b!.name, a!.name]).toEqual(['B', 'A'])
+    expect(repository.queue(a!.id).map((v) => v.name)).toEqual(['B', 'A'])
+
+    expect(repository.record(a!.id, 60, 200)).toBe('progress')
+    expect(repository.list()[0]!.videos.find((v) => v.id === a!.id)?.progress).toBeCloseTo(0.3)
+    expect(repository.record(a!.id, 195, 200)).toBe('watched')
+    const after = repository.list()[0]!.videos.find((v) => v.id === a!.id)!
+    expect([after.progress, after.watched]).toEqual([null, true])
+
+    repository.record(b!.id, 60, 200)
+    repository.clearProgress(b!.id)
+    expect(repository.progress(b!.id)).toBeNull()
   })
 })

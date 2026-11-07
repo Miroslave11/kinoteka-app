@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, Clapperboard, Home, Settings2, Smile, Tv } from 'lucide-react'
+import { BookOpen, Clapperboard, Home, MonitorPlay, Settings2, Smile, Tv } from 'lucide-react'
 import { NavLink } from 'react-router'
 import appIcon from '../../../../build/icon.svg'
 import { useApp } from '../app/AppContext'
@@ -19,10 +19,26 @@ function useKidsVideoCount(): number | null {
   return count
 }
 
+/** Kolik videí je ve složce YT videa (obnoví se po skenu a přehrání). */
+function useYtVideoCount(): number | null {
+  const [count, setCount] = useState<number | null>(null)
+  useEffect(() => {
+    const { yt } = window.kinoteka
+    const load = (): void =>
+      void yt
+        .listCategories()
+        .then((categories) => setCount(categories.reduce((sum, c) => sum + c.videos.length, 0)))
+    load()
+    return yt.onChanged(load)
+  }, [])
+  return count
+}
+
 export default function Sidebar(): React.JSX.Element {
   const { movies, shows, folders } = useApp()
   const link = ({ isActive }: { isActive: boolean }): string => (isActive ? 'on' : '')
   const kids = useKidsVideoCount()
+  const ytCount = useYtVideoCount()
   const [scanning, setScanning] = useState<ReadonlySet<number>>(new Set())
 
   /** Klik na knihovnu ji znovu proskenuje (hlavně aby se vrátil odpojený a znovu připojený disk). */
@@ -62,6 +78,10 @@ export default function Sidebar(): React.JSX.Element {
         </NavLink>
         <NavLink to="/deti" className={link}>
           <Smile size={18} /> Děti {kids !== null && <span className="count">{kids}</span>}
+        </NavLink>
+        <NavLink to="/yt" className={link}>
+          <MonitorPlay size={18} /> YT videa{' '}
+          {ytCount !== null && <span className="count">{ytCount}</span>}
         </NavLink>
       </nav>
 

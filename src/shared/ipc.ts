@@ -120,5 +120,6 @@ export const IpcChannel = {
   YtChanged: 'yt:changed',
   YtPickFolder: 'yt:pick-folder',
   YtManage: 'yt:manage',
-  YtOpenFolder: 'yt:open-folder'
+  YtOpenFolder: 'yt:open-folder',
+  YtPlayVideo: 'yt:play-video'
 } as const

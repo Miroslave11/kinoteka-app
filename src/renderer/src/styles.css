@@ -2410,3 +2410,55 @@ p.info-chip {
   font-size: 13px;
   line-height: 1.6;
 }
+
+/* ---------- stránka YT videa ---------- */
+.yt-row {
+  margin-bottom: 18px;
+}
+
+.yt-row h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.yt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px 18px;
+}
+
+.yt-grid .land {
+  width: 100%;
+}
+
+.yt-length {
+  position: absolute;
+  z-index: 3;
+  right: 8px;
+  bottom: 10px;
+}
+
+.yt-watched {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ok);
+  background: rgb(0 0 0 / 0.55);
+  padding: 3px;
+}
+
+.yt-card .cap b {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

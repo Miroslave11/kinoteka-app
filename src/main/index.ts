@@ -36,6 +36,7 @@ import { KidsRepository } from './kids/KidsRepository'
 import { fetchOembed } from './kids/oembed'
 import { YtDlpTool } from './kids/YtDlpTool'
 import { YtLibrary } from './yt/YtLibrary'
+import { ytPlayItem, type YtPlayItem } from './yt/ytPlayback'
 import { registerYtIpc, ytFolder } from './yt/ytIpc'
 import { YtRepository } from './yt/YtRepository'
 import { openDatabase } from './db/database'
@@ -385,6 +386,84 @@ function loadKids(current: PlayerSession, videoId: number): void {
   })
 }
 
+/** Právě hrané YT video (sousedé v kategorii pro „předchozí / další“). */
+let ytCurrent: YtPlayItem | null = null
+let ytTracker: KidsTracker
+let ytRepository: YtRepository
+
+/**
+ * Video z části YT videa: běžný přehrávač s plným ovládáním, pozice se ukládá do vlastní
+ * historie (ne do deníku), rozkoukané video pokračuje bez ptaní; předchozí / další v kategorii.
+ */
+async function playYt(host: BrowserWindow | null, videoId: number): Promise<OpenFileResult> {
+  const item = ytPlayItem(ytRepository, videoId)
+  if (!item) return { ok: false, reason: 'error', message: 'Video už ve složce není.' }
+  if (!host) return { ok: false, reason: 'error', message: 'Okno aplikace nebylo nalezeno.' }
+  try {
+    session?.close()
+    let started: PlayerSession | undefined = undefined
+    started = await PlayerSession.start({
+      mainWindow: host,
+      file: item.path,
+      title: item.title,
+      startSec: item.startSec,
+      next: item.next?.name ?? null,
+      previous: item.previous?.name ?? null,
+      audio: audioLaunchOptions(loadAudioSettings(settings)),
+      tracks: trackChoicesFor(item.path),
+      subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
+      prepareSubtitle: (path) => prepareSubtitle(path, item.path, subtitleCacheDir()),
+      logFile: join(app.getPath('logs'), 'mpv.log'),
+      onProgress: (position, duration) => {
+        if (session === started) ytTracker.update(position, duration)
+      },
+      onNext: () => {
+        if (session === started && ytCurrent?.next) loadYt(started, ytCurrent.next.id)
+      },
+      onPrevious: () => {
+        if (session === started && ytCurrent?.previous) loadYt(started, ytCurrent.previous.id)
+      },
+      onStop: () => {
+        if (session !== started) return
+        const id = ytTracker.abandon()
+        if (id !== null) ytRepository.clearProgress(id)
+      },
+      onEnd: (info) => {
+        if (session === started) {
+          session = null
+          ytCurrent = null
+          ytTracker.finish()
+        }
+        broadcast(IpcChannel.YtChanged)
+        if (!host.isDestroyed()) host.webContents.send(IpcChannel.PlayerClosed, info)
+      }
+    })
+    session = started
+    tracker.finish()
+    ytTracker.start(item.videoId)
+    ytCurrent = item
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, reason: 'error', message: (error as Error).message }
+  }
+}
+
+/** Další nebo předchozí video kategorie – načte se do běžícího přehrávače. */
+function loadYt(current: PlayerSession, videoId: number): void {
+  const item = ytPlayItem(ytRepository, videoId)
+  if (!item) return
+  ytTracker.start(item.videoId)
+  ytCurrent = item
+  current.load({
+    file: item.path,
+    title: item.title,
+    startSec: item.startSec,
+    next: item.next?.name ?? null,
+    previous: item.previous?.name ?? null,
+    tracks: trackChoicesFor(item.path)
+  })
+}
+
 /** Titulky z OpenSubtitles: nastavení z hlavního okna, hledání a stažení jen z ovládání přehrávače. */
 function registerOnlineSubtitlesIpc(service: OnlineSubtitlesService): void {
   const fromPlayer = (sender: Electron.WebContents): PlayerSession | null =>
@@ -530,7 +609,8 @@ void app.whenReady().then(() => {
     clipsDir,
     {
       video: (id) => kidsRepository.thumbnailPath(id),
-      title: (id) => kidsRepository.customCoverPath(id)
+      title: (id) => kidsRepository.customCoverPath(id),
+      ytVideo: (id) => ytRepository.thumbnailPath(id)
     },
     chromiumFetch,
     (titleId) => themes.path(titleId)
@@ -686,7 +766,8 @@ void app.whenReady().then(() => {
   void kidsLibrary.scan().catch((error: Error) => console.warn(`Složka Kids: ${error.message}`))
 
   // YT videa: vlastní složka, podsložky = kategorie podle obsahu; údaje z YouTube přes yt-dlp.
-  const ytRepository = new YtRepository(db)
+  ytRepository = new YtRepository(db)
+  ytTracker = new KidsTracker(ytRepository, () => broadcast(IpcChannel.YtChanged))
   const ytLibrary = new YtLibrary(ytRepository, {
     folder: () => ytFolder(settings),
     fetchInfo: async (youtubeId) => {
@@ -705,7 +786,7 @@ void app.whenReady().then(() => {
     thumbnailDir: join(app.getPath('userData'), 'cache', 'yt')
   })
   ytLibrary.on('changed', () => broadcast(IpcChannel.YtChanged))
-  registerYtIpc({ settings, library: ytLibrary, repository: ytRepository })
+  registerYtIpc({ settings, library: ytLibrary, repository: ytRepository, play: playYt })
   void ytLibrary.scan().catch((error: Error) => console.warn(`Složka YT: ${error.message}`))
   ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))
   ipcMain.handle(IpcChannel.SubtitlesSaveSettings, (_event, value: unknown) =>

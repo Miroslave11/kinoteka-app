@@ -284,6 +284,8 @@ export interface KinotekaApi {
     /** Nová kategorie, klíčová slova kategorie. */
     manage(action: YtManageAction): Promise<YtManageResult>
     openFolder(): Promise<void>
+    /** Přehraje video (rozkoukané od uložené pozice, předchozí / další v kategorii). */
+    playVideo(videoId: number): Promise<OpenFileResult>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>

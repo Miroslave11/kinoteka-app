@@ -100,6 +100,13 @@ export class KidsTracker {
     this.onChanged()
   }
 
+  /** Konec bez uložení pozice (■ Zastavit – rozkoukání maže volající). Vrací id videa. */
+  abandon(): number | null {
+    const id = this.videoId
+    this.videoId = null
+    return id
+  }
+
   private save(): void {
     if (this.videoId === null) return
     const outcome = this.repository.record(this.videoId, this.position, this.duration)

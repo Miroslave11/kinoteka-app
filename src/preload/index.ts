@@ -147,7 +147,8 @@ const api: KinotekaApi = {
     onChanged: (listener) => subscribe(IpcChannel.YtChanged, () => listener()),
     pickFolder: () => ipcRenderer.invoke(IpcChannel.YtPickFolder),
     manage: (action) => ipcRenderer.invoke(IpcChannel.YtManage, action),
-    openFolder: () => ipcRenderer.invoke(IpcChannel.YtOpenFolder)
+    openFolder: () => ipcRenderer.invoke(IpcChannel.YtOpenFolder),
+    playVideo: (videoId) => ipcRenderer.invoke(IpcChannel.YtPlayVideo, videoId)
   },
   library: {
     listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),

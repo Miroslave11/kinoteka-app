@@ -323,5 +323,20 @@ export const MIGRATIONS: readonly string[] = [
     added_at TEXT NOT NULL
   );
   CREATE INDEX yt_video_category ON yt_video (category_id);
+  `,
+  // 20 – YT videa: rozkoukaná a zhlédnutá videa (vlastní historie, do deníku se nezapisuje)
+  `
+  CREATE TABLE yt_progress (
+    video_id INTEGER PRIMARY KEY REFERENCES yt_video (id) ON DELETE CASCADE,
+    position REAL NOT NULL,
+    duration REAL NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE yt_watch (
+    video_id INTEGER PRIMARY KEY REFERENCES yt_video (id) ON DELETE CASCADE,
+    count INTEGER NOT NULL,
+    last_at TEXT NOT NULL
+  );
   `
 ]
