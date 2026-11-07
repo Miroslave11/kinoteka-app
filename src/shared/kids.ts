@@ -282,7 +282,8 @@ export function parseYoutubeUrl(text: string): string | null {
   return link?.videoId ? youtubeVideoUrl(link.videoId) : null
 }
 
-export type KidsQuality = '1080' | '720'
+/** Nejvyšší výška obrazu; 4K (2160) nabízí jen část YT videa. */
+export type KidsQuality = '2160' | '1080' | '720'
 
 /** Náhled odkazu před stažením (část Pro rodiče). */
 export interface KidsPreview {
@@ -317,8 +318,14 @@ export interface KidsDownloadRequest {
   quality: KidsQuality
 }
 
-/** Ověří požadavek na stažení z okna. */
-export function parseDownloadRequest(value: unknown): KidsDownloadRequest | null {
+/**
+ * Ověří požadavek na stažení z okna. `allowAuto` (YT videa): prázdný název = uložit do kořene
+ * složky, kde se video zařadí samo podle obsahu.
+ */
+export function parseDownloadRequest(
+  value: unknown,
+  { allowAuto = false }: { allowAuto?: boolean } = {}
+): KidsDownloadRequest | null {
   if (typeof value !== 'object' || value === null) return null
   const input = value as Record<string, unknown>
   const id = (key: string, pattern: RegExp): string | null =>
@@ -328,8 +335,11 @@ export function parseDownloadRequest(value: unknown): KidsDownloadRequest | null
   const kind =
     input['kind'] === 'playlist' ? 'playlist' : input['kind'] === 'video' ? 'video' : null
   const title = typeof input['title'] === 'string' ? input['title'].trim() : ''
-  const quality = input['quality'] === '720' ? '720' : input['quality'] === '1080' ? '1080' : null
-  if (!kind || !quality || !title || title.length > 120) return null
+  const quality =
+    input['quality'] === '720' || input['quality'] === '1080' || input['quality'] === '2160'
+      ? input['quality']
+      : null
+  if (!kind || !quality || (!title && !allowAuto) || title.length > 120) return null
   if (kind === 'video' ? !videoId : !playlistId) return null
   return { kind, videoId, playlistId, title, quality }
 }

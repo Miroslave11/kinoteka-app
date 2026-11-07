@@ -246,3 +246,57 @@ describe('removePartialFiles', () => {
     ])
   })
 })
+
+describe('KidsDownloadQueue – YT videa (vlastní návrh, stažení do kořene)', () => {
+  function ytSetup(have: string[] = []) {
+    const downloader = Object.assign(new EventEmitter(), {
+      info: vi.fn(async () => PEPPA_VIDEO),
+      download: vi.fn(async (url: string, _options?: object): Promise<KidsDownloadResult> => ({
+        ok: true,
+        title: `Staženo ${url.slice(-11)}`,
+        channel: null,
+        durationSec: 1,
+        fileName: 'x.mp4',
+        thumbnail: null
+      })),
+      cancel: vi.fn()
+    })
+    const queue = new KidsDownloadQueue({
+      downloader,
+      folder: () => root,
+      suggest: (meta) => ({
+        name: meta.title.includes('Bláto') ? 'Příroda' : null,
+        existing: true
+      }),
+      alreadyIn: (id) => (have.includes(id) ? 'Města' : null),
+      scan: vi.fn(async () => undefined)
+    })
+    return { queue, downloader }
+  }
+
+  it('návrh a „už staženo“ z vlastních funkcí', async () => {
+    const { queue } = ytSetup(['aaaaaaaaaaa'])
+    const result = await queue.preview({ videoId: 'aaaaaaaaaaa', playlistId: null })
+    expect(result).toMatchObject({
+      ok: true,
+      preview: { suggestedTitle: 'Příroda', suggestedExisting: true, alreadyIn: 'Města' }
+    })
+  })
+
+  it('prázdný název = stáhnout do kořenové složky', async () => {
+    const { queue, downloader } = ytSetup()
+    await queue.enqueue({
+      kind: 'video',
+      videoId: 'bbbbbbbbbbb',
+      playlistId: null,
+      title: '',
+      quality: '2160'
+    })
+    await vi.waitFor(() => expect(queue.items[0]?.status).toBe('done'))
+    expect(queue.items[0]?.title).toBe('')
+    expect(downloader.download).toHaveBeenCalledWith(expect.stringContaining('bbbbbbbbbbb'), {
+      folder: root,
+      quality: '2160'
+    })
+  })
+})

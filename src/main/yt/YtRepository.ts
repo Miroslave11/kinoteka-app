@@ -181,6 +181,18 @@ export class YtRepository {
     this.db.prepare('UPDATE yt_video SET duration = ? WHERE id = ?').run(duration, id)
   }
 
+  /** Kategorie, ve které už video z YouTube je; null = ještě není staženo. */
+  categoryOfYoutubeId(youtubeId: string): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT c.folder FROM yt_video v LEFT JOIN yt_category c ON c.id = v.category_id
+         WHERE v.youtube_id = ? ORDER BY v.id DESC LIMIT 1`
+      )
+      .get(youtubeId)
+    if (!row) return null
+    return (row['folder'] as string | null) ?? 'Čeká na zařazení'
+  }
+
   thumbnailPath(id: number): string | null {
     const row = this.db.prepare('SELECT thumbnail FROM yt_video WHERE id = ?').get(id)
     return row?.['thumbnail'] ? String(row['thumbnail']) : null

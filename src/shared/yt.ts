@@ -30,6 +30,8 @@ export interface YtCategory {
 
 export interface YtStatus {
   folder: string
+  /** Kvalita naposledy zvolená při stahování. */
+  quality: '2160' | '1080' | '720'
   /** Kolik videí bez údajů ještě čeká na dotažení z YouTube. */
   pendingInfo: number
 }

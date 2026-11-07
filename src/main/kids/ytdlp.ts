@@ -3,9 +3,12 @@ import type { KidsDownloadProgress, KidsQuality } from '../../shared/kids'
 /**
  * Formát: nejlépe H.264 do zvolené výšky (přehraje cokoli a nezatíží procesor), jinak
  * nejlepší dostupný obraz do té výšky, jinak cokoli. Obraz a zvuk spojí ffmpeg do mp4.
+ * 4K YouTube v H.264 nemá – tam nejdřív VP9 (častěji dekóduje grafická karta), pak cokoli.
  */
 export const formatFor = (quality: KidsQuality): string =>
-  `bv*[height<=${quality}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=${quality}]+ba/b[height<=${quality}]/b`
+  quality === '2160'
+    ? 'bv*[height<=2160][vcodec^=vp09]+ba/bv*[height<=2160]+ba/b[height<=2160]/b'
+    : `bv*[height<=${quality}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=${quality}]+ba/b[height<=${quality}]/b`
 
 export const YTDLP_FORMAT = formatFor('1080')
 
