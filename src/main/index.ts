@@ -408,18 +408,26 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
   const item = ytPlayItem(ytRepository, videoId)
   if (!item) return { ok: false, reason: 'error', message: 'Video už ve složce není.' }
   if (!host) return { ok: false, reason: 'error', message: 'Okno aplikace nebylo nalezeno.' }
+  let source: YtSource
+  try {
+    source = await ytSource(item)
+  } catch (error) {
+    return { ok: false, reason: 'error', message: ytStreamError(error) }
+  }
   try {
     session?.close()
     let started: PlayerSession | undefined = undefined
     started = await PlayerSession.start({
       mainWindow: host,
-      file: item.path,
+      file: source.file,
       title: item.title,
       startSec: item.startSec,
       next: item.next?.name ?? null,
       previous: item.previous?.name ?? null,
+      // Vždy s volbami pro síť – v jedné kategorii se můžou střídat stažená a online videa.
+      networkArgs: mpvNetworkArgs({ headers: source.headers ?? {} }),
       audio: audioLaunchOptions(loadAudioSettings(settings)),
-      tracks: trackChoicesFor(item.path),
+      tracks: trackChoicesFor(item.online ? '' : item.path),
       subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
       prepareSubtitle: (path) => prepareSubtitle(path, item.path, subtitleCacheDir()),
       logFile: join(app.getPath('logs'), 'mpv.log'),
@@ -427,15 +435,21 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
         if (session === started) ytTracker.update(position, duration)
       },
       onNext: () => {
-        if (session === started && ytCurrent?.next) loadYt(started, ytCurrent.next.id)
+        if (session === started && ytCurrent?.next) void loadYt(started, ytCurrent.next.id)
       },
       onPrevious: () => {
-        if (session === started && ytCurrent?.previous) loadYt(started, ytCurrent.previous.id)
+        if (session === started && ytCurrent?.previous) void loadYt(started, ytCurrent.previous.id)
       },
       onStop: () => {
         if (session !== started) return
         const id = ytTracker.abandon()
         if (id !== null) ytRepository.clearProgress(id)
+      },
+      // Online video, které mpv neotevřelo (adresa mezitím přestala platit, výpadek sítě).
+      onOpenFailed: () => {
+        if (session !== started || !ytCurrent?.online) return false
+        ytStreams?.forget(ytCurrent.online)
+        return 'Video z YouTube se nepodařilo otevřít. Zkontroluj připojení a zkus ho pustit znovu.'
       },
       onEnd: (info) => {
         if (session === started) {
@@ -458,60 +472,71 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
 }
 
 let ytStreams: YtStreamResolver | null = null
-let ytStreamStop: (() => void) | null = null
 
-/**
- * Test přehrávání online (přírůstek O1): video z YouTube přímo ze sítě, bez stažení.
- * Adresy obrazu a zvuku zjistí yt-dlp, mpv je přehraje; pozice se zatím neukládá.
- */
-async function playOnline(
-  host: BrowserWindow | null,
-  youtubeId: string,
-  quality: KidsQuality
-): Promise<OpenFileResult> {
-  if (!host) return { ok: false, reason: 'error', message: 'Okno aplikace nebylo nalezeno.' }
-  if (!ytStreams)
-    return { ok: false, reason: 'error', message: 'Přehrávání online není připravené.' }
-  try {
-    const stream = await ytStreams.resolve(youtubeId, quality)
-    session?.close()
-    let started: PlayerSession | undefined = undefined
-    started = await PlayerSession.start({
-      mainWindow: host,
-      file: mpvFileFor(stream),
-      title: stream.title ?? youtubeId,
-      next: null,
-      networkArgs: mpvNetworkArgs(stream),
-      audio: audioLaunchOptions(loadAudioSettings(settings)),
-      tracks: trackChoicesFor(''),
-      subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
-      logFile: join(app.getPath('logs'), 'mpv.log'),
-      onEnd: (info) => {
-        if (session === started) session = null
-        if (!host.isDestroyed()) host.webContents.send(IpcChannel.PlayerClosed, info)
-      }
-    })
-    session = started
-    tracker.finish()
-    return { ok: true }
-  } catch (error) {
-    return { ok: false, reason: 'error', message: (error as Error).message }
+/** Náhled videa z YouTube v co nejlepší velikosti pro kartu (1280×720, jinak 320×180). */
+async function youtubeThumbnail(
+  fetchImpl: typeof fetch,
+  youtubeId: string
+): Promise<Uint8Array | null> {
+  for (const name of ['hq720.jpg', 'mqdefault.jpg']) {
+    try {
+      const response = await fetchImpl(`https://i.ytimg.com/vi/${youtubeId}/${name}`)
+      if (response.ok) return new Uint8Array(await response.arrayBuffer())
+    } catch {
+      // Bez připojení – karta použije náhled přes aplikaci, až bude síť.
+    }
   }
+  return null
+}
+let ytStreamStop: (() => void) | null = null
+const ytQualitySetting = (): KidsQuality => {
+  const saved = settings.get<string>('yt.quality')
+  return saved === '2160' || saved === '720' ? saved : '1080'
+}
+
+/** Co přehrát: stažený soubor, nebo adresy z YouTube (online video) s hlavičkami. */
+interface YtSource {
+  file: string
+  headers?: Record<string, string>
+}
+
+async function ytSource(item: YtPlayItem): Promise<YtSource> {
+  if (!item.online) return { file: item.path }
+  if (!ytStreams) throw new Error('Přehrávání online není připravené.')
+  const stream = await ytStreams.resolve(item.online, ytQualitySetting())
+  return { file: mpvFileFor(stream), headers: stream.headers }
+}
+
+/** Chyba při zjišťování adres online videa jako srozumitelná zpráva. */
+function ytStreamError(error: unknown): string {
+  const { message, retry } = error as Error & { retry?: boolean }
+  return retry
+    ? 'Online video teď nejde přehrát – zkontroluj připojení k internetu.'
+    : message || 'Online video nejde přehrát.'
 }
 
 /** Další nebo předchozí video kategorie – načte se do běžícího přehrávače. */
-function loadYt(current: PlayerSession, videoId: number): void {
+async function loadYt(current: PlayerSession, videoId: number): Promise<void> {
   const item = ytPlayItem(ytRepository, videoId)
   if (!item) return
+  let source: YtSource
+  try {
+    source = await ytSource(item)
+  } catch (error) {
+    current.notify(ytStreamError(error))
+    return
+  }
+  if (session !== current) return
   ytTracker.start(item.videoId)
   ytCurrent = item
   current.load({
-    file: item.path,
+    file: source.file,
     title: item.title,
     startSec: item.startSec,
     next: item.next?.name ?? null,
     previous: item.previous?.name ?? null,
-    tracks: trackChoicesFor(item.path)
+    httpHeaders: source.headers ?? {},
+    tracks: trackChoicesFor(item.online ? '' : item.path)
   })
 }
 
@@ -836,7 +861,9 @@ void app.whenReady().then(() => {
       : undefined,
     thumbnailDir: join(app.getPath('userData'), 'cache', 'yt'),
     trash: (path) => shell.trashItem(path),
-    downloadingInto: (folder): boolean => ytQueueRef?.isDownloadingInto(folder) ?? false
+    downloadingInto: (folder): boolean => ytQueueRef?.isDownloadingInto(folder) ?? false,
+    busy: () => ytDownloaderRef?.busy ?? false,
+    fetchThumbnail: (youtubeId) => youtubeThumbnail(chromiumFetch, youtubeId)
   })
   ytLibrary.on('changed', () => broadcast(IpcChannel.YtChanged))
   // Stahování do YT videí: vlastní yt-dlp proces (souběžně se stahováním pohádek), stejný nástroj.
@@ -881,7 +908,6 @@ void app.whenReady().then(() => {
     library: ytLibrary,
     repository: ytRepository,
     play: playYt,
-    playOnline,
     downloader: ytDownloader,
     queue: ytQueue
   })

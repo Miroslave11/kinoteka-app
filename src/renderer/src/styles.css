@@ -2671,3 +2671,23 @@ p.info-chip {
   gap: 6px;
   margin-left: auto;
 }
+
+/* ---------- YT videa: online / v počítači ---------- */
+.yt-storage {
+  position: absolute;
+  z-index: 3;
+  left: 8px;
+  bottom: 10px;
+  gap: 4px;
+}
+
+.yt-storage.is-online {
+  color: #9fd8ff;
+}
+
+.yt-chip-sep {
+  width: 1px;
+  height: 24px;
+  margin: 0 6px;
+  background: var(--line);
+}

@@ -7,6 +7,7 @@ import {
 import type { YtCategory, YtCategoryRole, YtVideoSummary } from '../../shared/yt'
 import type { Database } from '../db/database'
 import type { StoredFile } from '../library/scanner'
+import { isOnlineFile } from '../library/videoSidecars'
 import type { CategoryKeywords } from './ytClassify'
 
 type Row = Record<string, unknown>
@@ -267,6 +268,7 @@ export class YtRepository {
         channel: (row['channel'] as string | null) ?? null,
         durationSec: typeof row['duration'] === 'number' ? Math.round(row['duration']) : null,
         youtubeId: (row['youtube_id'] as string | null) ?? null,
+        online: isOnlineFile(String(row['path'])),
         thumbnailUrl: row['thumbnail']
           ? `kinoteka-media://yt/video/${id}?v=${Number(row['mtime_ms'])}`
           : null,
@@ -297,16 +299,21 @@ export class YtRepository {
   // ---------- přehrávání ----------
 
   /** Videa kategorie v pořadí na stránce (nejnovější první) – pro „předchozí / další“. */
-  queue(videoId: number): { id: number; path: string; name: string }[] {
+  queue(videoId: number): { id: number; path: string; name: string; youtubeId: string | null }[] {
     const row = this.db.prepare('SELECT category_id FROM yt_video WHERE id = ?').get(videoId)
     if (!row) return []
     return this.db
       .prepare(
-        `SELECT id, path, name FROM yt_video WHERE category_id IS ?
+        `SELECT id, path, name, youtube_id FROM yt_video WHERE category_id IS ?
          ORDER BY added_at DESC, id DESC`
       )
       .all(row['category_id'] ?? null)
-      .map((r) => ({ id: Number(r['id']), path: String(r['path']), name: String(r['name']) }))
+      .map((r) => ({
+        id: Number(r['id']),
+        path: String(r['path']),
+        name: String(r['name']),
+        youtubeId: (r['youtube_id'] as string | null) ?? null
+      }))
   }
 
   progress(videoId: number): PlaybackProgress | null {

@@ -38,11 +38,14 @@ async function downloaded(
 
 function library(
   fetchInfo?: (id: string) => Promise<FetchInfoResult>,
-  downloadingInto?: string
+  downloadingInto?: string,
+  extra: { busy?: () => boolean } = {}
 ): YtLibrary {
   return new YtLibrary(repository, {
     folder: () => yt,
     fetchInfo,
+    busy: extra.busy,
+    fetchThumbnail: vi.fn(async () => new Uint8Array([1, 2, 3])),
     trash: async (path) => {
       await mkdir(join(root, 'Koš'), { recursive: true })
       await rename(path, join(root, 'Koš', basename(path)))
@@ -350,6 +353,101 @@ describe('YtLibrary – správa', () => {
       'Clip [aaaaaaaaaaa].info.json',
       'Clip [aaaaaaaaaaa].jpg',
       'Clip [aaaaaaaaaaa].mp4'
+    ])
+  })
+})
+
+describe('YtLibrary – online videa', () => {
+  const info = (id: string, title: string, tags: string[]): FetchInfoResult => ({
+    ok: true,
+    info: { id, title, tags, duration: 245, channel: 'Kanál', formats: ['velké'] }
+  })
+
+  it('přidání online „automaticky“: odkaz do kořene, údaje z YouTube, zařazení podle obsahu', async () => {
+    const fetchInfo = vi.fn(async (id: string) => info(id, 'Ocean Waves', ['ocean', 'beach']))
+    const lib = library(fetchInfo)
+    await lib.scan()
+
+    const result = await lib.addOnline([{ youtubeId: 'aaaaaaaaaaa', title: 'Ocean | Waves' }], '')
+    expect(result).toEqual({ added: 1, skipped: 0 })
+    await lib.idle()
+
+    expect(summary()).toEqual([['Příroda', ['Ocean Waves']]])
+    expect((await readdir(join(yt, 'Příroda'))).sort()).toEqual([
+      'Ocean Waves [aaaaaaaaaaa].info.json',
+      'Ocean Waves [aaaaaaaaaaa].jpg',
+      'Ocean Waves [aaaaaaaaaaa].ytonline'
+    ])
+    const video = repository.list().flatMap((c) => c.videos)[0]!
+    expect(video).toMatchObject({ online: true, youtubeId: 'aaaaaaaaaaa', durationSec: 245 })
+    const link = JSON.parse(
+      await readFile(join(yt, 'Příroda', 'Ocean Waves [aaaaaaaaaaa].ytonline'), 'utf8')
+    ) as Record<string, unknown>
+    expect(link['url']).toBe('https://www.youtube.com/watch?v=aaaaaaaaaaa')
+  })
+
+  it('přidání do vybrané kategorie: hned tam, údaje se dotáhnou na pozadí', async () => {
+    const fetchInfo = vi.fn(async (id: string) => info(id, 'Song', ['nature']))
+    const lib = library(fetchInfo)
+    await lib.scan()
+    await lib.addOnline([{ youtubeId: 'bbbbbbbbbbb', title: 'Song' }], 'Města')
+    expect(summary()).toEqual([['Města', ['Song']]])
+    await vi.waitFor(() =>
+      expect(repository.list().flatMap((c) => c.videos)[0]?.channel).toBe('Kanál')
+    )
+    // Zůstane, kam ho uživatel dal (štítky přírody nevadí).
+    expect(summary()).toEqual([['Města', ['Song']]])
+  })
+
+  it('už přidané nebo stažené video se znovu nepřidá; online video se nesnímkuje ffmpegem', async () => {
+    const lib = library()
+    await lib.scan()
+    await downloaded(join(yt, 'Města'), 'Clip', 'aaaaaaaaaaa', { title: 'Clip' })
+    await lib.scan()
+    expect(
+      await lib.addOnline(
+        [
+          { youtubeId: 'aaaaaaaaaaa', title: 'Clip' },
+          { youtubeId: 'ccccccccccc', title: 'Nové' },
+          { youtubeId: 'ccccccccccc', title: 'Nové' }
+        ],
+        'Města'
+      )
+    ).toEqual({ added: 1, skipped: 2 })
+    const online = repository
+      .list()
+      .flatMap((c) => c.videos)
+      .find((v) => v.online)!
+    expect(online.name).toBe('Nové')
+    expect(online.thumbnailUrl).not.toBeNull()
+  })
+
+  it('během stahování se kořen netřídí', async () => {
+    let busy = true
+    const lib = library(undefined, undefined, { busy: () => busy })
+    await lib.scan()
+    await downloaded(yt, 'Paris', 'aaaaaaaaaaa', { title: 'Paris', tags: ['paris'] })
+    await lib.scan()
+    expect(existsSync(join(yt, 'Paris [aaaaaaaaaaa].mp4'))).toBe(true)
+    busy = false
+    await lib.scan()
+    expect(summary()).toEqual([['Města', ['Paris']]])
+  })
+
+  it('online video jde přesunout i smazat jako stažené', async () => {
+    const lib = library()
+    await lib.scan()
+    await lib.addOnline([{ youtubeId: 'ddddddddddd', title: 'Klip' }], 'Města')
+    const id = repository.list().flatMap((c) => c.videos)[0]!.id
+    const priroda = repository.list().find((c) => c.name === 'Příroda')!.id!
+    expect(await lib.manage({ kind: 'move-video', videoId: id, categoryId: priroda })).toEqual({
+      ok: true
+    })
+    expect(existsSync(join(yt, 'Příroda', 'Klip [ddddddddddd].ytonline'))).toBe(true)
+    expect(await lib.manage({ kind: 'trash-video', videoId: id })).toEqual({ ok: true })
+    expect((await readdir(join(root, 'Koš'))).sort()).toEqual([
+      'Klip [ddddddddddd].jpg',
+      'Klip [ddddddddddd].ytonline'
     ])
   })
 })

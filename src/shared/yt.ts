@@ -9,6 +9,8 @@ export interface YtVideoSummary {
   channel: string | null
   durationSec: number | null
   youtubeId: string | null
+  /** Online video (jen odkaz, přehrává se z YouTube); false = stažené v počítači. */
+  online: boolean
   /** Obrázek videa (z YouTube, jinak snímek z videa); null = zástupné pozadí. */
   thumbnailUrl: string | null
   addedAt: string
