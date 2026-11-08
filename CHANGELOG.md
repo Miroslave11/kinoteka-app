@@ -8,6 +8,18 @@
 - Každé video má štítek **V počítači** nebo **☁ Online**; podtitul stránky ukazuje, kolik místa zabírají stažená videa.
 - **Převody:** „Ponechat jen online“ u staženého videa nebo celé kategorie uvolní místo (soubor jde do Koše, pozice a zhlédnutí zůstanou); „Stáhnout do počítače“ u online videa ho stáhne zpět.
 - Online video, které YouTube už nevydá, dostane štítek **Nedostupné**.
+- **Rychlý start:** adresy online videí si Kinotéka pamatuje i po zavření (video spuštěné v posledních hodinách se spustí hned) a připraví je předem, když najedeš myší na video.
+- Po kliknutí na online video se ukáže **„Načítám video z YouTube…“** s kolečkem.
+- Oprava: online video se po otevření hned zavřelo (YouTube čerstvou adresu první vteřiny odmítá – Kinotéka teď počká, až ji vydá).
+
+### YT videa – vzhled
+
+- Videa v kategoriích se zalamují pod sebe – stránku už není potřeba posouvat doprava.
+- Výraznější nadpisy kategorií (větší písmo, oranžový proužek, počet videí).
+
+### Přehrávač
+
+- Při každém čekání (otevírání videa, další / předchozí díl, přetáčení, načítání dat ze sítě) se uprostřed obrazu ukáže kolečko s textem, co se děje.
 
 ### YT videa – stahování
 
