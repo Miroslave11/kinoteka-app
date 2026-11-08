@@ -338,5 +338,9 @@ export const MIGRATIONS: readonly string[] = [
     count INTEGER NOT NULL,
     last_at TEXT NOT NULL
   );
+  `,
+  // 21 – YT videa: online video, které YouTube už nevydá (zjištěno při přehrání)
+  `
+  ALTER TABLE yt_video ADD COLUMN unavailable INTEGER NOT NULL DEFAULT 0;
   `
 ]

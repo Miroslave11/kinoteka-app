@@ -2691,3 +2691,34 @@ p.info-chip {
   margin: 0 6px;
   background: var(--line);
 }
+
+/* ---------- YT videa: převody ---------- */
+.yt-unavailable {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  right: 8px;
+  gap: 4px;
+  color: #ffb4a8;
+}
+
+.yt-free {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.yt-free.is-confirming {
+  color: var(--danger);
+}
+
+.yt-grid-head {
+  display: flex;
+  justify-content: flex-end;
+  margin: -10px 0 14px;
+}
+
+.yt-notice {
+  cursor: pointer;
+  margin-bottom: 8px;
+}

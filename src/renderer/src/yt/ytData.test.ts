@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { YtCategory, YtVideoSummary } from '../../../shared/yt'
 import {
   continueRow,
+  diskBytes,
   filterKey,
+  freeableBytes,
   filterStorage,
   parseStorage,
   totalVideos,
@@ -16,6 +18,8 @@ const video = (id: number, patch: Partial<YtVideoSummary> = {}): YtVideoSummary 
   durationSec: 200,
   youtubeId: null,
   online: false,
+  sizeBytes: 1000,
+  unavailable: false,
   thumbnailUrl: null,
   addedAt: '2026-11-07T10:00:00.000Z',
   progress: null,
@@ -79,5 +83,23 @@ describe('filtr uložení', () => {
       'vse',
       'vse'
     ])
+  })
+})
+
+describe('místo na disku', () => {
+  it('obsazené a uvolnitelné místo', () => {
+    const category: YtCategory = {
+      id: 1,
+      name: 'Města',
+      keywords: [],
+      role: null,
+      videos: [
+        video(1, { sizeBytes: 500, youtubeId: 'aaaaaaaaaaa' }),
+        video(2, { sizeBytes: 300 }),
+        video(3, { online: true, sizeBytes: 0, youtubeId: 'bbbbbbbbbbb' })
+      ]
+    }
+    expect(diskBytes([category])).toBe(800)
+    expect(freeableBytes(category)).toBe(500)
   })
 })

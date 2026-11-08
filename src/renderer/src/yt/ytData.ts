@@ -42,3 +42,17 @@ export function filterStorage(categories: readonly YtCategory[], storage: YtStor
     videos: category.videos.filter((video) => video.online === online)
   }))
 }
+
+/** Kolik místa zabírají stažená videa (bajty). */
+export const diskBytes = (categories: readonly YtCategory[]): number =>
+  categories.reduce(
+    (sum, category) => sum + category.videos.reduce((s, video) => s + video.sizeBytes, 0),
+    0
+  )
+
+/** Kolik místa uvolní „Ponechat jen online“ u kategorie (stažená videa s odkazem na YouTube). */
+export const freeableBytes = (category: YtCategory): number =>
+  category.videos.reduce(
+    (sum, video) => sum + (!video.online && video.youtubeId ? video.sizeBytes : 0),
+    0
+  )
