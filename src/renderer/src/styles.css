@@ -2413,16 +2413,70 @@ p.info-chip {
 
 /* ---------- stránka YT videa ---------- */
 .yt-row {
-  margin-bottom: 18px;
+  margin-bottom: 32px;
 }
 
+/* ---------- YT videa: načítání online videa ---------- */
+.yt-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(3px);
+}
+
+.yt-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: min(440px, 90vw);
+  padding: 28px 36px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgb(18 18 22 / 0.94);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.5);
+  text-align: center;
+}
+
+.yt-loading-card svg {
+  color: var(--accent);
+}
+
+.yt-loading-card .small {
+  overflow: hidden;
+  max-width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Nadpis kategorie: větší písmo a akcentní proužek vlevo. */
 .yt-row h3 {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 10px;
-  font-size: 18px;
+  margin-bottom: 14px;
+  padding-left: 12px;
+  border-left: 4px solid var(--accent);
+  font-size: 24px;
   font-weight: 700;
+  line-height: 1.2;
+}
+
+.yt-row h3 .row-link {
+  margin-left: 4px;
+}
+
+.yt-count {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .yt-grid {

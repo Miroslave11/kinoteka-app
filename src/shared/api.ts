@@ -293,6 +293,8 @@ export interface KinotekaApi {
     openFolder(): Promise<void>
     /** Přehraje video (rozkoukané od uložené pozice, předchozí / další v kategorii). */
     playVideo(videoId: number): Promise<OpenFileResult>
+    /** Online video: zjistí adresy předem (najetí myší), spuštění pak nečeká. */
+    prefetch(videoId: number): Promise<void>
     /** Náhled odkazu s návrhem kategorie (podle názvu a kanálu). */
     preview(url: string): Promise<KidsPreviewResult>
     onPreviewStage(listener: (stage: KidsPreviewStage) => void): () => void

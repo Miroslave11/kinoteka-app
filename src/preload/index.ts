@@ -149,6 +149,7 @@ const api: KinotekaApi = {
     manage: (action) => ipcRenderer.invoke(IpcChannel.YtManage, action),
     openFolder: () => ipcRenderer.invoke(IpcChannel.YtOpenFolder),
     playVideo: (videoId) => ipcRenderer.invoke(IpcChannel.YtPlayVideo, videoId),
+    prefetch: (videoId) => ipcRenderer.invoke(IpcChannel.YtPrefetch, videoId),
     preview: (url) => ipcRenderer.invoke(IpcChannel.YtPreview, url),
     onPreviewStage: (listener) => subscribe(IpcChannel.YtPreviewStage, listener),
     warmUp: () => ipcRenderer.invoke(IpcChannel.YtWarmUp),

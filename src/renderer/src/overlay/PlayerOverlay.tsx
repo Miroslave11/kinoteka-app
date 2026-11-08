@@ -21,6 +21,7 @@ import {
   type PlayerCommand,
   type PlayerState
 } from '../../../shared/player'
+import BusyIndicator from './BusyIndicator'
 import KidsOverlay from './KidsOverlay'
 import SeekBar from './SeekBar'
 import OnlineSubtitlesPanel from './OnlineSubtitlesPanel'
@@ -165,6 +166,8 @@ export default function PlayerOverlay(): React.JSX.Element {
 
       {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
       {onlineOpen && <OnlineSubtitlesPanel onClose={() => setOnlineOpen(false)} />}
+
+      <BusyIndicator text={state.ended ? null : state.busy} />
 
       {notice && (
         <div className="notice-toast" {...controlsProps}>
