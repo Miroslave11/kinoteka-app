@@ -38,3 +38,23 @@ Každý přírůstek samostatně ověřitelný, další začíná po potvrzení 
 | Y2  | **Stránka YT videa a přehrávání**     | Položka v menu, Pokračovat, filtr, řádky kategorií, přehrávání s pokračováním a dalším videem.                               | Data stránky, pokračování, další video                                | Proklikej podle mockupu, pusť video, odejdi a vrať se → pokračuje.         |
 | Y3  | **Stahování z odkazu**                | Okno stahování, náhled, návrh kategorie, kvalita, fronta s průběhem a chybami.                                               | Návrh kategorie, fronta (bez sítě)                                    | Stáhni klip a krátký playlist, jednou změň kategorii; zkus neplatný odkaz. |
 | Y4  | **Správa**                            | Přesun mezi kategoriemi, přejmenování a mazání kategorií, smazání videa do Koše.                                             | Přesun a mazání na dočasných souborech                                | Přesuň video, přejmenuj kategorii, smaž video → je v Koši.                 |
+
+## Online videa a fronta stahování (schváleno 2026-11-08)
+
+Cíl: videa zabírají hodně místa – přidat jde i jen **odkaz**. Video se přehrává v Kinotéce stejně jako stažené, jen se stream bere přímo z YouTube.
+
+| Téma         | Řešení                                                                                                                                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Online video | Malý soubor `Název [ID].ytonline` (odkaz) + `.info.json` + `.jpg` ve složce kategorie. Zařazení, přesun, mazání, pokračování i předchozí/další jako u stažených.                                           |
+| Přehrávání   | yt-dlp zjistí adresy obrazu a zvuku (kvalita podle nastavení, výchozí 1080p), mpv je přehraje ze sítě (EDL obraz + zvuk, stejné hlavičky). Adresy se drží v mezipaměti, dokud platí. Bez internetu hláška. |
+| Označení     | Štítek ☁ Online / 💾 V počítači, filtr Vše / V počítači / Online.                                                                                                                                          |
+| Přidání      | V okně Stáhnout z YouTube volba **Online (výchozí)** / Stáhnout do počítače; i playlist.                                                                                                                   |
+| Převody      | Ponechat jen online (smaže soubor do Koše, i hromadně za kategorii s ukázáním uvolněného místa), Stáhnout do počítače.                                                                                     |
+| Fronta       | Víc odkazů najednou (jeden na řádek), 2 stahování souběžně (nastavitelné 1–3), opakování chybných, fronta přežije restart a navazuje na rozpracované soubory.                                              |
+
+| #   | Přírůstek                                                                                        |
+| --- | ------------------------------------------------------------------------------------------------ |
+| O1  | Technický test přehrávání online (rozhodovací bod, ruční test uživatele)                         |
+| O2  | Online videa v knihovně, volba Online / Stáhnout, štítky a filtr; pojistka třídění při stahování |
+| O3  | Převody: Ponechat jen online / Stáhnout do počítače                                              |
+| O4  | Víc odkazů najednou, souběžné stahování, fronta s opakováním a pokračováním po restartu          |

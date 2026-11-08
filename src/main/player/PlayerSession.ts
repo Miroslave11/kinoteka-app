@@ -80,6 +80,8 @@ export interface PlayerSessionOptions {
   tracks: TrackChoices
   /** Styl titulků (volby `--sub-…`). */
   subtitleArgs?: readonly string[]
+  /** Přehrávání ze sítě (YT videa online): hlavičky, vyrovnávací paměť. */
+  networkArgs?: readonly string[]
   logFile?: string
   /** Pozice a délka právě hraného souboru (několikrát za sekundu). */
   onProgress?: (position: number, duration: number) => void
@@ -193,9 +195,12 @@ export class PlayerSession {
       subtitleArgs: options.subtitleArgs,
       logFile: options.logFile,
       startSec: options.startSec,
-      extraArgs: app.isPackaged
-        ? undefined
-        : process.env['KINOTEKA_DEV_MPV_ARGS']?.split(' ').filter(Boolean)
+      extraArgs: [
+        ...(options.networkArgs ?? []),
+        ...((app.isPackaged
+          ? undefined
+          : process.env['KINOTEKA_DEV_MPV_ARGS']?.split(' ').filter(Boolean)) ?? [])
+      ]
     })
     const mpv = spawn(executable, args, { windowsHide: true, stdio: 'ignore' })
 

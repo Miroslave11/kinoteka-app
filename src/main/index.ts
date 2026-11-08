@@ -4,7 +4,12 @@ import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { WindowState } from '../shared/api'
 import { IpcChannel } from '../shared/ipc'
-import { DEFAULT_KIDS_SETTINGS, parseKidsSettings, type KidsSettings } from '../shared/kids'
+import {
+  DEFAULT_KIDS_SETTINGS,
+  parseKidsSettings,
+  type KidsQuality,
+  type KidsSettings
+} from '../shared/kids'
 import { VIDEO_EXTENSIONS } from '../shared/library'
 import { parseClassification } from '../shared/classification'
 import { parseFileIds } from '../shared/deletion'
@@ -37,6 +42,7 @@ import { fetchOembed } from './kids/oembed'
 import { YtDlpTool } from './kids/YtDlpTool'
 import { YtLibrary } from './yt/YtLibrary'
 import { ytPlayItem, type YtPlayItem } from './yt/ytPlayback'
+import { mpvFileFor, mpvNetworkArgs, YtStreamResolver } from './yt/ytStream'
 import { matchCategory, metaFromInfo } from './yt/ytClassify'
 import { registerYtIpc, ytFolder } from './yt/ytIpc'
 import { YtRepository } from './yt/YtRepository'
@@ -451,6 +457,48 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
   }
 }
 
+let ytStreams: YtStreamResolver | null = null
+let ytStreamStop: (() => void) | null = null
+
+/**
+ * Test přehrávání online (přírůstek O1): video z YouTube přímo ze sítě, bez stažení.
+ * Adresy obrazu a zvuku zjistí yt-dlp, mpv je přehraje; pozice se zatím neukládá.
+ */
+async function playOnline(
+  host: BrowserWindow | null,
+  youtubeId: string,
+  quality: KidsQuality
+): Promise<OpenFileResult> {
+  if (!host) return { ok: false, reason: 'error', message: 'Okno aplikace nebylo nalezeno.' }
+  if (!ytStreams)
+    return { ok: false, reason: 'error', message: 'Přehrávání online není připravené.' }
+  try {
+    const stream = await ytStreams.resolve(youtubeId, quality)
+    session?.close()
+    let started: PlayerSession | undefined = undefined
+    started = await PlayerSession.start({
+      mainWindow: host,
+      file: mpvFileFor(stream),
+      title: stream.title ?? youtubeId,
+      next: null,
+      networkArgs: mpvNetworkArgs(stream),
+      audio: audioLaunchOptions(loadAudioSettings(settings)),
+      tracks: trackChoicesFor(''),
+      subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
+      logFile: join(app.getPath('logs'), 'mpv.log'),
+      onEnd: (info) => {
+        if (session === started) session = null
+        if (!host.isDestroyed()) host.webContents.send(IpcChannel.PlayerClosed, info)
+      }
+    })
+    session = started
+    tracker.finish()
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, reason: 'error', message: (error as Error).message }
+  }
+}
+
 /** Další nebo předchozí video kategorie – načte se do běžícího přehrávače. */
 function loadYt(current: PlayerSession, videoId: number): void {
   const item = ytPlayItem(ytRepository, videoId)
@@ -816,11 +864,24 @@ void app.whenReady().then(() => {
     quickInfo: (videoId) => fetchOembed(chromiumFetch, videoId)
   })
   ytQueueRef = ytQueue
+  // Online videa: adresy streamu přes stejný yt-dlp (vlastní proces, aby nečekal na stahování).
+  const ytStreamDownloader = new KidsDownloader({
+    tool: () => ytDlp.ensure(),
+    folder: () => ytFolder(settings),
+    ffmpegDir: dirname(ffmpeg),
+    nodePath: process.execPath,
+    tempDir: join(app.getPath('temp'), 'kinoteka')
+  })
+  ytStreamStop = () => ytStreamDownloader.stopAll()
+  ytStreams = new YtStreamResolver((youtubeId, quality) =>
+    ytStreamDownloader.streamInfo(youtubeId, quality)
+  )
   registerYtIpc({
     settings,
     library: ytLibrary,
     repository: ytRepository,
     play: playYt,
+    playOnline,
     downloader: ytDownloader,
     queue: ytQueue
   })
@@ -889,6 +950,7 @@ void app.whenReady().then(() => {
     // Náhledy a stahování z YouTube nesmí běžet dál bez aplikace.
     kidsDownloader.stopAll()
     ytDownloaderRef?.stopAll()
+    ytStreamStop?.()
     themeDownloader.stopAll()
     db.close()
   })

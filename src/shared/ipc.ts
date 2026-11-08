@@ -129,5 +129,6 @@ export const IpcChannel = {
   YtQueue: 'yt:queue',
   YtQueueRemove: 'yt:queue-remove',
   YtQueueClear: 'yt:queue-clear',
-  YtQueueChanged: 'yt:queue-changed'
+  YtQueueChanged: 'yt:queue-changed',
+  YtPlayOnline: 'yt:play-online'
 } as const

@@ -107,6 +107,57 @@ function CategoryActions({
   )
 }
 
+/** Dočasný test přehrávání online (přírůstek O1) – v O2 ho nahradí online videa v knihovně. */
+function OnlineTest(): React.JSX.Element {
+  const { yt } = window.kinoteka
+  const [url, setUrl] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const play = async (): Promise<void> => {
+    setBusy(true)
+    setMessage(null)
+    const started = Date.now()
+    const result = await yt.playOnline(url)
+    setBusy(false)
+    setMessage(
+      result.ok
+        ? `Spuštěno za ${((Date.now() - started) / 1000).toFixed(1).replace('.', ',')} s.`
+        : result.reason === 'error'
+          ? result.message
+          : null
+    )
+  }
+  return (
+    <section className="card">
+      <h2>Test: přehrát z YouTube bez stažení</h2>
+      <p className="muted small">
+        Dočasné – ověření, že online videa půjdou přehrávat. Kvalita podle poslední volby při
+        stahování.
+      </p>
+      <div className="key-row">
+        <input
+          className="field grow"
+          aria-label="Odkaz na video z YouTube"
+          placeholder="https://www.youtube.com/watch?v=…"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && url.trim() && !busy) void play()
+          }}
+        />
+        <button
+          className="btn sm primary"
+          disabled={!url.trim() || busy}
+          onClick={() => void play()}
+        >
+          {busy ? 'Připravuji video z YouTube…' : 'Přehrát online'}
+        </button>
+      </div>
+      {message && <p className="notice">{message}</p>}
+    </section>
+  )
+}
+
 const ROLE_HINT = {
   music: 'Sem jde hudba (podle YouTube), která nepatří do jiné kategorie.',
   other: 'Sem jde vše, co nepatří jinam.'
@@ -260,6 +311,7 @@ export default function YtSettings(): React.JSX.Element {
           </button>
         </div>
       </section>
+      <OnlineTest />
     </div>
   )
 }
