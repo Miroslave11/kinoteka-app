@@ -191,6 +191,11 @@ export async function signIn(options: SignInOptions): Promise<GoogleTokens> {
     })
     if (typeof json['refresh_token'] !== 'string')
       throw new Error('Google nevrátil obnovovací klíč – zkus se přihlásit znovu.')
+    // Google nechává oprávnění zaškrtnout jednotlivě – bez Disku sdílení nefunguje.
+    if (typeof json['scope'] === 'string' && !json['scope'].includes('drive.appdata'))
+      throw new Error(
+        'Při přihlášení nebyl povolen přístup ke Google Disku. Přihlas se znovu a v okně Googlu zaškrtni přístup k datům aplikace na Disku.'
+      )
     return {
       refreshToken: json['refresh_token'],
       accessToken: String(json['access_token']),

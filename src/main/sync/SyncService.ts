@@ -253,10 +253,10 @@ export class SyncService extends EventEmitter<{ changed: [] }> {
     } catch (error) {
       if (stale()) return
       const revoked = (error as { revoked?: boolean }).revoked === true
-      const denied = error instanceof DriveError && error.status === 401
-      this.lastError =
-        revoked || denied
-          ? 'Přihlášení ke Google vypršelo nebo bylo zrušeno – přihlas se prosím znovu.'
+      this.lastError = revoked
+        ? 'Přihlášení ke Google vypršelo nebo bylo zrušeno – přihlas se prosím znovu.'
+        : error instanceof DriveError
+          ? error.message
           : /fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ERR_INTERNET/i.test(String(error))
             ? 'Bez připojení k internetu – změny se pošlou, až bude síť.'
             : (error as Error).message

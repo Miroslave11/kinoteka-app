@@ -35,6 +35,35 @@ export class DriveError extends Error {
   }
 }
 
+/** Důvod chyby z odpovědi Google API (`error.errors[0].reason`, `error.details[].reason`). */
+function reasonOf(text: string): { reason: string; message: string } {
+  try {
+    const error = (JSON.parse(text) as { error?: Record<string, unknown> }).error ?? {}
+    const errors = (error['errors'] as { reason?: string }[] | undefined) ?? []
+    const details = (error['details'] as { reason?: string }[] | undefined) ?? []
+    return {
+      reason: errors[0]?.reason ?? details.find((d) => d.reason)?.reason ?? '',
+      message: typeof error['message'] === 'string' ? error['message'] : ''
+    }
+  } catch {
+    return { reason: '', message: '' }
+  }
+}
+
+/** Srozumitelná zpráva podle důvodu, který Google uvedl. */
+export function driveErrorMessage(status: number, text: string): string {
+  const { reason, message } = reasonOf(text)
+  if (/accessNotConfigured|SERVICE_DISABLED/i.test(reason + message))
+    return 'V projektu Google Cloud není zapnuté Google Drive API – zapni ho (APIs & Services → Library → Google Drive API → Enable) a za pár minut to zkus znovu.'
+  if (/insufficient|SCOPE/i.test(reason + message))
+    return 'Při přihlášení nebyl povolen přístup ke Google Disku – odhlas se a při přihlášení zaškrtni přístup k datům aplikace na Disku.'
+  if (status === 401)
+    return 'Přihlášení ke Google vypršelo nebo bylo zrušeno – přihlas se prosím znovu.'
+  if (status === 403)
+    return `Google Disk odmítl přístup${message ? `: ${message}` : ''}${reason ? ` (${reason})` : ''}.`
+  return `Google Disk vrátil chybu ${status}${message ? `: ${message}` : text ? `: ${text.slice(0, 200)}` : ''}`
+}
+
 export class DriveClient {
   constructor(
     private readonly fetchImpl: FetchLike,
@@ -51,12 +80,7 @@ export class DriveClient {
     })
     if (!response.ok) {
       const text = await response.text().catch(() => '')
-      throw new DriveError(
-        response.status === 401 || response.status === 403
-          ? 'Google Disk odmítl přístup – přihlas se prosím znovu.'
-          : `Google Disk vrátil chybu ${response.status}${text ? `: ${text.slice(0, 200)}` : ''}`,
-        response.status
-      )
+      throw new DriveError(driveErrorMessage(response.status, text), response.status)
     }
     return response
   }

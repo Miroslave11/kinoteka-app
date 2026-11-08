@@ -4,7 +4,7 @@ import { CatalogRepository } from '../catalog/CatalogRepository'
 import { openDatabase } from '../db/database'
 import { JournalRepository } from '../journal/JournalRepository'
 import { SettingsRepository } from '../settings/SettingsRepository'
-import { driveEndpointsAt } from './driveClient'
+import { driveEndpointsAt, driveErrorMessage } from './driveClient'
 import { endpointsAt } from './googleAuth'
 import { JournalSync } from './journalSync'
 import { SyncService } from './SyncService'
@@ -104,5 +104,18 @@ describe('SyncService', () => {
 
     await doma.service.signOut()
     expect(doma.service.status()).toMatchObject({ signedIn: false, lastError: null, devices: [] })
+  })
+})
+
+describe('driveErrorMessage', () => {
+  it('rozliší vypnuté Drive API, chybějící oprávnění a vypršelé přihlášení', () => {
+    const google = (reason: string, message = ''): string =>
+      JSON.stringify({ error: { code: 403, message, errors: [{ reason }] } })
+    expect(driveErrorMessage(403, google('accessNotConfigured'))).toMatch(/Google Drive API/)
+    expect(driveErrorMessage(403, google('insufficientPermissions'))).toMatch(/zaškrtni/)
+    expect(driveErrorMessage(401, '')).toMatch(/přihlas se prosím znovu/)
+    expect(driveErrorMessage(403, google('rateLimitExceeded', 'Rate limit'))).toBe(
+      'Google Disk odmítl přístup: Rate limit (rateLimitExceeded).'
+    )
   })
 })
