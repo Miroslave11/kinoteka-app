@@ -5,7 +5,8 @@ import {
   mpvNetworkArgs,
   parseStream,
   STREAM_REUSE_MARGIN_MS,
-  YtStreamResolver
+  YtStreamResolver,
+  waitUntilPlayable
 } from './ytStream'
 
 const EXPIRE = 1_800_000_000
@@ -132,5 +133,66 @@ describe('YtStreamResolver', () => {
   it('výpis bez adresy = srozumitelná chyba', async () => {
     const resolver = new YtStreamResolver(async () => ({ title: 'X' }))
     await expect(resolver.resolve('abc', '1080')).rejects.toThrow(/nevrátil adresu/)
+  })
+})
+
+describe('waitUntilPlayable', () => {
+  const stream = { video: 'https://v', audio: 'https://a', headers: { 'User-Agent': 'X' } }
+  const clock = () => {
+    let now = 0
+    return { now: () => now, sleep: async (ms: number) => void (now += ms) }
+  }
+
+  it('čeká, dokud YouTube adresy odmítá (403), pak pokračuje', async () => {
+    const answers: Record<string, number[]> = { 'https://v': [403, 403, 206], 'https://a': [206] }
+    const probe = vi.fn(async (url: string) => answers[url]!.shift()!)
+    const time = clock()
+    await waitUntilPlayable(
+      { ...stream, title: null, durationSec: null, expiresAt: null },
+      {
+        probe,
+        ...time
+      }
+    )
+    expect(probe.mock.calls.map(([url]) => url)).toEqual([
+      'https://v',
+      'https://v',
+      'https://v',
+      'https://a'
+    ])
+    expect(probe).toHaveBeenCalledWith('https://v', { 'User-Agent': 'X' })
+    expect(time.now()).toBe(600)
+  })
+
+  it('nečeká věčně a jiné chyby nechá na přehrávači', async () => {
+    const time = clock()
+    const always403 = vi.fn(async () => 403)
+    await waitUntilPlayable(
+      { ...stream, audio: null, title: null, durationSec: null, expiresAt: null },
+      { probe: always403, timeoutMs: 1000, ...time }
+    )
+    expect(time.now()).toBeGreaterThanOrEqual(1000)
+    expect(time.now()).toBeLessThan(1400)
+
+    const offline = vi.fn(async () => {
+      throw new Error('ENOTFOUND')
+    })
+    await waitUntilPlayable(
+      { ...stream, title: null, durationSec: null, expiresAt: null },
+      { probe: offline, ...clock() }
+    )
+    expect(offline).toHaveBeenCalledTimes(1)
+  })
+
+  it('resolver počká na platnost jen při novém zjištění, ne z mezipaměti', async () => {
+    const ready = vi.fn(async () => undefined)
+    const resolver = new YtStreamResolver(
+      async () => SPLIT,
+      () => (EXPIRE - 3600) * 1000,
+      ready
+    )
+    await resolver.resolve('abc', '1080')
+    await resolver.resolve('abc', '1080')
+    expect(ready).toHaveBeenCalledTimes(1)
   })
 })

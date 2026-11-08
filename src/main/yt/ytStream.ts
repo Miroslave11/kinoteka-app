@@ -120,6 +120,51 @@ export function mpvNetworkArgs(stream: Pick<YtStream, 'headers'>): string[] {
   return args
 }
 
+/** Jak dlouho nejvýš čekat, než YouTube čerstvou adresu začne vydávat. */
+export const READY_TIMEOUT_MS = 12_000
+const READY_POLL_MS = 300
+
+export interface WaitOptions {
+  /** HTTP stav odpovědi na první bajt adresy (výchozí přes fetch). */
+  probe?: (url: string, headers: Record<string, string>) => Promise<number>
+  sleep?: (ms: number) => Promise<void>
+  now?: () => number
+  timeoutMs?: number
+}
+
+const fetchProbe = async (url: string, headers: Record<string, string>): Promise<number> => {
+  const response = await fetch(url, { headers: { ...headers, Range: 'bytes=0-0' } })
+  await response.body?.cancel().catch(() => undefined)
+  return response.status
+}
+
+/**
+ * Počká, až adresy začnou platit. YouTube čerstvě vydanou adresu první 2–3 sekundy odmítá
+ * (HTTP 403) – mpv by ji neotevřel a skončil. Jiná chyba než 403 se nečeká (pozná ji mpv).
+ */
+export async function waitUntilPlayable(
+  stream: YtStream,
+  options: WaitOptions = {}
+): Promise<void> {
+  const probe = options.probe ?? fetchProbe
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+  const now = options.now ?? Date.now
+  const deadline = now() + (options.timeoutMs ?? READY_TIMEOUT_MS)
+  for (const url of [stream.video, stream.audio]) {
+    if (!url) continue
+    for (;;) {
+      let status: number
+      try {
+        status = await probe(url, stream.headers)
+      } catch {
+        return // Síť – rozhodne až mpv.
+      }
+      if (status !== 403 || now() >= deadline) break
+      await sleep(READY_POLL_MS)
+    }
+  }
+}
+
 /** Adresy platí několik hodin; do 15 minut před vypršením se použijí znovu. */
 export const STREAM_REUSE_MARGIN_MS = 15 * 60 * 1000
 /** Bez údaje o platnosti se adresy drží nejvýš hodinu. */
@@ -135,7 +180,9 @@ export class YtStreamResolver {
 
   constructor(
     private readonly lookup: (youtubeId: string, quality: KidsQuality) => Promise<unknown>,
-    private readonly now: () => number = Date.now
+    private readonly now: () => number = Date.now,
+    /** Čekání, než čerstvé adresy začnou platit (viz {@link waitUntilPlayable}). */
+    private readonly ready: (stream: YtStream) => Promise<void> = async () => undefined
   ) {}
 
   resolve(youtubeId: string, quality: KidsQuality): Promise<YtStream> {
@@ -145,9 +192,10 @@ export class YtStreamResolver {
     let running = this.pending.get(key)
     if (!running) {
       running = this.lookup(youtubeId, quality)
-        .then((json) => {
+        .then(async (json) => {
           const stream = parseStream(json)
           if (!stream) throw new Error('YouTube nevrátil adresu videa. Zkus to prosím znovu.')
+          await this.ready(stream)
           const expires = stream.expiresAt ?? this.now() + DEFAULT_LIFETIME_MS
           this.cache.set(key, { stream, validUntil: expires - STREAM_REUSE_MARGIN_MS })
           return stream

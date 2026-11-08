@@ -46,7 +46,7 @@ import { fetchOembed } from './kids/oembed'
 import { YtDlpTool } from './kids/YtDlpTool'
 import { YtLibrary } from './yt/YtLibrary'
 import { ytPlayItem, type YtPlayItem } from './yt/ytPlayback'
-import { mpvFileFor, mpvNetworkArgs, YtStreamResolver } from './yt/ytStream'
+import { mpvFileFor, mpvNetworkArgs, waitUntilPlayable, YtStreamResolver } from './yt/ytStream'
 import { matchCategory, metaFromInfo } from './yt/ytClassify'
 import { QUEUE_SETTING, registerYtIpc, ytConcurrency, ytFolder } from './yt/ytIpc'
 import { YtRepository } from './yt/YtRepository'
@@ -920,8 +920,11 @@ void app.whenReady().then(() => {
     tempDir: join(app.getPath('temp'), 'kinoteka')
   })
   ytStreamStop = () => ytStreamDownloader.stopAll()
-  ytStreams = new YtStreamResolver((youtubeId, quality) =>
-    ytStreamDownloader.streamInfo(youtubeId, quality)
+  ytStreams = new YtStreamResolver(
+    (youtubeId, quality) => ytStreamDownloader.streamInfo(youtubeId, quality),
+    Date.now,
+    // Čerstvé adresy YouTube první vteřiny odmítá – přehrávač by se otevřel a hned zavřel.
+    (stream) => waitUntilPlayable(stream)
   )
   registerYtIpc({
     settings,
