@@ -46,8 +46,13 @@ const OBSERVED_PROPERTIES = [
   'video-params',
   'path',
   'track-list',
-  'sub-delay'
+  'sub-delay',
+  'seeking',
+  'paused-for-cache'
 ]
+
+/** Výchozí text, když přehrávač čeká (otevírá soubor, přetáčí, čeká na data). */
+export const DEFAULT_BUSY_TEXT = 'Načítám…'
 
 const BOUNDS_EVENTS = [
   'move',
@@ -82,6 +87,8 @@ export interface PlayerSessionOptions {
   subtitleArgs?: readonly string[]
   /** Přehrávání ze sítě (YT videa online): hlavičky, vyrovnávací paměť. */
   networkArgs?: readonly string[]
+  /** Text při čekání (např. „Načítám video z YouTube…“); jinak {@link DEFAULT_BUSY_TEXT}. */
+  loadingText?: string
   logFile?: string
   /** Pozice a délka právě hraného souboru (několikrát za sekundu). */
   onProgress?: (position: number, duration: number) => void
@@ -119,6 +126,8 @@ export interface LoadOptions {
   kids?: KidsPlayerInfo
   /** Hlavičky HTTP pro soubor ze sítě (online video); {} = žádné. */
   httpHeaders?: Record<string, string>
+  /** Text při čekání na tento soubor (viz {@link PlayerSessionOptions.loadingText}). */
+  loadingText?: string
 }
 
 const asNumber = (value: unknown): number =>
@@ -156,6 +165,14 @@ export class PlayerSession {
   private firstPosition: number | null = null
   private advanced = false
   private pcmFallback = false
+  /** Proč přehrávač čeká: otevírá soubor, přetáčí, čeká na data, nebo to řekl volající. */
+  private readonly waiting = {
+    opening: true,
+    seeking: false,
+    cache: false,
+    external: null as string | null
+  }
+  private loadingText: string
   private readonly cleanups: (() => void)[] = []
 
   private constructor(
@@ -167,11 +184,13 @@ export class PlayerSession {
     private readonly options: PlayerSessionOptions
   ) {
     this.fixedTitle = options.title
+    this.loadingText = options.loadingText ?? DEFAULT_BUSY_TEXT
     this.selector = new TrackSelector(client)
     this.file = options.file
     this.selector.reset(options.tracks)
     this.state = {
       ...INITIAL_PLAYER_STATE,
+      busy: this.loadingText,
       title: options.title ?? basename(options.file),
       next: options.next ?? null,
       previous: options.previous ?? null,
@@ -305,6 +324,10 @@ export class PlayerSession {
     if (this.finished) return
     this.switching = true
     this.file = options.file
+    this.loadingText = options.loadingText ?? DEFAULT_BUSY_TEXT
+    this.waiting.opening = true
+    this.waiting.external = null
+    this.refreshBusy()
     this.fixedTitle = options.title
     this.selector.reset(options.tracks)
     this.update({
@@ -334,7 +357,24 @@ export class PlayerSession {
 
   /** Krátké upozornění nahoře v přehrávači. */
   notify(message: string): void {
+    this.waiting.external = null
+    this.refreshBusy()
     this.update({ notice: message })
+  }
+
+  /**
+   * Volající na něco čeká mimo mpv (např. zjišťuje adresu dalšího online videa) – overlay
+   * ukáže kolečko s textem; null = už nečeká.
+   */
+  setLoading(text: string | null): void {
+    this.waiting.external = text
+    this.refreshBusy()
+  }
+
+  private refreshBusy(): void {
+    const { opening, seeking, cache, external } = this.waiting
+    const busy = external ?? (opening || seeking || cache ? this.loadingText : null)
+    if (busy !== this.state.busy) this.update({ busy })
   }
 
   /**
@@ -392,6 +432,8 @@ export class PlayerSession {
     this.client.on('event', (name, message) => {
       if (name === 'file-loaded') void this.selector.onFileLoaded()
       if (name === 'end-file' && field(message, 'reason') === 'error') {
+        this.waiting.opening = false
+        this.refreshBusy()
         const error = this.options.onOpenFailed?.()
         if (error) this.finish(error)
       }
@@ -460,6 +502,10 @@ export class PlayerSession {
       case 'time-pos':
         // Při ukončení nebo výměně souboru mpv hlásí „žádná pozice“ – ta se nesmí uložit jako 0.
         if (typeof value !== 'number' || this.switching) return
+        if (this.waiting.opening) {
+          this.waiting.opening = false
+          this.refreshBusy()
+        }
         if (this.firstPosition === null) this.firstPosition = value
         else if (Math.abs(value - this.firstPosition) > 0.3) this.advanced = true
         this.update({ position: value }, true)
@@ -480,6 +526,12 @@ export class PlayerSession {
           audioTracks: audioTracksFromMpv(value),
           subtitleTracks: subtitleTracksFromMpv(value)
         })
+      case 'seeking':
+        this.waiting.seeking = value === true
+        return this.refreshBusy()
+      case 'paused-for-cache':
+        this.waiting.cache = value === true
+        return this.refreshBusy()
       case 'sub-delay':
         return this.update({ subDelay: Math.round(asNumber(value) * 10) / 10 })
       case 'media-title':

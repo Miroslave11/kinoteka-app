@@ -443,6 +443,7 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
       previous: item.previous?.name ?? null,
       // Vždy s volbami pro síť – v jedné kategorii se můžou střídat stažená a online videa.
       networkArgs: mpvNetworkArgs({ headers: source.headers ?? {} }),
+      loadingText: ytLoadingText(item),
       audio: audioLaunchOptions(loadAudioSettings(settings)),
       tracks: trackChoicesFor(item.online ? '' : item.path),
       subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
@@ -536,6 +537,8 @@ function ytStreamError(error: unknown): string {
 async function loadYt(current: PlayerSession, videoId: number): Promise<void> {
   const item = ytPlayItem(ytRepository, videoId)
   if (!item) return
+  // Zjištění adresy online videa trvá i několik sekund – přehrávač mezitím ukáže, co dělá.
+  current.setLoading(ytLoadingText(item))
   let source: YtSource
   try {
     source = await ytSource(item)
@@ -553,9 +556,14 @@ async function loadYt(current: PlayerSession, videoId: number): Promise<void> {
     next: item.next?.name ?? null,
     previous: item.previous?.name ?? null,
     httpHeaders: source.headers ?? {},
-    tracks: trackChoicesFor(item.online ? '' : item.path)
+    tracks: trackChoicesFor(item.online ? '' : item.path),
+    loadingText: ytLoadingText(item)
   })
 }
+
+/** Text při čekání na video z části YT videa. */
+const ytLoadingText = (item: YtPlayItem): string =>
+  item.online ? 'Načítám video z YouTube…' : 'Načítám video…'
 
 /** Titulky z OpenSubtitles: nastavení z hlavního okna, hledání a stažení jen z ovládání přehrávače. */
 function registerOnlineSubtitlesIpc(service: OnlineSubtitlesService): void {
