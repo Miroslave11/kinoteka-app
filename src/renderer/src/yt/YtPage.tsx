@@ -23,11 +23,8 @@ import {
   diskBytes,
   filterKey,
   freeableBytes,
-  filterStorage,
-  parseStorage,
   totalVideos,
-  visibleCategories,
-  type YtStorage
+  visibleCategories
 } from './ytData'
 
 /** Obrázek videa: uložený vedle videa (nebo snímek z něj), jinak náhled z YouTube. */
@@ -150,11 +147,7 @@ export default function YtPage(): React.JSX.Element {
     return yt.onChanged(() => void reload())
   }, [yt, reload])
 
-  const storage = parseStorage(params.get('uloziste'))
-  const visible = useMemo(
-    () => visibleCategories(filterStorage(categories ?? [], storage)),
-    [categories, storage]
-  )
+  const visible = useMemo(() => visibleCategories(categories ?? []), [categories])
   const everything = totalVideos(categories ?? [])
   const continuing = useMemo(() => continueRow(visible), [visible])
   const selected = visible.find((category) => filterKey(category) === params.get('kategorie'))
@@ -194,19 +187,8 @@ export default function YtPage(): React.JSX.Element {
     setMenu({ video, categoryId: owner?.id ?? null, x, y })
   }
   const closeMenu = useCallback(() => setMenu(null), [])
-  const filterParams = (category: YtCategory | null, store: YtStorage): Record<string, string> => ({
-    ...(category ? { kategorie: filterKey(category) } : {}),
-    ...(store !== 'vse' ? { uloziste: store } : {})
-  })
   const select = (category: YtCategory | null): void =>
-    setParams(filterParams(category, storage), { replace: true })
-  const selectStorage = (store: YtStorage): void =>
-    setParams(filterParams(selected ?? null, store), { replace: true })
-  const counts = {
-    vse: everything,
-    pc: totalVideos(filterStorage(categories ?? [], 'pc')),
-    online: totalVideos(filterStorage(categories ?? [], 'online'))
-  }
+    setParams(category ? { kategorie: filterKey(category) } : {}, { replace: true })
 
   const dialog = downloading && (
     <YtDownload categories={categories ?? []} onClose={() => setDownloading(false)} />
@@ -262,22 +244,6 @@ export default function YtPage(): React.JSX.Element {
       )}
 
       <div className="toolbar yt-chips">
-        {(
-          [
-            ['vse', 'Vše', null],
-            ['pc', 'V počítači', <HardDrive key="pc" size={14} />],
-            ['online', 'Online', <Cloud key="online" size={14} />]
-          ] as const
-        ).map(([store, label, icon]) => (
-          <button
-            key={store}
-            className={`chip ${storage === store ? 'on' : ''}`}
-            onClick={() => selectStorage(store)}
-          >
-            {icon} {label} <span className="chip-count">{counts[store]}</span>
-          </button>
-        ))}
-        <span className="yt-chip-sep" />
         <button className={`chip ${selected ? '' : 'on'}`} onClick={() => select(null)}>
           Vše <span className="chip-count">{total}</span>
         </button>
@@ -338,12 +304,10 @@ export default function YtPage(): React.JSX.Element {
                 <button className="row-link" onClick={() => select(category)}>
                   Zobrazit vše
                 </button>
-                {storage !== 'online' && (
-                  <FreeSpaceButton
-                    category={(categories ?? []).find((c) => c.id === category.id) ?? category}
-                    onFree={(categoryId) => manage({ kind: 'keep-online-category', categoryId })}
-                  />
-                )}
+                <FreeSpaceButton
+                  category={category}
+                  onFree={(categoryId) => manage({ kind: 'keep-online-category', categoryId })}
+                />
               </h3>
               <div className="strip">
                 {category.videos.map((video) => (

@@ -5,8 +5,6 @@ import {
   diskBytes,
   filterKey,
   freeableBytes,
-  filterStorage,
-  parseStorage,
   totalVideos,
   visibleCategories
 } from './ytData'
@@ -61,28 +59,6 @@ describe('ytData', () => {
   it('klíč filtru a počet videí', () => {
     expect(categories.map(filterKey)).toEqual(['1', '2', 'ceka'])
     expect(totalVideos(categories)).toBe(3)
-  })
-})
-
-describe('filtr uložení', () => {
-  it('online / v počítači / vše', () => {
-    const mixed: YtCategory[] = [
-      {
-        id: 1,
-        name: 'Města',
-        keywords: [],
-        role: null,
-        videos: [video(1, { online: true }), video(2)]
-      }
-    ]
-    expect(totalVideos(filterStorage(mixed, 'online'))).toBe(1)
-    expect(filterStorage(mixed, 'pc')[0]!.videos.map((v) => v.id)).toEqual([2])
-    expect(totalVideos(filterStorage(mixed, 'vse'))).toBe(2)
-    expect([parseStorage('online'), parseStorage('x'), parseStorage(null)]).toEqual([
-      'online',
-      'vse',
-      'vse'
-    ])
   })
 })
 

@@ -2685,13 +2685,6 @@ p.info-chip {
   color: #9fd8ff;
 }
 
-.yt-chip-sep {
-  width: 1px;
-  height: 24px;
-  margin: 0 6px;
-  background: var(--line);
-}
-
 /* ---------- YT videa: převody ---------- */
 .yt-unavailable {
   position: absolute;

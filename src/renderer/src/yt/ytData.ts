@@ -28,21 +28,6 @@ export const filterKey = (category: YtCategory): string =>
 export const totalVideos = (categories: readonly YtCategory[]): number =>
   categories.reduce((sum, category) => sum + category.videos.length, 0)
 
-/** Filtr podle uložení: všechna, jen stažená v počítači, jen online (odkazy). */
-export type YtStorage = 'vse' | 'pc' | 'online'
-
-export const parseStorage = (value: string | null): YtStorage =>
-  value === 'pc' || value === 'online' ? value : 'vse'
-
-export function filterStorage(categories: readonly YtCategory[], storage: YtStorage): YtCategory[] {
-  if (storage === 'vse') return [...categories]
-  const online = storage === 'online'
-  return categories.map((category) => ({
-    ...category,
-    videos: category.videos.filter((video) => video.online === online)
-  }))
-}
-
 /** Kolik místa zabírají stažená videa (bajty). */
 export const diskBytes = (categories: readonly YtCategory[]): number =>
   categories.reduce(
