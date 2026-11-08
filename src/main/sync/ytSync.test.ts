@@ -40,6 +40,7 @@ async function computer(id: string) {
   const sync = new SyncRepository(db)
   let file: DeviceFile = { format: 1, device: { id, name: id }, updatedAt: '', entities: [] }
   return {
+    db,
     folder,
     trashDir,
     library,
@@ -173,5 +174,22 @@ describe('sdílení YT videí mezi dvěma počítači', () => {
     await notebook.sync([doma.file], '2026-11-08T10:01:00.000Z')
     expect(notebook.summary()).toEqual({ Města: ['Paris Walk ☁'] })
     expect(doma.summary()).toEqual({ Města: ['Paris Walk'] })
+  })
+})
+
+describe('video čekající na zařazení', () => {
+  it('se na druhém PC nesmaže ani nepřidá, dokud nemá kategorii', async () => {
+    const doma = await computer('A-doma')
+    const notebook = await computer('B-notebook')
+    await doma.library.addOnline([{ youtubeId: 'ttttttttttt', title: 'Tokyo Night' }], 'Města')
+    await doma.sync([], '2026-11-08T10:00:00.000Z')
+    await notebook.sync([doma.file], '2026-11-08T10:01:00.000Z')
+
+    // Doma video na chvíli „vypadne“ z kategorie (čeká na zařazení).
+    doma.db.prepare("UPDATE yt_video SET category_id = NULL WHERE youtube_id = 'ttttttttttt'").run()
+    await doma.sync([notebook.file], '2026-11-08T11:00:00.000Z')
+    await notebook.sync([doma.file], '2026-11-08T11:01:00.000Z')
+    // Na notebooku zůstává (nesmazáno, nepřesunuto).
+    expect(notebook.summary()).toEqual({ Města: ['Tokyo Night ☁'] })
   })
 })

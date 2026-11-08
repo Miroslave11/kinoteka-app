@@ -32,6 +32,18 @@ jobs:
           KINOTEKA_UPDATE_TOKEN: ${{ secrets.KINOTEKA_UPDATE_TOKEN }}
         run: test -n "$KINOTEKA_UPDATE_TOKEN" || { echo "Chybí secret KINOTEKA_UPDATE_TOKEN"; exit 1; }
 
+      # Sdílení přes Google Disk: klíč aplikace u Googlu (Google Cloud → Clients, typ Desktop app).
+      - name: Klíč Google pro sdílení je platný
+        shell: bash
+        env:
+          KINOTEKA_GOOGLE_CLIENT_ID: ${{ secrets.KINOTEKA_GOOGLE_CLIENT_ID }}
+          KINOTEKA_GOOGLE_CLIENT_SECRET: ${{ secrets.KINOTEKA_GOOGLE_CLIENT_SECRET }}
+        run: |
+          [[ "$KINOTEKA_GOOGLE_CLIENT_ID" =~ ^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$ ]] ||
+            { echo "Secret KINOTEKA_GOOGLE_CLIENT_ID není ID klienta Google (…apps.googleusercontent.com)"; exit 1; }
+          [[ "$KINOTEKA_GOOGLE_CLIENT_SECRET" == GOCSPX-* ]] ||
+            { echo "Secret KINOTEKA_GOOGLE_CLIENT_SECRET není tajný klíč klienta Google (GOCSPX-…)"; exit 1; }
+
       - name: Verze v package.json odpovídá tagu
         shell: bash
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"

@@ -89,8 +89,14 @@ export class JournalSync {
             }
           ])
       ),
-    apply: (entity) => this.applyDiary(entity)
+    apply: (entity) => this.applyDiary(entity),
+    prepare: (keys) => {
+      this.remoteKeys = keys
+    }
   }
+
+  /** Záznamy deníku, které už mají jiné počítače (ty se neslučují). */
+  private remoteKeys: ReadonlySet<string> = new Set()
 
   readonly ratings: SyncAdapter = {
     prefix: RATING_PREFIX,
@@ -126,12 +132,30 @@ export class JournalSync {
         'UPDATE watch_event SET title_id = ?, episode_id = ?, watched_at = ?, source = ?, note = ? WHERE sync_id = ?'
       )
       .run(titleId, episodeId, data.watchedAt, data.source, data.note, syncId)
-    if (Number(updated.changes) === 0)
+    if (Number(updated.changes) > 0) return
+    // První synchronizace: totéž zhlédnutí (titul, díl, den) zapsané na obou počítačích –
+    // místní záznam, který ostatní ještě nemají, převezme ID z druhého PC (žádný duplikát).
+    const twin = this.db
+      .prepare(
+        `SELECT id, sync_id FROM watch_event
+         WHERE title_id = ? AND episode_id IS ? AND substr(watched_at, 1, 10) = substr(?, 1, 10)
+         ORDER BY id`
+      )
+      .all(titleId, episodeId, data.watchedAt)
+      .find((row) => !this.remoteKeys.has(`${DIARY_PREFIX}${String(row['sync_id'])}`))
+    if (twin) {
       this.db
         .prepare(
-          'INSERT INTO watch_event (title_id, episode_id, watched_at, source, note, sync_id) VALUES (?, ?, ?, ?, ?, ?)'
+          'UPDATE watch_event SET sync_id = ?, watched_at = ?, source = ?, note = COALESCE(?, note) WHERE id = ?'
         )
-        .run(titleId, episodeId, data.watchedAt, data.source, data.note, syncId)
+        .run(syncId, data.watchedAt, data.source, data.note, twin['id'])
+      return
+    }
+    this.db
+      .prepare(
+        'INSERT INTO watch_event (title_id, episode_id, watched_at, source, note, sync_id) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+      .run(titleId, episodeId, data.watchedAt, data.source, data.note, syncId)
   }
 
   private applyRating(entity: SyncEntity): void {

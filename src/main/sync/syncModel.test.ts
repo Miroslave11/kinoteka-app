@@ -154,3 +154,40 @@ describe('sdílení deníku mezi dvěma počítači', () => {
     expect(doma.file.entities).toContainEqual(future)
   })
 })
+
+describe('první synchronizace dvou existujících deníků', () => {
+  it('totéž zhlédnutí (titul a den) na obou PC = jeden záznam; jiné dny zůstanou', async () => {
+    const doma = computer('A-doma', ['Duna (2021).mkv'])
+    const notebook = computer('B-notebook', ['Duna (2021).mkv'])
+    doma.journal.addManual({
+      titleId: doma.titleId('Duna'),
+      episodeIds: [],
+      watchedAt: '2026-11-02T20:00:00.000Z',
+      note: 'Kino'
+    })
+    notebook.journal.addManual({
+      titleId: notebook.titleId('Duna'),
+      episodeIds: [],
+      watchedAt: '2026-11-02T21:30:00.000Z',
+      note: null
+    })
+    notebook.journal.addManual({
+      titleId: notebook.titleId('Duna'),
+      episodeIds: [],
+      watchedAt: '2026-11-05T19:00:00.000Z',
+      note: 'Podruhé'
+    })
+    await doma.sync([], '2026-11-08T10:00:00.000Z')
+    await notebook.sync([doma.file], '2026-11-08T10:01:00.000Z')
+    await doma.sync([notebook.file], '2026-11-08T10:02:00.000Z')
+    await notebook.sync([doma.file], '2026-11-08T10:03:00.000Z')
+
+    const shape = (pc: typeof doma): string[] =>
+      pc.journal
+        .list()
+        .map((e) => `${e.watchedAt.slice(0, 10)} ${e.note ?? '-'}`)
+        .sort()
+    expect(shape(notebook)).toEqual(['2026-11-02 Kino', '2026-11-05 Podruhé'])
+    expect(shape(doma)).toEqual(shape(notebook))
+  })
+})

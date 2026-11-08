@@ -1,5 +1,15 @@
 # Změny
 
+## 1.5.0 – 2026-11-08
+
+### Sdílení mezi počítači přes Google Disk
+
+- Nová sekce **Nastavení → Sdílení**: po přihlášení účtem Google sdílí Kinotéka data se všemi počítači přihlášenými ke stejnému účtu – doma i mimo domácí síť, i když běží na obou současně.
+- Sdílí se **deník** (záznamy, datum, poznámka, smazání) a **hodnocení**. Film, který druhý počítač v knihovně nemá, je v jeho deníku jako „není v knihovně“. Stejné zhlédnutí zapsané na obou počítačích se při prvním propojení sloučí.
+- Sdílí se **YT videa**: kategorie s klíčovými slovy a videa s odkazem na YouTube. Video stažené na jednom počítači se na ostatních objeví jako online; přesun do jiné kategorie i smazání se promítne všude. Rozkoukání zůstává na každém počítači zvlášť.
+- Kinotéka má přístup jen ke své **skryté složce** na Google Disku – ostatní soubory nevidí. Synchronizuje po spuštění, chvíli po každé změně a každých 5 minut; bez internetu změny počkají.
+- Zásady ochrany soukromí: https://miroslave11.github.io/kinoteka-web/soukromi.html
+
 ## 1.4.0 – 2026-11-08
 
 ### YT videa – online videa
