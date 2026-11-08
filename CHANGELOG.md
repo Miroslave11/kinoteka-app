@@ -1,5 +1,22 @@
 # Změny
 
+## 1.4.0 – 2026-11-08
+
+### YT videa – online videa
+
+- **Přidat jen odkazem:** video z YouTube jde přidat jako **online** (výchozí) – na disk se uloží jen odkaz a náhled, video se přehraje v běžném přehrávači přímo z YouTube (rozkoukání, předchozí / další, přetáčení). Kvalita přehrávání podle nastavení (výchozí 1080p).
+- Každé video má štítek **V počítači** nebo **☁ Online**; podtitul stránky ukazuje, kolik místa zabírají stažená videa.
+- **Převody:** „Ponechat jen online“ u staženého videa nebo celé kategorie uvolní místo (soubor jde do Koše, pozice a zhlédnutí zůstanou); „Stáhnout do počítače“ u online videa ho stáhne zpět.
+- Online video, které YouTube už nevydá, dostane štítek **Nedostupné**.
+
+### YT videa – stahování
+
+- **Víc odkazů najednou:** každý odkaz na nový řádek, seznam se zaškrtnutím (videa, která už máš, jsou odškrtnutá), Přidat vybrané.
+- **Souběžné stahování:** výchozí 2 videa najednou, v Nastavení → YT videa jde zvolit 1–3.
+- **Fronta:** pozastavit vše / pokračovat, zkusit znovu chybné, zrušit vše. Nedokončená stahování **pokračují i po restartu** aplikace; zbytky přerušených stahování se při startu smažou.
+- Video dostažené během procházení složky se zařadí do kategorie hned.
+
+
 ## 1.3.0 – 2026-11-07
 
 ### YT videa (nová část)
