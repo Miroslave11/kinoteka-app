@@ -129,6 +129,8 @@ export const IpcChannel = {
   YtQueue: 'yt:queue',
   YtQueueRemove: 'yt:queue-remove',
   YtQueueClear: 'yt:queue-clear',
+  YtQueueControl: 'yt:queue-control',
+  YtSetConcurrency: 'yt:set-concurrency',
   YtQueueChanged: 'yt:queue-changed',
   YtAddOnline: 'yt:add-online'
 } as const

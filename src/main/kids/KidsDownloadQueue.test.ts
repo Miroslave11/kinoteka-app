@@ -5,7 +5,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { KidsDownloadResult } from '../../shared/kids'
-import { KidsDownloadQueue, removePartialFiles } from './KidsDownloadQueue'
+import {
+  KidsDownloadQueue,
+  removeOrphanPartials,
+  removePartialFiles,
+  type SavedQueueItem
+} from './KidsDownloadQueue'
 import type { VideoInfo } from './ytdlp'
 
 let root: string
@@ -189,11 +194,11 @@ describe('KidsDownloadQueue', () => {
     expect(downloader.download.mock.calls.map(([url, options]) => [url, options])).toEqual([
       [
         'https://www.youtube.com/watch?v=aaaaaaaaaaa',
-        { folder: join(root, 'Prasátko Peppa'), quality: '720' }
+        expect.objectContaining({ folder: join(root, 'Prasátko Peppa'), quality: '720' })
       ],
       [
         'https://www.youtube.com/watch?v=ccccccccccc',
-        { folder: join(root, 'Prasátko Peppa'), quality: '720' }
+        expect.objectContaining({ folder: join(root, 'Prasátko Peppa'), quality: '720' })
       ]
     ])
     expect(scan).toHaveBeenCalledTimes(2)
@@ -294,9 +299,152 @@ describe('KidsDownloadQueue – YT videa (vlastní návrh, stažení do kořene)
     })
     await vi.waitFor(() => expect(queue.items[0]?.status).toBe('done'))
     expect(queue.items[0]?.title).toBe('')
-    expect(downloader.download).toHaveBeenCalledWith(expect.stringContaining('bbbbbbbbbbb'), {
-      folder: root,
-      quality: '2160'
+    expect(downloader.download).toHaveBeenCalledWith(
+      expect.stringContaining('bbbbbbbbbbb'),
+      expect.objectContaining({ folder: root, quality: '2160' })
+    )
+  })
+})
+
+describe('KidsDownloadQueue – souběh, pozastavení, opakování, obnova', () => {
+  type Download = (url: string, options?: { signal?: AbortSignal }) => Promise<KidsDownloadResult>
+  const done = (url: string): KidsDownloadResult => ({
+    ok: true,
+    title: `Staženo ${url.slice(-11)}`,
+    channel: null,
+    durationSec: 1,
+    fileName: 'x.mp4',
+    thumbnail: null
+  })
+  /** Stahování, které skončí až na pokyn (nebo zrušením). */
+  function controlled() {
+    const pending = new Map<string, (result: KidsDownloadResult) => void>()
+    const download = vi.fn<Download>(
+      (url, options) =>
+        new Promise((resolve) => {
+          pending.set(url.slice(-11), resolve)
+          options?.signal?.addEventListener('abort', () =>
+            resolve({ ok: false, message: 'Zrušeno.' })
+          )
+        })
+    )
+    const finish = (id: string, result?: KidsDownloadResult): void =>
+      pending.get(id)?.(result ?? done(id))
+    return { download, finish }
+  }
+  function setup(options: { concurrency?: number; saved?: SavedQueueItem[] } = {}) {
+    const { download, finish } = controlled()
+    let saved = options.saved ?? []
+    const queue = new KidsDownloadQueue({
+      downloader: { info: vi.fn(async () => PEPPA_VIDEO), download },
+      folder: () => root,
+      alreadyIn: () => null,
+      suggest: () => ({ name: null, existing: false }),
+      scan: vi.fn(async () => undefined),
+      concurrency: () => options.concurrency ?? 2,
+      store: { load: () => saved, save: (items) => (saved = items) }
     })
+    const add = (videoId: string) =>
+      queue.enqueue({ kind: 'video', videoId, playlistId: null, title: '', quality: '1080' })
+    return { queue, download, finish, add, saved: () => saved }
+  }
+  const statuses = (queue: KidsDownloadQueue): string[] => queue.items.map((i) => i.status)
+
+  it('stahuje 2 najednou, třetí čeká; po dokončení naskočí', async () => {
+    const { queue, download, finish, add } = setup()
+    await add('aaaaaaaaaaa')
+    await add('bbbbbbbbbbb')
+    await add('ccccccccccc')
+    expect(statuses(queue)).toEqual(['downloading', 'downloading', 'waiting'])
+    expect(download).toHaveBeenCalledTimes(2)
+    finish('aaaaaaaaaaa')
+    await vi.waitFor(() => expect(statuses(queue)).toEqual(['done', 'downloading', 'downloading']))
+  })
+
+  it('pozastavit vše a pokračovat; rozpracované soubory zůstanou', async () => {
+    const { queue, download, add } = setup({ concurrency: 1 })
+    await writeFile(join(root, 'A [aaaaaaaaaaa].f137.mp4.part'), 'x')
+    await add('aaaaaaaaaaa')
+    await add('bbbbbbbbbbb')
+    queue.pause()
+    await vi.waitFor(() => expect(statuses(queue)).toEqual(['paused', 'paused']))
+    expect(existsSync(join(root, 'A [aaaaaaaaaaa].f137.mp4.part'))).toBe(true)
+    queue.resume()
+    expect(statuses(queue)).toEqual(['downloading', 'waiting'])
+    expect(download).toHaveBeenCalledTimes(2)
+  })
+
+  it('chybné video jde zkusit znovu', async () => {
+    const { queue, finish, add } = setup()
+    await add('aaaaaaaaaaa')
+    finish('aaaaaaaaaaa', { ok: false, message: 'Chyba připojení.' })
+    await vi.waitFor(() => expect(statuses(queue)).toEqual(['error']))
+    queue.retry()
+    expect(statuses(queue)).toEqual(['downloading'])
+    expect(queue.items[0]!.message).toBeNull()
+  })
+
+  it('zrušit vše: smaže čekající i stahované s rozpracovanými soubory', async () => {
+    const { queue, add } = setup({ concurrency: 1 })
+    await writeFile(join(root, 'A [aaaaaaaaaaa].mp4.part'), 'x')
+    await add('aaaaaaaaaaa')
+    await add('bbbbbbbbbbb')
+    queue.cancelAll()
+    await vi.waitFor(() => expect(queue.items).toEqual([]))
+    await vi.waitFor(() => expect(existsSync(join(root, 'A [aaaaaaaaaaa].mp4.part'))).toBe(false))
+  })
+
+  it('fronta se ukládá a po restartu pokračuje (pozastavené zůstanou)', async () => {
+    const first = setup({ concurrency: 1 })
+    await first.add('aaaaaaaaaaa')
+    await first.add('bbbbbbbbbbb')
+    await first.add('ccccccccccc')
+    first.queue.pause()
+    await vi.waitFor(() => expect(statuses(first.queue)).toEqual(['paused', 'paused', 'paused']))
+    first.queue.resume()
+    first.finish('aaaaaaaaaaa', { ok: false, message: 'Video je soukromé.' })
+    await vi.waitFor(() => expect(statuses(first.queue)[0]).toBe('error'))
+    // Hotová videa se neukládají; stahované se uloží jako stahované.
+    expect(first.saved().map((i) => [i.videoId, i.status])).toEqual([
+      ['aaaaaaaaaaa', 'error'],
+      ['bbbbbbbbbbb', 'downloading'],
+      ['ccccccccccc', 'waiting']
+    ])
+
+    const second = setup({ concurrency: 1, saved: first.saved() })
+    second.queue.restore()
+    expect(second.queue.items.map((i) => [i.videoId, i.status, i.message])).toEqual([
+      ['aaaaaaaaaaa', 'error', 'Video je soukromé.'],
+      ['bbbbbbbbbbb', 'downloading', null],
+      ['ccccccccccc', 'waiting', null]
+    ])
+    expect(second.download).toHaveBeenCalledWith(
+      expect.stringContaining('bbbbbbbbbbb'),
+      expect.objectContaining({ quality: '1080' })
+    )
+  })
+})
+
+describe('removeOrphanPartials', () => {
+  it('smaže rozpracované soubory bez videa ve frontě, ostatní nechá', async () => {
+    await mkdir(join(root, 'Města'))
+    const names = [
+      'A [aaaaaaaaaaa].f137.mp4.part',
+      join('Města', 'B [bbbbbbbbbbb].mp4.part'),
+      'C [ccccccccccc].f251.webm.part',
+      'D [ddddddddddd].mp4',
+      'D [ddddddddddd].info.json',
+      'E [eeeeeeeeeee].ytonline'
+    ]
+    for (const name of names) await writeFile(join(root, name), 'x')
+    expect(await removeOrphanPartials(root, new Set(['ccccccccccc']))).toBe(2)
+    expect(names.map((name) => existsSync(join(root, name)))).toEqual([
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ])
   })
 })

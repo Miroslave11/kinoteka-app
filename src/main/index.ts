@@ -32,7 +32,11 @@ import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
 import { KidsArtwork } from './kids/KidsArtwork'
 import { KidsDownloader } from './kids/KidsDownloader'
-import { KidsDownloadQueue } from './kids/KidsDownloadQueue'
+import {
+  KidsDownloadQueue,
+  removeOrphanPartials,
+  type SavedQueueItem
+} from './kids/KidsDownloadQueue'
 import { kidsFolder, KIDS_SETTINGS_KEY, registerKidsIpc } from './kids/kidsIpc'
 import { KidsGuard } from './kids/KidsGuard'
 import { KidsTracker, kidsPlayItem, PlayTimeMeter, type KidsPlayItem } from './kids/kidsPlayback'
@@ -44,7 +48,7 @@ import { YtLibrary } from './yt/YtLibrary'
 import { ytPlayItem, type YtPlayItem } from './yt/ytPlayback'
 import { mpvFileFor, mpvNetworkArgs, YtStreamResolver } from './yt/ytStream'
 import { matchCategory, metaFromInfo } from './yt/ytClassify'
-import { registerYtIpc, ytFolder } from './yt/ytIpc'
+import { QUEUE_SETTING, registerYtIpc, ytConcurrency, ytFolder } from './yt/ytIpc'
 import { YtRepository } from './yt/YtRepository'
 import { openDatabase } from './db/database'
 import { makeClip, posterPixels, videoThumbnail } from './media/ffmpeg'
@@ -895,7 +899,16 @@ void app.whenReady().then(() => {
     // Online video jde ještě stáhnout do počítače – „už máš“ jen u staženého.
     alreadyIn: (videoId) => ytRepository.categoryOfYoutubeId(videoId, true),
     scan: () => ytLibrary.scan(),
-    quickInfo: (videoId) => fetchOembed(chromiumFetch, videoId)
+    quickInfo: (videoId) => fetchOembed(chromiumFetch, videoId),
+    concurrency: () => ytConcurrency(settings),
+    // Nedokončená stahování přežijí restart; yt-dlp pak naváže na rozpracované soubory.
+    store: {
+      load: () => {
+        const saved = settings.get<SavedQueueItem[]>(QUEUE_SETTING)
+        return Array.isArray(saved) ? saved : []
+      },
+      save: (items) => settings.set(QUEUE_SETTING, items)
+    }
   })
   ytQueueRef = ytQueue
   // Online videa: adresy streamu přes stejný yt-dlp (vlastní proces, aby nečekal na stahování).
@@ -919,6 +932,12 @@ void app.whenReady().then(() => {
     queue: ytQueue
   })
   void ytLibrary.scan().catch((error: Error) => console.warn(`Složka YT: ${error.message}`))
+  // Pokračovat v nedokončeném stahování; rozpracované soubory bez videa ve frontě smazat.
+  ytQueue.restore()
+  void removeOrphanPartials(
+    ytFolder(settings),
+    new Set(ytQueue.items.map((item) => item.videoId))
+  ).catch(() => undefined)
   ipcMain.handle(IpcChannel.SubtitlesGetSettings, () => loadSubtitleSettings(settings))
   ipcMain.handle(IpcChannel.SubtitlesSaveSettings, (_event, value: unknown) =>
     saveSubtitleSettings(settings, value)

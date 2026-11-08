@@ -10,7 +10,9 @@ import {
   type KidsQueueItem
 } from '../../shared/kids'
 import {
+  parseConcurrency,
   parseYtManageAction,
+  parseYtQueueAction,
   type YtCategory,
   type YtManageResult,
   type YtScanResult,
@@ -25,6 +27,13 @@ import type { YtRepository } from './YtRepository'
 
 const FOLDER_SETTING = 'yt.folder'
 const QUALITY_SETTING = 'yt.quality'
+const CONCURRENCY_SETTING = 'yt.concurrency'
+/** Nedokončená stahování – po restartu se v nich pokračuje. */
+export const QUEUE_SETTING = 'yt.queue'
+
+/** Kolik videí stahovat najednou (výchozí 2). */
+export const ytConcurrency = (settings: SettingsRepository): number =>
+  parseConcurrency(settings.get<number>(CONCURRENCY_SETTING))
 
 const ytQuality = (settings: SettingsRepository): KidsQuality => {
   const saved = settings.get<string>(QUALITY_SETTING)
@@ -68,7 +77,8 @@ export function registerYtIpc({
   ipcMain.handle(IpcChannel.YtStatus, (): YtStatus => ({
     folder: ytFolder(settings),
     quality: ytQuality(settings),
-    pendingInfo: library.pendingInfo
+    pendingInfo: library.pendingInfo,
+    concurrency: ytConcurrency(settings)
   }))
   ipcMain.handle(IpcChannel.YtListCategories, (): YtCategory[] => repository.list())
   ipcMain.handle(IpcChannel.YtScan, (): Promise<YtScanResult> => library.scan())
@@ -105,9 +115,13 @@ export function registerYtIpc({
     async (event, value: unknown): Promise<KidsPreviewResult> => {
       const link = typeof value === 'string' ? parseYoutubeLink(value) : null
       if (!link) return { ok: false, message: 'Tohle není odkaz na video ani playlist z YouTube.' }
-      return queue.preview(link, (stage) => {
+      const result = await queue.preview(link, (stage) => {
         if (!event.sender.isDestroyed()) event.sender.send(IpcChannel.YtPreviewStage, stage)
       })
+      // Online video stažené není, ale přidat ho znovu jako online nemá smysl.
+      if (result.ok && link.videoId)
+        result.preview.alreadyOnline = repository.categoryOfYoutubeId(link.videoId)
+      return result
     }
   )
   ipcMain.handle(IpcChannel.YtWarmUp, () => downloader.warmUp())
@@ -131,6 +145,20 @@ export function registerYtIpc({
     Number.isInteger(id) ? queue.remove(id as number) : undefined
   )
   ipcMain.handle(IpcChannel.YtQueueClear, () => queue.clearFinished())
+  ipcMain.handle(IpcChannel.YtQueueControl, (_event, value: unknown) => {
+    const action = parseYtQueueAction(value)
+    if (action?.kind === 'pause') queue.pause()
+    else if (action?.kind === 'resume') queue.resume()
+    else if (action?.kind === 'retry') queue.retry(action.id ?? undefined)
+    else if (action?.kind === 'cancel-all') queue.cancelAll()
+  })
+  ipcMain.handle(IpcChannel.YtSetConcurrency, (_event, value: unknown): number => {
+    const count = parseConcurrency(value)
+    settings.set(CONCURRENCY_SETTING, count)
+    // Víc míst → hned se rozjedou další čekající videa.
+    queue.refresh()
+    return count
+  })
 
   // Průběh stahování chodí často – do oken nejvýš 4× za sekundu.
   let timer: NodeJS.Timeout | null = null

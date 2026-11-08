@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
-import { Cloud, Download, Link2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Cloud, Download, Link2, Pause, Play, RotateCcw, X } from 'lucide-react'
 import {
   MAX_PLAYLIST_VIDEOS,
   parseYoutubeLink,
   youtubeThumbnailUrl,
+  type KidsDownloadRequest,
   type KidsPreview,
   type KidsPreviewStage,
   type KidsQuality,
@@ -11,7 +12,7 @@ import {
 } from '../../../shared/kids'
 import { formatTime } from '../../../shared/player'
 import { countOf } from '../../../shared/plural'
-import type { YtCategory } from '../../../shared/yt'
+import { MAX_BULK_LINKS, splitLinks, type YtCategory } from '../../../shared/yt'
 
 /** Zařazení podle obsahu po stažení (štítky, popis) – video se stáhne do kořene složky. */
 const AUTO = ''
@@ -34,6 +35,8 @@ function queueText(item: KidsQueueItem): string {
   switch (item.status) {
     case 'waiting':
       return `Čeká · ${where(item)}`
+    case 'paused':
+      return `Pozastaveno · ${where(item)}`
     case 'downloading': {
       const p = item.progress
       if (!p || p.phase === 'tool') return `Připravuji yt-dlp… · ${where(item)}`
@@ -55,7 +58,35 @@ function queueText(item: KidsQueueItem): string {
   }
 }
 
-/** Okno Stáhnout z YouTube: odkaz, náhled, kategorie, kvalita a fronta stahování. */
+/** Jeden odkaz z hromadného vložení: načtený náhled, nebo chyba. */
+interface BulkRow {
+  url: string
+  preview: KidsPreview | null
+  error: string | null
+  checked: boolean
+}
+
+/** Video už je v knihovně (stažené, nebo – při přidávání online – jako odkaz). */
+function haveIn(preview: KidsPreview, online: boolean): string | null {
+  if (preview.kind !== 'video') return null
+  return preview.alreadyIn ?? (online ? (preview.alreadyOnline ?? null) : null)
+}
+
+/** Požadavek na přidání: celý playlist (odkaz jen na playlist), jinak jedno video. */
+const requestFor = (
+  preview: KidsPreview,
+  whole: boolean,
+  title: string,
+  quality: KidsQuality
+): KidsDownloadRequest => ({
+  kind: whole ? 'playlist' : 'video',
+  videoId: preview.videoId,
+  playlistId: preview.playlist?.id ?? null,
+  title,
+  quality
+})
+
+/** Okno Přidat z YouTube: odkaz (nebo víc odkazů), náhled, kategorie, kvalita a fronta. */
 export default function YtDownload({
   categories,
   onClose
@@ -64,10 +95,11 @@ export default function YtDownload({
   onClose: () => void
 }): React.JSX.Element {
   const { yt } = window.kinoteka
-  const [url, setUrl] = useState('')
+  const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [stage, setStage] = useState<KidsPreviewStage | null>(null)
   const [preview, setPreview] = useState<KidsPreview | null>(null)
+  const [bulk, setBulk] = useState<BulkRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [target, setTarget] = useState(AUTO)
@@ -76,8 +108,13 @@ export default function YtDownload({
   /** Přidat jen odkaz (výchozí – nezabírá místo), nebo stáhnout do počítače. */
   const [online, setOnline] = useState(true)
   const [queue, setQueue] = useState<KidsQueueItem[]>([])
+  const [adding, setAdding] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  /** Okno zavřené během načítání víc odkazů – další už nenačítat. */
+  const closed = useRef(false)
 
   useEffect(() => {
+    closed.current = false
     void yt.queue().then(setQueue)
     void yt.status().then((status) => setQuality(status.quality))
     // yt-dlp se připraví hned při otevření – první náhled pak nečeká.
@@ -85,6 +122,7 @@ export default function YtDownload({
     const offQueue = yt.onQueueChanged(setQueue)
     const offStage = yt.onPreviewStage(setStage)
     return () => {
+      closed.current = true
       offQueue()
       offStage()
     }
@@ -99,50 +137,176 @@ export default function YtDownload({
   }, [onClose])
 
   const named = categories.filter((c) => c.id !== null)
-  const valid = parseYoutubeLink(url) !== null
+  const parts = splitLinks(text)
+  const links = parts.filter((part) => parseYoutubeLink(part) !== null)
+  const invalid = parts.length - links.length
+  const many = links.length > 1
 
-  const load = async (): Promise<void> => {
-    setLoading(true)
+  const reset = (): void => {
     setStage(null)
     setPreview(null)
+    setBulk(null)
     setError(null)
     setNotice(null)
-    const result = await yt.preview(url)
-    setLoading(false)
-    if (!result.ok) return setError(result.message)
-    setPreview(result.preview)
-    setWhole(result.preview.kind === 'playlist')
     setTarget(AUTO)
   }
 
-  const [adding, setAdding] = useState(false)
-  const download = async (): Promise<void> => {
-    if (!preview) return
-    const request = {
-      kind: whole ? ('playlist' as const) : ('video' as const),
-      videoId: preview.videoId,
-      playlistId: preview.playlist?.id ?? null,
-      title: target,
-      quality
-    }
-    setAdding(true)
-    const result = online ? await yt.addOnline(request) : await yt.enqueue(request)
-    setAdding(false)
+  const loadOne = async (url: string): Promise<void> => {
+    const result = await yt.preview(url)
     if (!result.ok) return setError(result.message)
-    const count = countOf(result.added, 'video', 'videa', 'videí')
+    setPreview(result.preview)
+    setWhole(result.preview.kind === 'playlist')
+  }
+
+  /** Víc odkazů: náhledy jeden po druhém (yt-dlp najednou by zahltil počítač). */
+  const loadMany = async (urls: string[]): Promise<void> => {
+    const rows: BulkRow[] = urls.map((url) => ({ url, preview: null, error: null, checked: false }))
+    setBulk(rows)
+    for (const [index, url] of urls.entries()) {
+      if (closed.current) return
+      const result = await yt.preview(url)
+      rows[index] = result.ok
+        ? {
+            url,
+            preview: result.preview,
+            error: null,
+            checked: haveIn(result.preview, online) === null
+          }
+        : { url, preview: null, error: result.message, checked: false }
+      setBulk([...rows])
+    }
+  }
+
+  const load = async (): Promise<void> => {
+    if (links.length === 0) return
+    reset()
+    setLoading(true)
+    if (many) await loadMany(links.slice(0, MAX_BULK_LINKS))
+    else await loadOne(links[0]!)
+    setLoading(false)
+  }
+
+  const finish = (added: number, skipped: number): void => {
+    const count = countOf(added, 'video', 'videa', 'videí')
     setNotice(
-      result.added === 0
+      added === 0
         ? 'Všechno už máš.'
         : (online ? `Přidáno online: ${count}` : `Do fronty: ${count}`) +
-            (result.skipped ? ` (${result.skipped} už máš)` : '')
+            (skipped ? ` (${skipped} už máš)` : '')
     )
     setPreview(null)
-    setUrl('')
+    setBulk(null)
+    setText('')
   }
+
+  const add = async (
+    request: KidsDownloadRequest
+  ): Promise<{ ok: true; added: number; skipped: number } | { ok: false; message: string }> =>
+    online ? yt.addOnline(request) : yt.enqueue(request)
+
+  const addOne = async (): Promise<void> => {
+    if (!preview) return
+    setAdding(true)
+    const result = await add(requestFor(preview, whole, target, quality))
+    setAdding(false)
+    if (!result.ok) return setError(result.message)
+    finish(result.added, result.skipped)
+  }
+
+  const chosen = (bulk ?? []).filter((row) => row.checked && row.preview)
+  const addChosen = async (): Promise<void> => {
+    setAdding(true)
+    let added = 0
+    let skipped = 0
+    const failed: string[] = []
+    for (const row of chosen) {
+      const p = row.preview!
+      const result = await add(requestFor(p, p.kind === 'playlist', target, quality))
+      if (result.ok) {
+        added += result.added
+        skipped += result.skipped
+      } else failed.push(`${p.title}: ${result.message}`)
+    }
+    setAdding(false)
+    finish(added, skipped)
+    if (failed.length > 0) setError(failed.join('\n'))
+  }
+
+  const toggle = (index: number): void =>
+    setBulk((rows) =>
+      rows ? rows.map((row, i) => (i === index ? { ...row, checked: !row.checked } : row)) : rows
+    )
 
   const autoHint = preview?.suggestedTitle
     ? `Automaticky (nejspíš ${preview.suggestedTitle})`
     : 'Automaticky podle obsahu'
+
+  const options = (
+    <>
+      <label className="yt-label">Uložit</label>
+      <div className="yt-seg">
+        <button className={`chip ${online ? 'on' : ''}`} onClick={() => setOnline(true)}>
+          <Cloud size={14} /> Jen odkaz – online (nezabírá místo)
+        </button>
+        <button className={`chip ${!online ? 'on' : ''}`} onClick={() => setOnline(false)}>
+          <Download size={14} /> Stáhnout do počítače
+        </button>
+      </div>
+      <p className="muted small">
+        {online
+          ? 'Video se přehraje přímo z YouTube (potřebuje internet). Na disk se uloží jen odkaz a náhled.'
+          : 'Video se stáhne celé – jde přehrát i bez internetu, ale zabírá místo.'}
+      </p>
+
+      <label className="yt-label">Kategorie</label>
+      <div className="yt-seg">
+        <button className={`chip ${target === AUTO ? 'on' : ''}`} onClick={() => setTarget(AUTO)}>
+          {autoHint}
+        </button>
+        {named.map((category) => (
+          <button
+            key={category.id}
+            className={`chip ${target === category.name ? 'on' : ''}`}
+            onClick={() => setTarget(category.name)}
+          >
+            {category.name}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">
+        Automaticky = podle štítků, názvu a popisu z YouTube (zjistí se po přidání).
+      </p>
+
+      <label className="yt-label">{online ? 'Kvalita přehrávání' : 'Kvalita stahování'}</label>
+      <div className="yt-seg">
+        {QUALITIES.map(([value, label]) => (
+          <button
+            key={value}
+            className={`chip ${quality === value ? 'on' : ''}`}
+            onClick={() => setQuality(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {quality === '2160' && (
+        <p className="muted small">
+          {online
+            ? '4K potřebuje rychlý internet (kolem 25 Mb/s) a na slabším počítači se nemusí přehrávat plynule.'
+            : '4K zabere hodně místa a na slabším počítači se nemusí přehrávat plynule.'}
+        </p>
+      )}
+    </>
+  )
+
+  const pending = queue.filter(
+    (i) => i.status === 'waiting' || i.status === 'downloading' || i.status === 'paused'
+  )
+  const active = queue.some((i) => i.status === 'waiting' || i.status === 'downloading')
+  const paused = queue.some((i) => i.status === 'paused')
+  const failedCount = queue.filter((i) => i.status === 'error').length
+  const finished = queue.some((i) => i.status === 'done' || i.status === 'skipped')
+  const loadedCount = (bulk ?? []).filter((row) => row.preview || row.error).length
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>
@@ -162,22 +326,46 @@ export default function YtDownload({
         <div className="key-row">
           <span className="field grow yt-url">
             <Link2 size={16} />
-            <input
+            <textarea
               autoFocus
-              aria-label="Odkaz na video nebo playlist"
-              placeholder="https://www.youtube.com/watch?v=…"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              rows={Math.min(6, Math.max(1, text.split('\n').length))}
+              aria-label="Odkaz na video nebo playlist (víc odkazů – každý na řádek)"
+              placeholder="https://www.youtube.com/watch?v=…  (víc odkazů – každý na nový řádek)"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && valid && !loading) void load()
+                // Enter načte; Shift+Enter = nový řádek pro další odkaz.
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  if (links.length > 0 && !loading) void load()
+                }
               }}
             />
           </span>
-          <button className="btn sm" disabled={!valid || loading} onClick={() => void load()}>
-            {loading ? (stage ? STAGE_TEXT[stage] : 'Načítám…') : 'Načíst'}
+          <button
+            className="btn sm"
+            disabled={links.length === 0 || loading}
+            onClick={() => void load()}
+          >
+            {loading
+              ? bulk
+                ? `Načítám ${loadedCount + 1} z ${bulk.length}…`
+                : stage
+                  ? STAGE_TEXT[stage]
+                  : 'Načítám…'
+              : many
+                ? `Načíst ${countOf(Math.min(links.length, MAX_BULK_LINKS), 'odkaz', 'odkazy', 'odkazů')}`
+                : 'Načíst'}
           </button>
         </div>
-        {error && <p className="notice is-error">{error}</p>}
+        {(invalid > 0 || links.length > MAX_BULK_LINKS) && (
+          <p className="muted small">
+            {invalid > 0 &&
+              `${countOf(invalid, 'řádek není', 'řádky nejsou', 'řádků není')} odkaz na YouTube – přeskočí se. `}
+            {links.length > MAX_BULK_LINKS && `Načte se jen prvních ${MAX_BULK_LINKS} odkazů.`}
+          </p>
+        )}
+        {error && <p className="notice is-error yt-error">{error}</p>}
         {notice && <p className="notice">{notice}</p>}
 
         {preview && (
@@ -210,70 +398,15 @@ export default function YtDownload({
                     Playlist je dlouhý – stáhne se prvních {MAX_PLAYLIST_VIDEOS} videí.
                   </p>
                 )}
-                {preview.alreadyIn && preview.kind === 'video' && (
-                  <p className="notice">Tohle video už máš – v kategorii „{preview.alreadyIn}“.</p>
+                {haveIn(preview, online) && (
+                  <p className="notice">
+                    Tohle video už máš – v kategorii „{haveIn(preview, online)}“.
+                  </p>
                 )}
               </div>
             </div>
 
-            <label className="yt-label">Uložit</label>
-            <div className="yt-seg">
-              <button className={`chip ${online ? 'on' : ''}`} onClick={() => setOnline(true)}>
-                <Cloud size={14} /> Jen odkaz – online (nezabírá místo)
-              </button>
-              <button className={`chip ${!online ? 'on' : ''}`} onClick={() => setOnline(false)}>
-                <Download size={14} /> Stáhnout do počítače
-              </button>
-            </div>
-            <p className="muted small">
-              {online
-                ? 'Video se přehraje přímo z YouTube (potřebuje internet). Na disk se uloží jen odkaz a náhled.'
-                : 'Video se stáhne celé – jde přehrát i bez internetu, ale zabírá místo.'}
-            </p>
-
-            <label className="yt-label">Kategorie</label>
-            <div className="yt-seg">
-              <button
-                className={`chip ${target === AUTO ? 'on' : ''}`}
-                onClick={() => setTarget(AUTO)}
-              >
-                {autoHint}
-              </button>
-              {named.map((category) => (
-                <button
-                  key={category.id}
-                  className={`chip ${target === category.name ? 'on' : ''}`}
-                  onClick={() => setTarget(category.name)}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
-            <p className="muted small">
-              Automaticky = podle štítků, názvu a popisu z YouTube (zjistí se po přidání).
-            </p>
-
-            <label className="yt-label">
-              {online ? 'Kvalita přehrávání' : 'Kvalita stahování'}
-            </label>
-            <div className="yt-seg">
-              {QUALITIES.map(([value, label]) => (
-                <button
-                  key={value}
-                  className={`chip ${quality === value ? 'on' : ''}`}
-                  onClick={() => setQuality(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {quality === '2160' && (
-              <p className="muted small">
-                {online
-                  ? '4K potřebuje rychlý internet (kolem 25 Mb/s) a na slabším počítači se nemusí přehrávat plynule.'
-                  : '4K zabere hodně místa a na slabším počítači se nemusí přehrávat plynule.'}
-              </p>
-            )}
+            {options}
 
             {preview.playlist && preview.kind === 'video' && (
               <>
@@ -295,8 +428,8 @@ export default function YtDownload({
               </button>
               <button
                 className="btn sm primary"
-                disabled={adding || (!whole && preview.alreadyIn !== null)}
-                onClick={() => void download()}
+                disabled={adding || (!whole && haveIn(preview, online) !== null)}
+                onClick={() => void addOne()}
               >
                 {online ? <Cloud size={16} /> : <Download size={16} />}{' '}
                 {adding ? 'Přidávám…' : online ? 'Přidat online' : 'Stáhnout'}
@@ -305,9 +438,113 @@ export default function YtDownload({
           </div>
         )}
 
+        {bulk && (
+          <div className="yt-preview">
+            <div className="yt-bulk">
+              {bulk.map((row, index) => {
+                const have = row.preview ? haveIn(row.preview, online) : null
+                return (
+                  <label
+                    key={row.url}
+                    className={`yt-bulk-row ${row.error ? 'is-error' : ''}`}
+                    title={row.url}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={row.checked}
+                      disabled={!row.preview}
+                      onChange={() => toggle(index)}
+                    />
+                    <span
+                      className="yt-q-thumb"
+                      style={
+                        row.preview?.thumbnailUrl
+                          ? { backgroundImage: `url("${row.preview.thumbnailUrl}")` }
+                          : undefined
+                      }
+                    />
+                    <span className="yt-q-info">
+                      <b>{row.preview?.title ?? row.url}</b>
+                      <small className={row.error ? 'is-error' : 'muted'}>
+                        {row.error ??
+                          (!row.preview
+                            ? 'Čeká na načtení…'
+                            : [
+                                row.preview.kind === 'playlist' && row.preview.playlist
+                                  ? `Playlist · ${countOf(row.preview.playlist.count, 'video', 'videa', 'videí')}`
+                                  : row.preview.channel,
+                                row.preview.durationSec !== null
+                                  ? formatTime(row.preview.durationSec)
+                                  : null,
+                                have ? `už máš v „${have}“` : null
+                              ]
+                                .filter(Boolean)
+                                .join(' · '))}
+                      </small>
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+
+            {options}
+
+            <div className="actions">
+              <button className="btn sm" onClick={() => setBulk(null)}>
+                Zrušit
+              </button>
+              <button
+                className="btn sm primary"
+                disabled={adding || loading || chosen.length === 0}
+                onClick={() => void addChosen()}
+              >
+                {online ? <Cloud size={16} /> : <Download size={16} />}{' '}
+                {adding
+                  ? 'Přidávám…'
+                  : `${online ? 'Přidat online' : 'Stáhnout'} vybrané (${chosen.length})`}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="yt-queue-head">
           <h4>Fronta stahování</h4>
-          {queue.some((i) => i.status !== 'waiting' && i.status !== 'downloading') && (
+          {active && (
+            <button
+              className="row-link"
+              onClick={() => void yt.controlQueue({ kind: 'pause' })}
+              title="Rozpracované soubory zůstanou, stahování půjde dokončit"
+            >
+              <Pause size={14} /> Pozastavit vše
+            </button>
+          )}
+          {paused && (
+            <button className="row-link" onClick={() => void yt.controlQueue({ kind: 'resume' })}>
+              <Play size={14} /> Pokračovat
+            </button>
+          )}
+          {failedCount > 0 && (
+            <button
+              className="row-link"
+              onClick={() => void yt.controlQueue({ kind: 'retry', id: null })}
+            >
+              <RotateCcw size={14} /> Zkusit znovu chybné ({failedCount})
+            </button>
+          )}
+          {pending.length > 0 && (
+            <button
+              className={`row-link ${confirmCancel ? 'is-danger' : ''}`}
+              onBlur={() => setConfirmCancel(false)}
+              onClick={() => {
+                if (!confirmCancel) return setConfirmCancel(true)
+                setConfirmCancel(false)
+                void yt.controlQueue({ kind: 'cancel-all' })
+              }}
+            >
+              <X size={14} /> {confirmCancel ? `Opravdu zrušit ${pending.length}?` : 'Zrušit vše'}
+            </button>
+          )}
+          {(finished || failedCount > 0) && (
             <button className="row-link" onClick={() => void yt.clearFinished()}>
               Vyčistit hotové
             </button>
@@ -332,7 +569,18 @@ export default function YtDownload({
                   {queueText(item)}
                 </small>
               </div>
-              {(item.status === 'waiting' || item.status === 'downloading') && (
+              {item.status === 'error' && (
+                <button
+                  className="icon-btn xs"
+                  title="Zkusit znovu"
+                  onClick={() => void yt.controlQueue({ kind: 'retry', id: item.id })}
+                >
+                  <RotateCcw size={14} />
+                </button>
+              )}
+              {(item.status === 'waiting' ||
+                item.status === 'downloading' ||
+                item.status === 'paused') && (
                 <button
                   className="icon-btn xs"
                   title={item.status === 'downloading' ? 'Zrušit stahování' : 'Odebrat z fronty'}

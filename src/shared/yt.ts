@@ -40,6 +40,58 @@ export interface YtStatus {
   quality: '2160' | '1080' | '720'
   /** Kolik videí bez údajů ještě čeká na dotažení z YouTube. */
   pendingInfo: number
+  /** Kolik videí se stahuje najednou (1–3). */
+  concurrency: number
+}
+
+export const MIN_CONCURRENCY = 1
+export const MAX_CONCURRENCY = 3
+export const DEFAULT_CONCURRENCY = 2
+
+/** Počet souběžných stahování z nastavení (mimo rozsah = výchozí). */
+export function parseConcurrency(value: unknown): number {
+  return Number.isInteger(value) &&
+    (value as number) >= MIN_CONCURRENCY &&
+    (value as number) <= MAX_CONCURRENCY
+    ? (value as number)
+    : DEFAULT_CONCURRENCY
+}
+
+/** Ovládání fronty stahování v okně Přidat z YouTube. */
+export type YtQueueAction =
+  | { kind: 'pause' }
+  | { kind: 'resume' }
+  | { kind: 'retry'; id: number | null }
+  | { kind: 'cancel-all' }
+
+export function parseYtQueueAction(value: unknown): YtQueueAction | null {
+  if (typeof value !== 'object' || value === null) return null
+  const input = value as Record<string, unknown>
+  switch (input['kind']) {
+    case 'pause':
+    case 'resume':
+    case 'cancel-all':
+      return { kind: input['kind'] }
+    case 'retry':
+      return {
+        kind: 'retry',
+        id: Number.isInteger(input['id']) ? (input['id'] as number) : null
+      }
+    default:
+      return null
+  }
+}
+
+/** Nejvýš tolik odkazů najednou (každý se načítá zvlášť). */
+export const MAX_BULK_LINKS = 50
+
+/** Odkazy z vloženého textu – každý řádek (nebo mezerou oddělený kus) jeden; bez opakování. */
+export function splitLinks(text: string): string[] {
+  const seen = new Set<string>()
+  return text
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part && !seen.has(part) && seen.add(part))
 }
 
 export interface YtScanResult {

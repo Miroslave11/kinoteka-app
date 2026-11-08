@@ -200,6 +200,29 @@ export default function YtSettings(): React.JSX.Element {
       </section>
 
       <section className="card">
+        <h2>Stahování z YouTube</h2>
+        <p className="muted small">
+          Kolik videí se stahuje najednou. Víc najednou je rychlejší u pomalých videí, ale vytíží
+          internet i počítač. Ostatní čekají ve frontě – ta přežije i zavření aplikace.
+        </p>
+        <div className="yt-seg">
+          {[1, 2, 3].map((count) => (
+            <button
+              key={count}
+              className={`chip ${status?.concurrency === count ? 'on' : ''}`}
+              onClick={() =>
+                void yt
+                  .setConcurrency(count)
+                  .then((saved) => setStatus((s) => (s ? { ...s, concurrency: saved } : s)))
+              }
+            >
+              {count === 1 ? 'Po jednom' : `${count} najednou`}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="card">
         <h2>Kategorie a klíčová slova</h2>
         <p className="muted small">
           Slova se hledají ve štítcích, názvu, popisu a kanálu videa (bez ohledu na diakritiku a

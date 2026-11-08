@@ -1,14 +1,15 @@
 import { EventEmitter } from 'node:events'
+import type { Dirent } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   youtubePlaylistUrl,
   youtubeThumbnailUrl,
   youtubeVideoUrl,
-  type KidsDownloadProgress,
   type KidsDownloadRequest,
   type KidsPreviewResult,
   type KidsPreviewStage,
+  type KidsQuality,
   type KidsQueueItem,
   MAX_PLAYLIST_VIDEOS,
   type YoutubeLink
@@ -26,9 +27,16 @@ interface QueueEvents {
 export interface QueueDownloader {
   info: KidsDownloader['info']
   download: KidsDownloader['download']
-  cancel: () => void
-  on: (event: 'progress', listener: (progress: KidsDownloadProgress) => void) => unknown
-  off: (event: 'progress', listener: (progress: KidsDownloadProgress) => void) => unknown
+}
+
+/** Video fronty uložené na disk (přežije restart aplikace). */
+export interface SavedQueueItem {
+  videoId: string
+  name: string
+  title: string
+  status: 'waiting' | 'downloading' | 'paused' | 'error'
+  message: string | null
+  quality: KidsQuality | undefined
 }
 
 /** Údaje z náhledu, podle kterých se navrhuje, kam video uložit. */
@@ -52,6 +60,10 @@ export interface KidsDownloadQueueDeps {
   scan: () => Promise<unknown>
   /** Rychlé údaje o videu bez yt-dlp (oEmbed); null = načte je yt-dlp. */
   quickInfo?: (videoId: string) => Promise<VideoInfo | null>
+  /** Kolik videí stahovat najednou (1–3); bez = po jednom. */
+  concurrency?: () => number
+  /** Uložení fronty (YT videa) – po restartu se pokračuje, viz {@link KidsDownloadQueue.restore}. */
+  store?: { load: () => SavedQueueItem[]; save: (items: SavedQueueItem[]) => void }
 }
 
 type OnStage = (stage: KidsPreviewStage) => void
@@ -68,12 +80,12 @@ interface PreviewRun {
 export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
   private queue: KidsQueueItem[] = []
   private nextId = 1
-  private pumping = false
-  private current: KidsQueueItem | null = null
+  /** Právě stahovaná videa (id položky → zrušení s důvodem 'cancel' / 'pause'). */
+  private readonly running = new Map<number, AbortController>()
   /** Z náhledu: názvy videí a obsah playlistů (aby se nestahovaly znovu). */
   private readonly names = new Map<string, string>()
   private readonly playlists = new Map<string, VideoInfo>()
-  private readonly qualities = new Map<number, KidsDownloadRequest['quality']>()
+  private readonly qualities = new Map<number, KidsQuality | undefined>()
   /** Běžící náhled – nový ho zruší. */
   private previewRun: AbortController | null = null
 
@@ -227,99 +239,223 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
     } else if (request.videoId) ids = [request.videoId]
     else return { ok: false, message: 'Chybí video ke stažení.' }
 
+    // Video přidané bez náhledu (třeba „Stáhnout do počítače“ u online videa) – aspoň název.
+    const [single] = ids
+    if (ids.length === 1 && single && !this.names.has(single) && this.deps.quickInfo) {
+      const quick = await this.deps.quickInfo(single).catch(() => null)
+      if (quick) this.names.set(single, quick.title)
+    }
     let added = 0
     for (const videoId of ids) {
-      const queued = this.queue.some(
-        (item) =>
-          item.videoId === videoId && (item.status === 'waiting' || item.status === 'downloading')
-      )
+      const queued = this.queue.some((item) => item.videoId === videoId && isPending(item))
       if (queued || this.alreadyIn(videoId) !== null) continue
-      const item: KidsQueueItem = {
-        id: this.nextId++,
+      this.push({
         videoId,
         name: this.names.get(videoId) ?? videoId,
         title,
         status: 'waiting',
-        progress: null,
-        message: null
-      }
-      this.qualities.set(item.id, request.quality)
-      this.queue.push(item)
+        message: null,
+        quality: request.quality
+      })
       added++
     }
-    this.emit('changed')
-    void this.pump()
+    this.changed(true)
+    this.pump()
     return { ok: true, added, skipped: ids.length - added }
   }
 
-  /** Čekající video odebere, stahované zruší. */
+  private push(saved: SavedQueueItem): void {
+    const item: KidsQueueItem = {
+      id: this.nextId++,
+      videoId: saved.videoId,
+      name: saved.name,
+      title: saved.title,
+      status: saved.status,
+      progress: null,
+      message: saved.message
+    }
+    this.qualities.set(item.id, saved.quality)
+    this.queue.push(item)
+  }
+
+  /**
+   * Fronta z minulého spuštění (YT videa): nedokončená videa se stahují dál – yt-dlp
+   * naváže na rozpracované soubory. Pozastavená zůstanou pozastavená, chybná chybná.
+   */
+  restore(): void {
+    for (const saved of this.deps.store?.load() ?? []) {
+      if (this.queue.some((item) => item.videoId === saved.videoId)) continue
+      this.push({ ...saved, status: saved.status === 'downloading' ? 'waiting' : saved.status })
+    }
+    this.changed(false)
+    this.pump()
+  }
+
+  /** Čekající nebo pozastavené video odebere, stahované zruší (rozpracované soubory smaže). */
   remove(id: number): void {
     const item = this.queue.find((entry) => entry.id === id)
     if (!item) return
-    if (item.status === 'downloading') this.deps.downloader.cancel()
-    else this.queue = this.queue.filter((entry) => entry.id !== id)
-    this.emit('changed')
+    const running = this.running.get(id)
+    if (running) return running.abort('cancel')
+    this.queue = this.queue.filter((entry) => entry.id !== id)
+    if (item.status === 'paused') void removePartialFiles(this.folderOf(item), item.videoId)
+    this.changed(true)
+  }
+
+  /** Zruší všechna čekající, pozastavená i stahovaná videa. */
+  cancelAll(): void {
+    for (const item of this.queue.filter(isPending)) this.remove(item.id)
+  }
+
+  /** Pozastaví všechno nedokončené; rozpracované soubory zůstanou pro pokračování. */
+  pause(): void {
+    for (const item of this.queue) if (item.status === 'waiting') item.status = 'paused'
+    for (const controller of this.running.values()) controller.abort('pause')
+    this.changed(true)
+  }
+
+  /** Pozastavená videa zase stahuje. */
+  resume(): void {
+    for (const item of this.queue) if (item.status === 'paused') item.status = 'waiting'
+    this.changed(true)
+    this.pump()
+  }
+
+  /** Změnil se počet souběžných stahování – rozjede další čekající videa. */
+  refresh(): void {
+    this.pump()
+  }
+
+  /** Chybné video (nebo všechna chybná, bez `id`) zkusí stáhnout znovu. */
+  retry(id?: number): void {
+    for (const item of this.queue)
+      if (item.status === 'error' && (id === undefined || item.id === id)) {
+        item.status = 'waiting'
+        item.message = null
+      }
+    this.changed(true)
+    this.pump()
   }
 
   /** Stahuje se (nebo čeká) něco do této podsložky titulu? */
   isDownloadingInto(folder: string): boolean {
     return this.queue.some(
-      (item) =>
-        (item.status === 'waiting' || item.status === 'downloading') &&
-        item.title.toLowerCase() === folder.toLowerCase()
+      (item) => isPending(item) && item.title.toLowerCase() === folder.toLowerCase()
     )
   }
 
   /** Odebere hotová, přeskočená a chybná videa ze seznamu. */
   clearFinished(): void {
-    this.queue = this.queue.filter(
-      (item) => item.status === 'waiting' || item.status === 'downloading'
-    )
+    this.queue = this.queue.filter(isPending)
+    this.changed(true)
+  }
+
+  private folderOf(item: KidsQueueItem): string {
+    return item.title ? join(this.deps.folder(), item.title) : this.deps.folder()
+  }
+
+  /** Oznámí změnu; `save` = změnil se seznam nebo stav (ne jen průběh) → uložit frontu. */
+  private changed(save: boolean): void {
+    if (save && this.deps.store)
+      this.deps.store.save(
+        this.queue
+          .filter((item) => isPending(item) || item.status === 'error')
+          .map((item) => ({
+            videoId: item.videoId,
+            name: item.name,
+            title: item.title,
+            status: item.status as SavedQueueItem['status'],
+            message: item.message,
+            quality: this.qualities.get(item.id)
+          }))
+      )
     this.emit('changed')
   }
 
-  private async pump(): Promise<void> {
-    if (this.pumping) return
-    this.pumping = true
-    const onProgress = (progress: KidsDownloadProgress): void => {
-      if (!this.current) return
-      this.current.progress = progress
-      this.emit('changed')
-    }
-    this.deps.downloader.on('progress', onProgress)
-    try {
-      let item: KidsQueueItem | undefined
-      while ((item = this.queue.find((entry) => entry.status === 'waiting'))) {
-        this.current = item
-        item.status = 'downloading'
+  /** Spustí čekající videa, dokud běží méně stahování, než dovoluje nastavení. */
+  private pump(): void {
+    const limit = Math.max(1, Math.min(3, this.deps.concurrency?.() ?? 1))
+    let item: KidsQueueItem | undefined
+    while (
+      this.running.size < limit &&
+      (item = this.queue.find((entry) => entry.status === 'waiting'))
+    )
+      void this.start(item)
+  }
+
+  private async start(item: KidsQueueItem): Promise<void> {
+    const controller = new AbortController()
+    this.running.set(item.id, controller)
+    item.status = 'downloading'
+    item.message = null
+    this.changed(true)
+    const folder = this.folderOf(item)
+    const result = await this.deps.downloader.download(youtubeVideoUrl(item.videoId), {
+      folder,
+      quality: this.qualities.get(item.id),
+      onProgress: (progress) => {
+        item.progress = progress
         this.emit('changed')
-        const folder = item.title ? join(this.deps.folder(), item.title) : this.deps.folder()
-        const result = await this.deps.downloader.download(youtubeVideoUrl(item.videoId), {
-          folder,
-          quality: this.qualities.get(item.id)
-        })
-        item.progress = null
-        if (result.ok) {
-          item.status = 'done'
-          item.name = result.title
-          item.message = null
-          await this.deps.scan()
-        } else if (result.message === 'Zrušeno.') {
-          this.queue = this.queue.filter((entry) => entry !== item)
-          await removePartialFiles(folder, item.videoId)
-        } else {
-          item.status = 'error'
-          item.message = result.message
-        }
-        this.current = null
-        this.emit('changed')
-      }
-    } finally {
-      this.deps.downloader.off('progress', onProgress)
-      this.pumping = false
+      },
+      signal: controller.signal
+    })
+    this.running.delete(item.id)
+    item.progress = null
+    if (result.ok) {
+      item.status = 'done'
+      item.name = result.title
+      item.message = null
+      this.changed(true)
+      await this.deps.scan()
+    } else if (controller.signal.aborted && controller.signal.reason === 'pause') {
+      item.status = 'paused'
+      this.changed(true)
+    } else if (controller.signal.aborted) {
+      this.queue = this.queue.filter((entry) => entry !== item)
+      this.changed(true)
+      await removePartialFiles(folder, item.videoId)
+    } else {
+      item.status = 'error'
+      item.message = result.message
+      this.changed(true)
     }
+    this.pump()
   }
 }
+
+/** Ještě nedokončené video (čeká, stahuje se, nebo je pozastavené). */
+const isPending = (item: KidsQueueItem): boolean =>
+  item.status === 'waiting' || item.status === 'downloading' || item.status === 'paused'
+
+/**
+ * Rozpracované soubory (.part a podobně), ke kterým už ve frontě nic není – zůstanou po
+ * pádu nebo starší verzi aplikace a zabírají místo. Hledá ve složce a jejích podsložkách.
+ */
+export async function removeOrphanPartials(root: string, keep: Set<string>): Promise<number> {
+  let removed = 0
+  const visit = async (folder: string, depth: number): Promise<void> => {
+    let entries: Dirent[]
+    try {
+      entries = await readdir(folder, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (depth === 0) await visit(join(folder, entry.name), 1)
+        continue
+      }
+      const id = /\[([\w-]{11})\]/.exec(entry.name)?.[1]
+      if (!id || keep.has(id) || !PARTIAL.test(entry.name)) continue
+      await rm(join(folder, entry.name), { force: true })
+      removed++
+    }
+  }
+  await visit(root, 0)
+  return removed
+}
+
+const PARTIAL = /\.(part|ytdl)$|\.(f\d+|temp)\.[^.]+$|\.part-Frag\d+/i
 
 /**
  * Po zrušení smaže rozpracované soubory videa (yt-dlp je pojmenuje s [ID] v názvu) a obrázek
@@ -333,7 +469,7 @@ export async function removePartialFiles(folder: string, videoId: string): Promi
     return
   }
   const mine = names.filter((name) => name.includes(`[${videoId}]`))
-  const partial = /\.(part|ytdl)$|\.(f\d+|temp)\.[^.]+$|\.part-Frag\d+/i
+  const partial = PARTIAL
   const finished = mine.some((name) => /\.(mp4|mkv|webm)$/i.test(name) && !partial.test(name))
   const sidecar = /\.(info\.json|jpg|webp|png)$/i
   await Promise.all(
