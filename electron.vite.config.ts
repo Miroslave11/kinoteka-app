@@ -7,7 +7,12 @@ export default defineConfig({
     // Klíč jen pro čtení soukromého repozitáře s vydáními (kinoteka-vydani). Vkládá ho workflow
     // Vydání ze secretu KINOTEKA_UPDATE_TOKEN; ve vývoji a v CI je prázdný.
     define: {
-      __KINOTEKA_UPDATE_TOKEN__: JSON.stringify(process.env['KINOTEKA_UPDATE_TOKEN'] ?? '')
+      __KINOTEKA_UPDATE_TOKEN__: JSON.stringify(process.env['KINOTEKA_UPDATE_TOKEN'] ?? ''),
+      // Klíč aplikace u Googlu pro sdílení přes Google Disk (secrets KINOTEKA_GOOGLE_CLIENT_*).
+      __KINOTEKA_GOOGLE_CLIENT_ID__: JSON.stringify(process.env['KINOTEKA_GOOGLE_CLIENT_ID'] ?? ''),
+      __KINOTEKA_GOOGLE_CLIENT_SECRET__: JSON.stringify(
+        process.env['KINOTEKA_GOOGLE_CLIENT_SECRET'] ?? ''
+      )
     }
   },
   preload: {},

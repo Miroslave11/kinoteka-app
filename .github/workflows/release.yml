@@ -58,6 +58,9 @@ jobs:
           GH_TOKEN: ${{ secrets.KINOTEKA_VYDANI_TOKEN }}
           # Klíč jen pro čtení kinoteka-vydani – vloží se do aplikace (aktualizace ze soukromého repa).
           KINOTEKA_UPDATE_TOKEN: ${{ secrets.KINOTEKA_UPDATE_TOKEN }}
+          # Klíč aplikace u Googlu pro sdílení přes Google Disk (bez něj se sdílení nedá zapnout).
+          KINOTEKA_GOOGLE_CLIENT_ID: ${{ secrets.KINOTEKA_GOOGLE_CLIENT_ID }}
+          KINOTEKA_GOOGLE_CLIENT_SECRET: ${{ secrets.KINOTEKA_GOOGLE_CLIENT_SECRET }}
           # Electron a nástroje electron-builderu přes místní zrcadlo (scripts/eb-mirror.mjs).
           EB_MIRROR_TOKEN: ${{ github.token }}
         run: npm run fetch:bin && npm run build && node scripts/eb-mirror.mjs npx electron-builder --win --publish always
