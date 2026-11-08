@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Download, MoreHorizontal, Play } from 'lucide-react'
+import { CheckCircle2, Cloud, HardDrive, MoreHorizontal, Play, Plus } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { formatTime } from '../../../shared/player'
 import { countOf } from '../../../shared/plural'
@@ -9,7 +9,15 @@ import { placeholderStyle, useAmbientPalette } from '../app/palette'
 import Artwork from '../components/Artwork'
 import YtDownload from './YtDownload'
 import YtVideoMenu, { type YtMenuState } from './YtVideoMenu'
-import { continueRow, filterKey, totalVideos, visibleCategories } from './ytData'
+import {
+  continueRow,
+  filterKey,
+  filterStorage,
+  parseStorage,
+  totalVideos,
+  visibleCategories,
+  type YtStorage
+} from './ytData'
 
 /** Obrázek videa: uložený vedle videa (nebo snímek z něj), jinak náhled z YouTube. */
 const imageOf = (video: YtVideoSummary): string | null =>
@@ -57,6 +65,13 @@ function VideoCard({
         {video.durationSec !== null && (
           <span className="badge glass yt-length">{formatTime(video.durationSec)}</span>
         )}
+        <span
+          className={`badge glass yt-storage ${video.online ? 'is-online' : ''}`}
+          title={video.online ? 'Online – přehrává se z YouTube' : 'Stažené v počítači'}
+        >
+          {video.online ? <Cloud size={12} /> : <HardDrive size={12} />}
+          {video.online ? 'Online' : 'V počítači'}
+        </span>
         {video.watched && video.progress === null && (
           <span className="yt-watched" title="Zhlédnuto">
             <CheckCircle2 size={18} />
@@ -92,7 +107,12 @@ export default function YtPage(): React.JSX.Element {
     return yt.onChanged(() => void reload())
   }, [yt, reload])
 
-  const visible = useMemo(() => visibleCategories(categories ?? []), [categories])
+  const storage = parseStorage(params.get('uloziste'))
+  const visible = useMemo(
+    () => visibleCategories(filterStorage(categories ?? [], storage)),
+    [categories, storage]
+  )
+  const everything = totalVideos(categories ?? [])
   const continuing = useMemo(() => continueRow(visible), [visible])
   const selected = visible.find((category) => filterKey(category) === params.get('kategorie'))
   const total = totalVideos(visible)
@@ -110,19 +130,30 @@ export default function YtPage(): React.JSX.Element {
     setMenu({ video, categoryId: owner?.id ?? null, x, y })
   }
   const closeMenu = useCallback(() => setMenu(null), [])
+  const filterParams = (category: YtCategory | null, store: YtStorage): Record<string, string> => ({
+    ...(category ? { kategorie: filterKey(category) } : {}),
+    ...(store !== 'vse' ? { uloziste: store } : {})
+  })
   const select = (category: YtCategory | null): void =>
-    setParams(category ? { kategorie: filterKey(category) } : {}, { replace: true })
+    setParams(filterParams(category, storage), { replace: true })
+  const selectStorage = (store: YtStorage): void =>
+    setParams(filterParams(selected ?? null, store), { replace: true })
+  const counts = {
+    vse: everything,
+    pc: totalVideos(filterStorage(categories ?? [], 'pc')),
+    online: totalVideos(filterStorage(categories ?? [], 'online'))
+  }
 
   const dialog = downloading && (
     <YtDownload categories={categories ?? []} onClose={() => setDownloading(false)} />
   )
   const downloadButton = (
     <button className="btn primary" onClick={() => setDownloading(true)}>
-      <Download size={16} /> Stáhnout z YouTube
+      <Plus size={16} /> Přidat z YouTube
     </button>
   )
 
-  if (categories !== null && total === 0) {
+  if (categories !== null && everything === 0) {
     return (
       <div className="page empty-home">
         <h1>YT videa</h1>
@@ -160,6 +191,22 @@ export default function YtPage(): React.JSX.Element {
       </div>
 
       <div className="toolbar yt-chips">
+        {(
+          [
+            ['vse', 'Vše', null],
+            ['pc', 'V počítači', <HardDrive key="pc" size={14} />],
+            ['online', 'Online', <Cloud key="online" size={14} />]
+          ] as const
+        ).map(([store, label, icon]) => (
+          <button
+            key={store}
+            className={`chip ${storage === store ? 'on' : ''}`}
+            onClick={() => selectStorage(store)}
+          >
+            {icon} {label} <span className="chip-count">{counts[store]}</span>
+          </button>
+        ))}
+        <span className="yt-chip-sep" />
         <button className={`chip ${selected ? '' : 'on'}`} onClick={() => select(null)}>
           Vše <span className="chip-count">{total}</span>
         </button>

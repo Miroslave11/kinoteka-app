@@ -101,6 +101,11 @@ export interface PlayerSessionOptions {
   onSubDelayChanged?: (seconds: number) => void
   /** Připraví ručně vybraný soubor titulků (převod kódování). */
   prepareSubtitle?: (path: string) => Promise<ExternalSubtitle>
+  /**
+   * mpv soubor neotevřel (např. adresa online videa přestala platit). Vrácená zpráva přehrávání
+   * ukončí s chybou; false = nic nedělat (výchozí chování).
+   */
+  onOpenFailed?: () => string | false
   onEnd: (info: PlayerClosedInfo) => void
 }
 
@@ -112,6 +117,8 @@ export interface LoadOptions {
   previous?: string | null
   tracks: TrackChoices
   kids?: KidsPlayerInfo
+  /** Hlavičky HTTP pro soubor ze sítě (online video); {} = žádné. */
+  httpHeaders?: Record<string, string>
 }
 
 const asNumber = (value: unknown): number =>
@@ -312,8 +319,10 @@ export class PlayerSession {
       subtitleTracks: []
     })
     // `start` platí pro další načtený soubor; na konci dílu je mpv pozastavené (keep-open).
-    void this.client
-      .setProperty('start', options.startSec ? options.startSec.toFixed(1) : 'none')
+    void this.setHttpHeaders(options.httpHeaders)
+      .then(() =>
+        this.client.setProperty('start', options.startSec ? options.startSec.toFixed(1) : 'none')
+      )
       // Stopy předchozího dílu neplatí – vybere je znovu TrackSelector.
       .then(() => this.client.setProperty('aid', 'auto'))
       .then(() => this.client.setProperty('sid', 'no'))
@@ -321,6 +330,24 @@ export class PlayerSession {
       .then(() => this.client.setProperty('pause', false))
       .catch(() => undefined)
     this.armStallCheck()
+  }
+
+  /** Krátké upozornění nahoře v přehrávači. */
+  notify(message: string): void {
+    this.update({ notice: message })
+  }
+
+  /**
+   * Hlavičky HTTP pro další soubor ze sítě (User-Agent a další, se kterými yt-dlp zjistil
+   * adresy). Hodnoty s čárkou se přidávají po jedné (`append`), jinak by je mpv rozdělilo.
+   */
+  private async setHttpHeaders(headers: Record<string, string> | undefined): Promise<void> {
+    if (!headers) return
+    const { 'User-Agent': userAgent, ...rest } = headers
+    if (userAgent) await this.client.setProperty('user-agent', userAgent)
+    await this.client.command('change-list', 'http-header-fields', 'clr', '')
+    for (const [name, value] of Object.entries(rest))
+      await this.client.command('change-list', 'http-header-fields', 'append', `${name}: ${value}`)
   }
 
   private armStallCheck(): void {
@@ -362,8 +389,12 @@ export class PlayerSession {
   private async attach(): Promise<void> {
     this.client.on('property', (name, value) => this.onProperty(name, value))
     this.client.on('close', () => this.finish())
-    this.client.on('event', (name) => {
+    this.client.on('event', (name, message) => {
       if (name === 'file-loaded') void this.selector.onFileLoaded()
+      if (name === 'end-file' && field(message, 'reason') === 'error') {
+        const error = this.options.onOpenFailed?.()
+        if (error) this.finish(error)
+      }
     })
     this.mpv.on('exit', (code) => {
       const crashed = code !== 0 && code !== null

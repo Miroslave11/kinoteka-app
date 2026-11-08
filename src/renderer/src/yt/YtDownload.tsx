@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Download, Link2, X } from 'lucide-react'
+import { Cloud, Download, Link2, X } from 'lucide-react'
 import {
   MAX_PLAYLIST_VIDEOS,
   parseYoutubeLink,
@@ -73,6 +73,8 @@ export default function YtDownload({
   const [target, setTarget] = useState(AUTO)
   const [quality, setQuality] = useState<KidsQuality>('1080')
   const [whole, setWhole] = useState(false)
+  /** Přidat jen odkaz (výchozí – nezabírá místo), nebo stáhnout do počítače. */
+  const [online, setOnline] = useState(true)
   const [queue, setQueue] = useState<KidsQueueItem[]>([])
 
   useEffect(() => {
@@ -113,21 +115,26 @@ export default function YtDownload({
     setTarget(AUTO)
   }
 
+  const [adding, setAdding] = useState(false)
   const download = async (): Promise<void> => {
     if (!preview) return
-    const result = await yt.enqueue({
-      kind: whole ? 'playlist' : 'video',
+    const request = {
+      kind: whole ? ('playlist' as const) : ('video' as const),
       videoId: preview.videoId,
       playlistId: preview.playlist?.id ?? null,
       title: target,
       quality
-    })
+    }
+    setAdding(true)
+    const result = online ? await yt.addOnline(request) : await yt.enqueue(request)
+    setAdding(false)
     if (!result.ok) return setError(result.message)
+    const count = countOf(result.added, 'video', 'videa', 'videí')
     setNotice(
       result.added === 0
-        ? 'Všechno už ve složce je.'
-        : `Do fronty: ${countOf(result.added, 'video', 'videa', 'videí')}` +
-            (result.skipped ? ` (${result.skipped} už ve složce)` : '')
+        ? 'Všechno už máš.'
+        : (online ? `Přidáno online: ${count}` : `Do fronty: ${count}`) +
+            (result.skipped ? ` (${result.skipped} už máš)` : '')
     )
     setPreview(null)
     setUrl('')
@@ -142,11 +149,11 @@ export default function YtDownload({
       <div
         className="dialog yt-download"
         role="dialog"
-        aria-label="Stáhnout z YouTube"
+        aria-label="Přidat z YouTube"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="yt-download-head">
-          <h3>Stáhnout z YouTube</h3>
+          <h3>Přidat z YouTube</h3>
           <button className="icon-btn" title="Zavřít (Esc)" onClick={onClose}>
             <X size={18} />
           </button>
@@ -209,6 +216,21 @@ export default function YtDownload({
               </div>
             </div>
 
+            <label className="yt-label">Uložit</label>
+            <div className="yt-seg">
+              <button className={`chip ${online ? 'on' : ''}`} onClick={() => setOnline(true)}>
+                <Cloud size={14} /> Jen odkaz – online (nezabírá místo)
+              </button>
+              <button className={`chip ${!online ? 'on' : ''}`} onClick={() => setOnline(false)}>
+                <Download size={14} /> Stáhnout do počítače
+              </button>
+            </div>
+            <p className="muted small">
+              {online
+                ? 'Video se přehraje přímo z YouTube (potřebuje internet). Na disk se uloží jen odkaz a náhled.'
+                : 'Video se stáhne celé – jde přehrát i bez internetu, ale zabírá místo.'}
+            </p>
+
             <label className="yt-label">Kategorie</label>
             <div className="yt-seg">
               <button
@@ -228,10 +250,12 @@ export default function YtDownload({
               ))}
             </div>
             <p className="muted small">
-              Automaticky = po stažení podle štítků, názvu a popisu z YouTube.
+              Automaticky = podle štítků, názvu a popisu z YouTube (zjistí se po přidání).
             </p>
 
-            <label className="yt-label">Kvalita</label>
+            <label className="yt-label">
+              {online ? 'Kvalita přehrávání' : 'Kvalita stahování'}
+            </label>
             <div className="yt-seg">
               {QUALITIES.map(([value, label]) => (
                 <button
@@ -245,13 +269,15 @@ export default function YtDownload({
             </div>
             {quality === '2160' && (
               <p className="muted small">
-                4K zabere hodně místa a na slabším počítači se nemusí přehrávat plynule.
+                {online
+                  ? '4K potřebuje rychlý internet (kolem 25 Mb/s) a na slabším počítači se nemusí přehrávat plynule.'
+                  : '4K zabere hodně místa a na slabším počítači se nemusí přehrávat plynule.'}
               </p>
             )}
 
             {preview.playlist && preview.kind === 'video' && (
               <>
-                <label className="yt-label">Stáhnout</label>
+                <label className="yt-label">Které video</label>
                 <div className="yt-seg">
                   <button className={`chip ${!whole ? 'on' : ''}`} onClick={() => setWhole(false)}>
                     Jen toto video
@@ -269,10 +295,11 @@ export default function YtDownload({
               </button>
               <button
                 className="btn sm primary"
-                disabled={!whole && preview.alreadyIn !== null}
+                disabled={adding || (!whole && preview.alreadyIn !== null)}
                 onClick={() => void download()}
               >
-                <Download size={16} /> Stáhnout
+                {online ? <Cloud size={16} /> : <Download size={16} />}{' '}
+                {adding ? 'Přidávám…' : online ? 'Přidat online' : 'Stáhnout'}
               </button>
             </div>
           </div>

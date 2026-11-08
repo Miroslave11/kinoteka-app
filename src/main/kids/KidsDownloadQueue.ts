@@ -183,6 +183,32 @@ export class KidsDownloadQueue extends EventEmitter<QueueEvents> {
     }
   }
 
+  /**
+   * Videa požadavku s názvy z náhledu (YT videa přidávaná jako online): jedno video, nebo
+   * videa playlistu (nejvýš {@link MAX_PLAYLIST_VIDEOS}).
+   */
+  async entries(
+    request: KidsDownloadRequest
+  ): Promise<
+    { ok: true; entries: { youtubeId: string; title: string }[] } | { ok: false; message: string }
+  > {
+    let ids: string[]
+    if (request.kind === 'playlist' && request.playlistId) {
+      try {
+        ids = (await this.playlist(request.playlistId)).entries
+          .map((entry) => entry.id)
+          .slice(0, MAX_PLAYLIST_VIDEOS)
+      } catch (error) {
+        return { ok: false, message: (error as Error).message }
+      }
+    } else if (request.videoId) ids = [request.videoId]
+    else return { ok: false, message: 'Chybí video.' }
+    return {
+      ok: true,
+      entries: ids.map((id) => ({ youtubeId: id, title: this.names.get(id) ?? id }))
+    }
+  }
+
   /** Přidá do fronty video, nebo všechna videa playlistu. Už stažená přeskočí. */
   async enqueue(
     request: KidsDownloadRequest

@@ -43,6 +43,11 @@ export function findSidecarImage(path: string): string | null {
   return IMAGE_EXTENSIONS.map((ext) => base + ext).find((image) => existsSync(image)) ?? null
 }
 
+/** Online YT video: soubor s odkazem místo videa (`Název [ID].ytonline`). */
+export const ONLINE_EXTENSION = '.ytonline'
+
+export const isOnlineFile = (path: string): boolean => path.toLowerCase().endsWith(ONLINE_EXTENSION)
+
 /** Neprázdný text z `.info.json`. */
 export const infoText = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() ? value.trim() : null

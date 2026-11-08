@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
-import { mkdir, readdir, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rename, rm, rmdir, stat, utimes, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative, sep } from 'node:path'
 import type { YtManageAction, YtManageResult, YtScanResult } from '../../shared/yt'
 import { isVideoFile } from '../../shared/library'
@@ -11,8 +11,10 @@ import {
   findSidecarImage,
   infoJsonPath,
   infoText,
+  isOnlineFile,
   moveWithSidecars,
   nameAndYoutubeId,
+  ONLINE_EXTENSION,
   PARTIAL_DOWNLOAD,
   readInfoJson,
   withoutExtension
@@ -48,9 +50,33 @@ export interface YtLibraryOptions {
   thumbnailDir: string
   /** Do Koše (`shell.trashItem`). */
   trash?: (path: string) => Promise<void>
+  /** Probíhá stahování – videa v kořeni se netřídí (yt-dlp s nimi ještě může pracovat). */
+  busy?: () => boolean
+  /** Náhled videa z YouTube (jpg) pro online video; null = nejde stáhnout. */
+  fetchThumbnail?: (youtubeId: string) => Promise<Uint8Array | null>
   /** Stahuje se (nebo na to čeká) něco do této podsložky – tu nejde přejmenovat ani smazat. */
   downloadingInto?: (folder: string) => boolean
   now?: () => Date
+}
+
+/** Stažené video nebo online video (soubor s odkazem). */
+const isMedia = (name: string): boolean => isVideoFile(name) || isOnlineFile(name)
+
+/** Uloží vedle videa jen potřebné údaje z výpisu yt-dlp (celý má stovky kB). */
+export async function writeSlimInfo(
+  mediaPath: string,
+  info: Record<string, unknown>
+): Promise<void> {
+  const kept = Object.fromEntries(
+    KEPT_INFO_FIELDS.filter((key) => key in info).map((key) => [key, info[key]])
+  )
+  await writeFile(infoJsonPath(mediaPath), JSON.stringify(kept, null, 1), 'utf8')
+}
+
+/** Online video k přidání: YouTube ID a název (z náhledu nebo playlistu). */
+export interface OnlineEntry {
+  youtubeId: string
+  title: string
 }
 
 /** Smaže prázdné složky (i vnořené); složku s čímkoli dalším nechá být. */
@@ -241,9 +267,10 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
     await mkdir(root, { recursive: true })
     const errors: string[] = []
     await this.prepareCategories(root)
-    const sorted = await this.sortLooseVideos(root, errors)
+    // Během stahování se kořen netřídí – yt-dlp v něm dokončuje soubory (stažení pak skenuje znovu).
+    const sorted = this.options.busy?.() ? 0 : await this.sortLooseVideos(root, errors)
 
-    const listing = await listVideoFiles(root)
+    const listing = await listVideoFiles(root, undefined, isMedia)
     listing.files = listing.files.filter((file) => !PARTIAL_DOWNLOAD.test(file.path))
     const folders = await this.categoryFolders(root)
     const diff = diffScan(this.repository.storedFiles(), listing)
@@ -319,7 +346,7 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
     const waiting = new Map<string, string>()
     let moved = 0
     for (const name of names) {
-      if (!isVideoFile(name) || PARTIAL_DOWNLOAD.test(name)) continue
+      if (!isMedia(name) || PARTIAL_DOWNLOAD.test(name)) continue
       const path = join(root, name)
       const info = await readInfoJson(path)
       const { name: fileTitle, youtubeId } = nameAndYoutubeId(path)
@@ -359,15 +386,8 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
       for (const [path, youtubeId] of this.waiting) {
         if (!existsSync(path)) continue
         const result = await this.options.fetchInfo!(youtubeId)
-        if (result.ok) {
-          const kept = Object.fromEntries(
-            KEPT_INFO_FIELDS.filter((key) => key in result.info).map((key) => [
-              key,
-              result.info[key]
-            ])
-          )
-          await writeFile(infoJsonPath(path), JSON.stringify(kept, null, 1), 'utf8')
-        } else if (result.retry) {
+        if (result.ok) await writeSlimInfo(path, result.info)
+        else if (result.retry) {
           // Bez připojení nemá smysl zkoušet další – video počká na příští sken.
           console.warn(`YT videa: údaje k ${youtubeId} nejde dotáhnout: ${result.message}`)
           break
@@ -386,10 +406,71 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
     return this.fetching
   }
 
+  /**
+   * Přidá videa jako online (soubor s odkazem + náhled, žádné stahování). `category` prázdná =
+   * do kořene složky, odkud se po dotažení údajů zařadí podle obsahu; jinak rovnou do kategorie
+   * (údaje se dotáhnou na pozadí). Už přidaná nebo stažená videa přeskočí.
+   */
+  async addOnline(
+    entries: readonly OnlineEntry[],
+    category: string
+  ): Promise<{ added: number; skipped: number }> {
+    const root = this.options.folder()
+    const dir = category ? join(root, safeFolderName(category)) : root
+    const created: string[] = []
+    await this.exclusive(async () => {
+      await mkdir(dir, { recursive: true })
+      for (const entry of entries) {
+        if (!/^[\w-]{11}$/.test(entry.youtubeId)) continue
+        if (this.repository.categoryOfYoutubeId(entry.youtubeId) !== null) continue
+        const base = join(
+          dir,
+          `${safeFolderName(entry.title || entry.youtubeId)} [${entry.youtubeId}]`
+        )
+        const path = base + ONLINE_EXTENSION
+        if (existsSync(path)) continue
+        const image = await this.options.fetchThumbnail?.(entry.youtubeId).catch(() => null)
+        if (image) await writeFile(`${base}.jpg`, image)
+        const link = {
+          url: `https://www.youtube.com/watch?v=${entry.youtubeId}`,
+          id: entry.youtubeId,
+          addedAt: this.now().toISOString()
+        }
+        await writeFile(path, JSON.stringify(link, null, 1), 'utf8')
+        created.push(path)
+      }
+    })
+    await this.scan()
+    // V kategorii se údaje (délka, kanál, štítky) dotáhnou na pozadí; v kořeni to udělá sken.
+    if (category && created.length > 0) void this.enrich(created)
+    return { added: created.length, skipped: entries.length - created.length }
+  }
+
+  /** Dotáhne údaje online videím v kategorii a obnoví jejich záznamy. */
+  private async enrich(paths: readonly string[]): Promise<void> {
+    if (!this.options.fetchInfo) return
+    for (const path of paths) {
+      const { youtubeId } = nameAndYoutubeId(path)
+      if (!youtubeId || !existsSync(path) || (await readInfoJson(path))) continue
+      const result = await this.options.fetchInfo(youtubeId)
+      if (!result.ok) {
+        if (result.retry) break
+        continue
+      }
+      await writeSlimInfo(path, result.info)
+      // Nové datum souboru = sken záznam načte znovu (název, kanál, délka z údajů).
+      const now = new Date()
+      await utimes(path, now, now).catch(() => undefined)
+    }
+    await this.scan().catch(() => undefined)
+  }
+
   /** Doplní délku (ffprobe) a obrázek (ffmpeg) videím, ke kterým je YouTube nedal. */
   private async complete(): Promise<void> {
     let changed = false
     for (const video of this.repository.incomplete()) {
+      // Online video na disku není – délku má z údajů YouTube, obrázek z náhledu.
+      if (isOnlineFile(video.path)) continue
       let duration = video.duration
       if (duration === null && this.options.probeDuration) {
         duration = await this.options.probeDuration(video.path).catch(() => null)

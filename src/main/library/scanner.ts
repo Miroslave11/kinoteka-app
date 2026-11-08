@@ -37,10 +37,14 @@ export function isIgnoredDir(name: string): boolean {
   return name.startsWith('.') || IGNORED_DIRS.has(name.toLowerCase())
 }
 
-/** Projde složku do hloubky a vrátí všechna videa. Symbolické odkazy přeskakuje. */
+/**
+ * Projde složku do hloubky a vrátí všechna videa (nebo soubory podle `include`).
+ * Symbolické odkazy přeskakuje.
+ */
 export async function listVideoFiles(
   root: string,
-  onProgress?: (found: number) => void
+  onProgress?: (found: number) => void,
+  include: (name: string) => boolean = isVideoFile
 ): Promise<FolderListing> {
   const files: FoundFile[] = []
   const unreadableDirs: string[] = []
@@ -60,7 +64,7 @@ export async function listVideoFiles(
       const fullPath = join(dir, entry.name)
       if (entry.isDirectory()) {
         if (!isIgnoredDir(entry.name)) pending.push(fullPath)
-      } else if (entry.isFile() && isVideoFile(entry.name)) {
+      } else if (entry.isFile() && include(entry.name)) {
         try {
           const info = await stat(fullPath)
           files.push({

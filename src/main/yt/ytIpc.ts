@@ -46,12 +46,6 @@ export interface YtIpcDeps {
   repository: YtRepository
   /** Přehraje video v běžném přehrávači (rozkoukané od uložené pozice). */
   play: (host: BrowserWindow | null, videoId: number) => Promise<unknown>
-  /** Přehraje video z YouTube bez stažení (test O1). */
-  playOnline: (
-    host: BrowserWindow | null,
-    youtubeId: string,
-    quality: KidsQuality
-  ) => Promise<unknown>
   downloader: KidsDownloader
   queue: KidsDownloadQueue
 }
@@ -61,7 +55,6 @@ export function registerYtIpc({
   library,
   repository,
   play,
-  playOnline,
   downloader,
   queue
 }: YtIpcDeps): void {
@@ -106,17 +99,6 @@ export function registerYtIpc({
     await shell.openPath(ytFolder(settings))
   })
 
-  ipcMain.handle(IpcChannel.YtPlayOnline, (event, value: unknown) => {
-    const link = typeof value === 'string' ? parseYoutubeLink(value) : null
-    if (!link?.videoId)
-      return { ok: false, reason: 'error', message: 'Tohle není odkaz na video z YouTube.' }
-    return playOnline(
-      BrowserWindow.fromWebContents(event.sender),
-      link.videoId,
-      ytQuality(settings)
-    )
-  })
-
   // ---------- stahování z YouTube ----------
   ipcMain.handle(
     IpcChannel.YtPreview,
@@ -134,6 +116,15 @@ export function registerYtIpc({
     if (!request) return { ok: false, message: 'Neplatný požadavek.' }
     settings.set(QUALITY_SETTING, request.quality)
     return queue.enqueue(request)
+  })
+  // Online video: jen odkaz a náhled, nic se nestahuje.
+  ipcMain.handle(IpcChannel.YtAddOnline, async (_event, value: unknown) => {
+    const request = parseDownloadRequest(value, { allowAuto: true })
+    if (!request) return { ok: false, message: 'Neplatný požadavek.' }
+    settings.set(QUALITY_SETTING, request.quality)
+    const found = await queue.entries(request)
+    if (!found.ok) return found
+    return { ok: true, ...(await library.addOnline(found.entries, request.title)) }
   })
   ipcMain.handle(IpcChannel.YtQueue, (): KidsQueueItem[] => queue.items)
   ipcMain.handle(IpcChannel.YtQueueRemove, (_event, id: unknown) =>
