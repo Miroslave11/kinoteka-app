@@ -592,11 +592,14 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
     name: string
     channel: string | null
     durationSec: number | null
-    category: string
+    category: string | null
   }): Promise<void> {
     if (!/^[\w-]{11}$/.test(video.youtubeId)) return
+    // Na druhém PC ještě nezařazené – tady nic nepřesouvat ani nepřidávat (přijde s kategorií).
+    const categoryName = video.category
+    if (categoryName === null) return
     const message = await this.exclusive(async () => {
-      const category = await this.ensureSyncCategory(video.category)
+      const category = await this.ensureSyncCategory(categoryName)
       const existing = this.repository.videosByYoutubeId(video.youtubeId)
       if (existing.length > 0) {
         for (const local of existing)

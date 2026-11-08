@@ -142,6 +142,8 @@ export interface SyncAdapter {
   rank?(entity: SyncEntity): number
   /** Po promítnutí všech změn (např. jeden sken složky místo jednoho na každé video). */
   afterApply?(): Promise<void>
+  /** Před promítáním: klíče, které už mají jiné počítače (sloučení duplicit). */
+  prepare?(remoteKeys: ReadonlySet<string>): void
 }
 
 export interface MergeResult {
@@ -229,6 +231,7 @@ export async function merge(
     adapters.find((a) => entity.key.startsWith(a.prefix))
   const rankOf = (entity: SyncEntity): number =>
     adapterOf(entity)?.rank?.(entity) ?? (entity.deleted ? 0 : 1)
+  for (const adapter of adapters) adapter.prepare?.(new Set(best.keys()))
   const incoming = [...best.values()]
     .filter((entity) => {
       const known = stored.get(entity.key)
@@ -271,7 +274,26 @@ export async function merge(
       }
     }
     const after = snapshot()
-    for (const key of touched) repository.setLocalSig(key, after.get(key) ?? null)
+    for (const key of touched) {
+      const sig = after.get(key) ?? null
+      repository.setLocalSig(key, sig)
+      const entity = stored.get(key)
+      if (entity) stored.set(key, { ...entity, localSig: sig })
+    }
+    // Místní záznam, který promítnutí pohltilo (sloučení duplicit) – smazat hned, ať ho
+    // ostatní počítače nedostanou jako nový.
+    for (const known of [...stored.values()]) {
+      if (known.deleted || known.localSig === null || after.has(known.key)) continue
+      const entity: StoredEntity = {
+        ...known,
+        updatedAt: now,
+        device,
+        deleted: true,
+        localSig: null
+      }
+      repository.put(entity)
+      stored.set(known.key, entity)
+    }
   }
 
   return {

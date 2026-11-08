@@ -12,6 +12,7 @@ export function startFakeGoogle(port = 0, { email = 'test@kinoteka.cz' } = {}) {
   const files = new Map() // id → { id, name, content, modifiedTime }
   const accessTokens = new Set()
   const revoked = new Set()
+  let anyToken = false
   let counter = 0
   const next = (prefix) => `${prefix}-${++counter}`
 
@@ -66,7 +67,7 @@ export function startFakeGoogle(port = 0, { email = 'test@kinoteka.cz' } = {}) {
     }
 
     const auth = request.headers.authorization?.replace(/^Bearer /, '')
-    if (!accessTokens.has(auth)) return json(response, 401, { error: 'unauthorized' })
+    if (!anyToken && !accessTokens.has(auth)) return json(response, 401, { error: 'unauthorized' })
 
     if (path === '/drive/v3/files' && request.method === 'GET') {
       return json(response, 200, {
@@ -115,6 +116,10 @@ export function startFakeGoogle(port = 0, { email = 'test@kinoteka.cz' } = {}) {
         url: `http://127.0.0.1:${address.port}`,
         files,
         /** Zrušit přihlášení (jako „Odebrat přístup“ v účtu Google). */
+        /** Přijmout jakýkoli přístupový klíč (server „restartovaný“ v testu výpadku sítě). */
+        acceptAllTokens: () => {
+          anyToken = true
+        },
         revokeAll: () => {
           for (const token of accessTokens) revoked.add(token)
           accessTokens.clear()

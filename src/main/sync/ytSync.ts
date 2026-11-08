@@ -5,7 +5,8 @@ import type { SyncAdapter, SyncEntity } from './syncModel'
  * Sdílení YT videí: kategorie (název, klíčová slova) a videa s ID z YouTube (název, kanál,
  * délka, kategorie). Jestli je video v počítači stažené, nebo jen online, je věc každého PC –
  * na druhém počítači se chybějící video objeví jako online. Rozkoukání se nesdílí.
- * Videa bez ID z YouTube (vlastní klipy) a videa čekající na zařazení se nesdílí.
+ * Videa bez ID z YouTube (vlastní klipy) se nesdílí; video čekající na zařazení se sdílí bez
+ * kategorie (druhé PC ho jen nechá být, dokud nedostane kategorii).
  */
 
 export const YT_CATEGORY_PREFIX = 'yt-kategorie:'
@@ -21,7 +22,8 @@ export interface YtVideoData {
   name: string
   channel: string | null
   durationSec: number | null
-  category: string
+  /** null = čeká na zařazení (v kořeni složky) – nic se nemaže ani nepřesouvá. */
+  category: string | null
 }
 
 /** Co adaptér potřebuje od knihovny YT videí (YtLibrary). */
@@ -76,9 +78,9 @@ export function ytVideoAdapter(db: Database, target: YtSyncTarget): SyncAdapter 
       const rows = db
         .prepare(
           `SELECT v.youtube_id, v.name, v.channel, v.duration, c.folder
-           FROM yt_video v JOIN yt_category c ON c.id = v.category_id
+           FROM yt_video v LEFT JOIN yt_category c ON c.id = v.category_id
            WHERE v.youtube_id IS NOT NULL
-           ORDER BY v.id`
+           ORDER BY c.folder IS NULL, v.id`
         )
         .all()
       for (const row of rows) {
@@ -90,7 +92,7 @@ export function ytVideoAdapter(db: Database, target: YtSyncTarget): SyncAdapter 
           name: String(row['name']),
           channel: (row['channel'] as string | null) ?? null,
           durationSec: typeof row['duration'] === 'number' ? Math.round(row['duration']) : null,
-          category: String(row['folder'])
+          category: (row['folder'] as string | null) ?? null
         })
       }
       return videos

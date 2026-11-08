@@ -7,7 +7,7 @@ import { SettingsRepository } from '../settings/SettingsRepository'
 import { driveEndpointsAt, driveErrorMessage } from './driveClient'
 import { endpointsAt } from './googleAuth'
 import { JournalSync } from './journalSync'
-import { SyncService } from './SyncService'
+import { activeDevices, isOffline, SyncService } from './SyncService'
 
 let google: FakeGoogle
 
@@ -117,5 +117,64 @@ describe('driveErrorMessage', () => {
     expect(driveErrorMessage(403, google('rateLimitExceeded', 'Rate limit'))).toBe(
       'Google Disk odmítl přístup: Rate limit (rateLimitExceeded).'
     )
+  })
+})
+
+describe('seznam počítačů a výpadek sítě', () => {
+  const file = (name: string, updatedAt: string) => ({
+    format: 1 as const,
+    device: { id: name + updatedAt, name },
+    updatedAt,
+    entities: []
+  })
+
+  it('neaktivní déle než 90 dní se skryje, stejný název jen jednou (nejnovější)', () => {
+    const now = new Date('2026-11-08T12:00:00.000Z')
+    expect(
+      activeDevices(
+        [
+          file('Notebook', '2026-11-08T10:00:00.000Z'),
+          file('Notebook', '2026-10-01T10:00:00.000Z'),
+          file('Starý PC', '2026-06-01T10:00:00.000Z'),
+          file('Chata', '2026-11-07T10:00:00.000Z')
+        ],
+        now
+      )
+    ).toEqual([
+      { name: 'Notebook', updatedAt: '2026-11-08T10:00:00.000Z' },
+      { name: 'Chata', updatedAt: '2026-11-07T10:00:00.000Z' }
+    ])
+  })
+
+  it('pozná výpadek internetu (Node i Chromium)', () => {
+    expect(
+      isOffline(new TypeError('fetch failed', { cause: new Error('getaddrinfo ENOTFOUND') }))
+    ).toBe(true)
+    expect(isOffline(new Error('net::ERR_INTERNET_DISCONNECTED'))).toBe(true)
+    expect(isOffline(new Error('net::ERR_NAME_NOT_RESOLVED'))).toBe(true)
+    expect(isOffline(new Error('Google Disk vrátil chybu 500'))).toBe(false)
+  })
+
+  it('bez internetu: srozumitelná chyba, po návratu sítě se změny pošlou', async () => {
+    const doma = computer('Doma', ['Duna (2021).mkv'])
+    await doma.service.signIn()
+    await doma.service.syncNow()
+    const url = google.url
+    await google.close()
+    doma.journal.addManual({
+      titleId: doma.titleId('Duna'),
+      episodeIds: [],
+      watchedAt: '2026-11-02T20:00:00.000Z',
+      note: null
+    })
+    await doma.service.syncNow()
+    expect(doma.service.status().lastError).toMatch(/Bez připojení/)
+    // Síť je zpět (nový server na stejné adrese už soubor nemá – nahraje se celý znovu).
+    google = await startFakeGoogle(Number(new URL(url).port))
+    google.acceptAllTokens()
+    await doma.service.syncNow()
+    expect(doma.service.status().lastError).toBeNull()
+    const [uploaded] = [...google.files.values()]
+    expect(uploaded!.content).toContain('Duna')
   })
 })

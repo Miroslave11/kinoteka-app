@@ -74,10 +74,19 @@ export class DriveClient {
 
   private async request(url: string, init: RequestInit = {}): Promise<Response> {
     const token = await this.accessToken()
-    const response = await this.fetchImpl(url, {
-      ...init,
-      headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` }
-    })
+    const send = (): Promise<Response> =>
+      this.fetchImpl(url, {
+        ...init,
+        headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` }
+      })
+    let response: Response
+    try {
+      response = await send()
+    } catch {
+      // Spojení přerušené (po probuzení počítače, změně sítě) – jeden další pokus.
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      response = await send()
+    }
     if (!response.ok) {
       const text = await response.text().catch(() => '')
       throw new DriveError(driveErrorMessage(response.status, text), response.status)

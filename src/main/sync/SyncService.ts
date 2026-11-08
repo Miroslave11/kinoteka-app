@@ -37,6 +37,29 @@ export const SYNC_DELAY_MS = 10_000
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>
 
+/** Počítač, který se tak dlouho neozval, se v seznamu neukazuje (jeho data zůstávají). */
+export const INACTIVE_DEVICE_MS = 90 * 24 * 60 * 60 * 1000
+
+/** Ostatní počítače pro kartu Sdílení: jen aktivní, každý název jednou (nejnovější). */
+export function activeDevices(files: readonly DeviceFile[], now: Date): SyncDevice[] {
+  const byName = new Map<string, SyncDevice>()
+  for (const file of files) {
+    const updated = Date.parse(file.updatedAt)
+    if (!Number.isFinite(updated) || now.getTime() - updated > INACTIVE_DEVICE_MS) continue
+    const name = file.device.name || 'Počítač'
+    const seen = byName.get(name)
+    if (!seen || seen.updatedAt < file.updatedAt)
+      byName.set(name, { name, updatedAt: file.updatedAt })
+  }
+  return [...byName.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
+/** Chyba sítě (bez internetu, DNS, výpadek) – ne chyba přihlášení ani Disku. */
+export const isOffline = (error: unknown): boolean =>
+  /fetch failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|net::ERR_/i.test(
+    `${String(error)} ${String((error as { cause?: unknown })?.cause ?? '')}`
+  )
+
 export interface SyncServiceOptions {
   db: Database
   settings: SettingsRepository
@@ -254,10 +277,7 @@ export class SyncService extends EventEmitter<{ changed: [] }> {
       if (stale()) return
 
       this.options.settings.set(LAST_SYNC_KEY, at)
-      this.options.settings.set(
-        DEVICES_KEY,
-        others.map((file) => ({ name: file.device.name || 'Počítač', updatedAt: file.updatedAt }))
-      )
+      this.options.settings.set(DEVICES_KEY, activeDevices(others, this.now))
       this.lastError = null
       if (result.applied > 0) this.options.onApplied()
     } catch (error) {
@@ -267,7 +287,7 @@ export class SyncService extends EventEmitter<{ changed: [] }> {
         ? 'Přihlášení ke Google vypršelo nebo bylo zrušeno – přihlas se prosím znovu.'
         : error instanceof DriveError
           ? error.message
-          : /fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ERR_INTERNET/i.test(String(error))
+          : isOffline(error)
             ? 'Bez připojení k internetu – změny se pošlou, až bude síť.'
             : (error as Error).message
       console.warn(`Sdílení: ${this.lastError}`)
