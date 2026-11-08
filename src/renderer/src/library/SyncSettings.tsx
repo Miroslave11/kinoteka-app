@@ -52,9 +52,11 @@ export default function SyncSettings(): React.JSX.Element {
     <section className="card">
       <h2>Sdílení přes Google Disk</h2>
       <p className="muted small">
-        Deník a hodnocení se sdílí mezi všemi počítači přihlášenými ke stejnému účtu Google – doma i
-        mimo domácí síť. Kinotéka má přístup jen ke své skryté složce na Google Disku, ostatní
-        soubory nevidí. Synchronizuje se po spuštění, chvíli po každé změně a každých 5 minut.
+        Deník, hodnocení a YT videa (kategorie a odkazy) se sdílí mezi všemi počítači přihlášenými
+        ke stejnému účtu Google – doma i mimo domácí síť. Video stažené na jednom počítači se na
+        ostatních objeví jako online; rozkoukání zůstává na každém počítači zvlášť. Kinotéka má
+        přístup jen ke své skryté složce na Google Disku, ostatní soubory nevidí. Synchronizuje se
+        po spuštění, chvíli po každé změně a každých 5 minut.
       </p>
 
       {!status?.signedIn ? (

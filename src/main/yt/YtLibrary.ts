@@ -26,7 +26,7 @@ import {
   matchCategory,
   metaFromInfo
 } from './ytClassify'
-import type { StoredYtVideo, YtRepository, YtVideoRecord } from './YtRepository'
+import type { StoredCategory, StoredYtVideo, YtRepository, YtVideoRecord } from './YtRepository'
 
 interface YtLibraryEvents {
   changed: []
@@ -562,6 +562,95 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
     // V kategorii se údaje (délka, kanál, štítky) dotáhnou na pozadí; v kořeni to udělá sken.
     if (category && created.length > 0) void this.enrich(created)
     return { added: created.length, skipped: entries.length - created.length }
+  }
+
+  // ---------- sdílení mezi počítači (src/main/sync/ytSync.ts) ----------
+
+  /** Kategorie podle názvu (chybějící se založí jako složka) a její klíčová slova. */
+  async syncCategory(name: string, keywords: readonly string[]): Promise<void> {
+    await this.exclusive(async () => {
+      const category = await this.ensureSyncCategory(name)
+      if (JSON.stringify(category.keywords) !== JSON.stringify(keywords))
+        this.repository.setKeywords(category.id, keywords)
+    })
+  }
+
+  /** Kategorie smazaná na jiném počítači (záložní kategorie zůstávají). */
+  async syncDeleteCategory(name: string): Promise<void> {
+    const category = this.repository.categoryByName(name)
+    if (!category || category.role) return
+    const result = await this.manage({ kind: 'delete-category', categoryId: category.id })
+    if (!result.ok) throw new Error(result.message)
+  }
+
+  /**
+   * Video z jiného počítače: když tu je (stažené nebo online), jen se přesune do jeho
+   * kategorie; jinak vznikne online video s údaji, které poslal druhý počítač (bez yt-dlp).
+   */
+  async syncVideo(video: {
+    youtubeId: string
+    name: string
+    channel: string | null
+    durationSec: number | null
+    category: string
+  }): Promise<void> {
+    if (!/^[\w-]{11}$/.test(video.youtubeId)) return
+    const message = await this.exclusive(async () => {
+      const category = await this.ensureSyncCategory(video.category)
+      const existing = this.repository.videosByYoutubeId(video.youtubeId)
+      if (existing.length > 0) {
+        for (const local of existing)
+          if (local.categoryId !== category.id) {
+            const failed = await this.apply({
+              kind: 'move-video',
+              videoId: local.id,
+              categoryId: category.id
+            })
+            if (failed) return failed
+          }
+        return null
+      }
+      const dir = join(this.options.folder(), category.folder)
+      const base = join(
+        dir,
+        `${safeFolderName(video.name || video.youtubeId)} [${video.youtubeId}]`
+      )
+      const path = base + ONLINE_EXTENSION
+      if (existsSync(path)) return null
+      const image = await this.options.fetchThumbnail?.(video.youtubeId).catch(() => null)
+      if (image) await writeFile(`${base}.jpg`, image)
+      await writeSlimInfo(path, {
+        id: video.youtubeId,
+        title: video.name,
+        ...(video.channel ? { channel: video.channel } : {}),
+        ...(video.durationSec !== null ? { duration: video.durationSec } : {})
+      })
+      const link = {
+        url: `https://www.youtube.com/watch?v=${video.youtubeId}`,
+        id: video.youtubeId,
+        addedAt: this.now().toISOString()
+      }
+      await writeFile(path, JSON.stringify(link, null, 1), 'utf8')
+      return null
+    })
+    if (message) throw new Error(message)
+  }
+
+  /** Video smazané na jiném počítači – tady jde do Koše (stažené i online). */
+  async syncDeleteVideo(youtubeId: string): Promise<void> {
+    for (const video of this.repository.videosByYoutubeId(youtubeId)) {
+      const result = await this.manage({ kind: 'trash-video', videoId: video.id })
+      if (!result.ok) throw new Error(result.message)
+    }
+  }
+
+  private async ensureSyncCategory(name: string): Promise<StoredCategory> {
+    const existing = this.repository.categoryByName(name)
+    if (existing) return existing
+    const folder = safeFolderName(name)
+    await mkdir(join(this.options.folder(), folder), { recursive: true })
+    const id = this.repository.ensureCategory(folder, defaultsFor(folder), this.now())
+    return this.repository.category(id)!
   }
 
   /** Dotáhne údaje online videím v kategorii a obnoví jejich záznamy. */

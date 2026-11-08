@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import { hostname } from 'node:os'
 import type { SyncDevice, SyncStatus } from '../../shared/sync'
-import { transaction, type Database } from '../db/database'
+import type { Database } from '../db/database'
 import type { SettingsRepository } from '../settings/SettingsRepository'
 import { DriveClient, DriveError, type DriveEndpoints } from './driveClient'
 import {
@@ -27,6 +27,7 @@ const DEVICE_NAME_KEY = 'sync.deviceName'
 const FILE_ID_KEY = 'sync.fileId'
 const LAST_SYNC_KEY = 'sync.lastSyncAt'
 const DEVICES_KEY = 'sync.devices'
+const UPLOADED_NAME_KEY = 'sync.uploadedName'
 
 const FILE_PREFIX = 'zarizeni-'
 /** Pravidelná synchronizace. */
@@ -143,6 +144,7 @@ export class SyncService extends EventEmitter<{ changed: [] }> {
     this.options.settings.delete(FILE_ID_KEY)
     this.options.settings.delete(DEVICES_KEY)
     this.options.settings.delete(LAST_SYNC_KEY)
+    this.options.settings.delete(UPLOADED_NAME_KEY)
     // Po přihlášení k jinému účtu se začne znovu (místní data se nahrají jako nová).
     this.repository.clear()
     this.downloaded.clear()
@@ -227,20 +229,28 @@ export class SyncService extends EventEmitter<{ changed: [] }> {
 
       if (stale()) return
       const at = this.now.toISOString()
-      const result = transaction(this.options.db, () =>
-        merge(this.repository, this.options.adapters, others, deviceId, at)
-      )
+      const result = await merge(this.repository, this.options.adapters, others, deviceId, at)
+      if (stale()) return
       for (const error of result.errors) console.warn(`Sdílení: ${error}`)
 
-      const content = JSON.stringify({
-        format: 1,
-        device: { id: deviceId, name: this.deviceName() },
-        updatedAt: at,
-        entities: result.own
-      } satisfies DeviceFile)
       const ownFile = files.find((file) => file.name === ownName)
-      if (ownFile) await drive.update(ownFile.id, content)
-      else this.options.settings.set(FILE_ID_KEY, await drive.create(ownName, content))
+      // Beze změny (ani názvu počítače) se soubor znovu nenahrává.
+      const unchanged =
+        ownFile !== undefined &&
+        result.local === 0 &&
+        result.applied === 0 &&
+        this.options.settings.get<string>(UPLOADED_NAME_KEY) === this.deviceName()
+      if (!unchanged) {
+        const content = JSON.stringify({
+          format: 1,
+          device: { id: deviceId, name: this.deviceName() },
+          updatedAt: at,
+          entities: result.own
+        } satisfies DeviceFile)
+        if (ownFile) await drive.update(ownFile.id, content)
+        else this.options.settings.set(FILE_ID_KEY, await drive.create(ownName, content))
+        this.options.settings.set(UPLOADED_NAME_KEY, this.deviceName())
+      }
       if (stale()) return
 
       this.options.settings.set(LAST_SYNC_KEY, at)

@@ -33,6 +33,8 @@ import { endpointsAt, GOOGLE_ENDPOINTS } from './sync/googleAuth'
 import { JournalSync } from './sync/journalSync'
 import { registerSyncIpc } from './sync/syncIpc'
 import { SyncService } from './sync/SyncService'
+import type { SyncAdapter } from './sync/syncModel'
+import { ytCategoryAdapter, ytVideoAdapter } from './sync/ytSync'
 import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
 import { KidsArtwork } from './kids/KidsArtwork'
@@ -777,10 +779,12 @@ void app.whenReady().then(() => {
         ? { id: 'kinoteka-dev', secret: 'dev' }
         : null
   const journalSync = new JournalSync(db)
+  // YT videa se připojí, až bude jejich knihovna (níž).
+  const syncAdapters: SyncAdapter[] = [journalSync.diary, journalSync.ratings]
   const sync = new SyncService({
     db,
     settings,
-    adapters: [journalSync.diary, journalSync.ratings],
+    adapters: syncAdapters,
     client: googleClient,
     endpoints: devGoogle ? endpointsAt(devGoogle) : GOOGLE_ENDPOINTS,
     drive: devGoogle ? driveEndpointsAt(devGoogle) : DRIVE_ENDPOINTS,
@@ -788,7 +792,10 @@ void app.whenReady().then(() => {
     openUrl: devGoogle
       ? async (url) => void (await chromiumFetch(url))
       : (url) => shell.openExternal(url),
-    onApplied: () => broadcast(IpcChannel.LibraryChanged)
+    onApplied: () => {
+      broadcast(IpcChannel.LibraryChanged)
+      broadcast(IpcChannel.YtChanged)
+    }
   })
   syncRef = sync
   registerSyncIpc(sync)
@@ -796,7 +803,6 @@ void app.whenReady().then(() => {
     broadcast(IpcChannel.LibraryChanged)
     sync.soon()
   })
-  sync.start()
   const deletion = new DeletionService(repository, {
     trash: (path) => shell.trashItem(path),
     remove: (path) => rm(path),
@@ -928,7 +934,12 @@ void app.whenReady().then(() => {
     busy: () => ytDownloaderRef?.busy ?? false,
     fetchThumbnail: (youtubeId) => youtubeThumbnail(chromiumFetch, youtubeId)
   })
-  ytLibrary.on('changed', () => broadcast(IpcChannel.YtChanged))
+  ytLibrary.on('changed', () => {
+    broadcast(IpcChannel.YtChanged)
+    sync.soon()
+  })
+  syncAdapters.push(ytCategoryAdapter(db, ytLibrary), ytVideoAdapter(db, ytLibrary))
+  sync.start()
   // Stahování do YT videí: vlastní yt-dlp proces (souběžně se stahováním pohádek), stejný nástroj.
   const ytDownloader = new KidsDownloader({
     tool: () => ytDlp.ensure(),
