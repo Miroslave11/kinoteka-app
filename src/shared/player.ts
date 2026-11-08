@@ -27,6 +27,8 @@ export interface PlayerState {
   subDelay: number
   /** Upozornění, které overlay na chvíli ukáže. */
   notice: string | null
+  /** Přehrávač na něco čeká (načítání, přetáčení, data ze sítě) – overlay ukáže kolečko s textem. */
+  busy: string | null
   /** Pohádka z dětské části – overlay ukáže dětské ovládání; null = běžné přehrávání. */
   kids: KidsPlayerInfo | null
 }
@@ -77,6 +79,7 @@ export const INITIAL_PLAYER_STATE: PlayerState = {
   subtitleTracks: [],
   subDelay: 0,
   notice: null,
+  busy: null,
   kids: null
 }
 

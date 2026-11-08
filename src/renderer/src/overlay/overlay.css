@@ -909,3 +909,34 @@ button {
   font-weight: 800;
   font-size: 18px;
 }
+
+/* Přehrávač čeká (načítání, přetáčení, data ze sítě). */
+.busy {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 30px;
+  transform: translate(-50%, -50%);
+  border-radius: 16px;
+  background: rgb(14 16 21 / 0.82);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
+  font-size: 15px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.busy-spin {
+  color: var(--accent);
+  animation: busy-spin 1s linear infinite;
+}
+
+@keyframes busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

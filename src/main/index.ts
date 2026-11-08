@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell } from 'electron'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { WindowState } from '../shared/api'
@@ -46,7 +46,14 @@ import { fetchOembed } from './kids/oembed'
 import { YtDlpTool } from './kids/YtDlpTool'
 import { YtLibrary } from './yt/YtLibrary'
 import { ytPlayItem, type YtPlayItem } from './yt/ytPlayback'
-import { mpvFileFor, mpvNetworkArgs, YtStreamResolver } from './yt/ytStream'
+import {
+  isPlayable,
+  mpvFileFor,
+  mpvNetworkArgs,
+  waitUntilPlayable,
+  YtStreamResolver,
+  type SavedStream
+} from './yt/ytStream'
 import { matchCategory, metaFromInfo } from './yt/ytClassify'
 import { QUEUE_SETTING, registerYtIpc, ytConcurrency, ytFolder } from './yt/ytIpc'
 import { YtRepository } from './yt/YtRepository'
@@ -436,6 +443,7 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
       previous: item.previous?.name ?? null,
       // Vždy s volbami pro síť – v jedné kategorii se můžou střídat stažená a online videa.
       networkArgs: mpvNetworkArgs({ headers: source.headers ?? {} }),
+      loadingText: ytLoadingText(item),
       audio: audioLaunchOptions(loadAudioSettings(settings)),
       tracks: trackChoicesFor(item.online ? '' : item.path),
       subtitleArgs: subtitleStyleArgs(loadSubtitleSettings(settings).style),
@@ -529,6 +537,8 @@ function ytStreamError(error: unknown): string {
 async function loadYt(current: PlayerSession, videoId: number): Promise<void> {
   const item = ytPlayItem(ytRepository, videoId)
   if (!item) return
+  // Zjištění adresy online videa trvá i několik sekund – přehrávač mezitím ukáže, co dělá.
+  current.setLoading(ytLoadingText(item))
   let source: YtSource
   try {
     source = await ytSource(item)
@@ -546,9 +556,14 @@ async function loadYt(current: PlayerSession, videoId: number): Promise<void> {
     next: item.next?.name ?? null,
     previous: item.previous?.name ?? null,
     httpHeaders: source.headers ?? {},
-    tracks: trackChoicesFor(item.online ? '' : item.path)
+    tracks: trackChoicesFor(item.online ? '' : item.path),
+    loadingText: ytLoadingText(item)
   })
 }
+
+/** Text při čekání na video z části YT videa. */
+const ytLoadingText = (item: YtPlayItem): string =>
+  item.online ? 'Načítám video z YouTube…' : 'Načítám video…'
 
 /** Titulky z OpenSubtitles: nastavení z hlavního okna, hledání a stažení jen z ovládání přehrávače. */
 function registerOnlineSubtitlesIpc(service: OnlineSubtitlesService): void {
@@ -920,9 +935,40 @@ void app.whenReady().then(() => {
     tempDir: join(app.getPath('temp'), 'kinoteka')
   })
   ytStreamStop = () => ytStreamDownloader.stopAll()
-  ytStreams = new YtStreamResolver((youtubeId, quality) =>
-    ytStreamDownloader.streamInfo(youtubeId, quality)
+  const streamsFile = join(app.getPath('userData'), 'cache', 'yt-streams.json')
+  ytStreams = new YtStreamResolver(
+    (youtubeId, quality) => ytStreamDownloader.streamInfo(youtubeId, quality),
+    {
+      // Čerstvé adresy YouTube první vteřiny odmítá – přehrávač by se otevřel a hned zavřel.
+      ready: (stream) => waitUntilPlayable(stream),
+      // Adresy platí ~6 h – uložené přežijí restart; před použitím se ověří (jiná síť).
+      store: {
+        load: () => {
+          try {
+            const saved: unknown = JSON.parse(readFileSync(streamsFile, 'utf8'))
+            return Array.isArray(saved) ? (saved as SavedStream[]) : []
+          } catch {
+            return []
+          }
+        },
+        save: (entries) => {
+          try {
+            mkdirSync(dirname(streamsFile), { recursive: true })
+            writeFileSync(streamsFile, JSON.stringify(entries))
+          } catch (error) {
+            console.warn(`YT adresy: ${(error as Error).message}`)
+          }
+        }
+      },
+      verify: isPlayable
+    }
   )
+  // Najetí myší na online video: adresy se zjistí předem, kliknutí pak nečeká.
+  ipcMain.handle(IpcChannel.YtPrefetch, (_event, id: unknown) => {
+    if (!Number.isInteger(id)) return
+    const item = ytPlayItem(ytRepository, id as number)
+    if (item?.online) ytStreams?.prefetch(item.online, ytQualitySetting())
+  })
   registerYtIpc({
     settings,
     library: ytLibrary,
