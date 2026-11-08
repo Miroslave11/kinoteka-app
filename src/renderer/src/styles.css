@@ -2491,15 +2491,80 @@ p.info-chip {
 
 .yt-queue-head {
   margin-top: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.yt-queue-head h4 {
+  margin: 0 auto 0 0;
+}
+
+.yt-queue-head .row-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.row-link.is-danger {
+  color: var(--danger);
 }
 
 .yt-url {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
-.yt-url input {
+.yt-url svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.yt-url textarea {
+  resize: none;
+  white-space: pre;
+  overflow-x: hidden;
+}
+
+.yt-error {
+  white-space: pre-line;
+}
+
+.yt-bulk {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.yt-bulk-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.yt-bulk-row:hover {
+  background: rgb(255 255 255 / 0.04);
+}
+
+.yt-bulk-row .yt-q-thumb {
+  width: 80px;
+}
+
+.yt-bulk-row.is-error .yt-q-thumb {
+  opacity: 0.4;
+}
+
+.yt-q.is-paused .yt-q-thumb {
+  opacity: 0.6;
+}
+
+.yt-url input,
+.yt-url textarea {
   flex: 1;
   min-width: 0;
   border: 0;

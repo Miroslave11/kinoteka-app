@@ -301,6 +301,8 @@ export interface KidsPreview {
   suggestedExisting: boolean
   /** Video už ve složce je (v tomto titulu). */
   alreadyIn: string | null
+  /** YT videa: kategorie, ve které už je video jako online (odkaz); jinde se nevyplňuje. */
+  alreadyOnline?: string | null
 }
 
 /** Co právě dělá náhled odkazu: rychlé údaje (oEmbed), příprava yt-dlp, načítání přes yt-dlp. */
@@ -344,7 +346,8 @@ export function parseDownloadRequest(
   return { kind, videoId, playlistId, title, quality }
 }
 
-export type KidsQueueStatus = 'waiting' | 'downloading' | 'done' | 'skipped' | 'error'
+/** paused = pozastavené uživatelem (rozpracované soubory zůstávají). */
+export type KidsQueueStatus = 'waiting' | 'downloading' | 'paused' | 'done' | 'skipped' | 'error'
 
 export interface KidsQueueItem {
   id: number

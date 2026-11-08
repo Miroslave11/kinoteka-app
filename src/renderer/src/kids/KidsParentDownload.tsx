@@ -39,6 +39,8 @@ function queueText(item: KidsQueueItem): string {
     }
     case 'done':
       return `✓ Hotovo · ${item.title}`
+    case 'paused':
+      return `Pozastaveno · ${item.title}`
     case 'skipped':
       return item.message ?? 'Přeskočeno'
     case 'error':

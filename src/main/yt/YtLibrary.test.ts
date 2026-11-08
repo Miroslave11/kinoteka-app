@@ -112,6 +112,21 @@ describe('YtLibrary', () => {
     ])
   })
 
+  it('video dostažené během procházení zařadí hned další procházení', async () => {
+    const lib = library()
+    await lib.scan()
+    const first = lib.scan()
+    // Video dorazí, když první procházení už běží – druhé volání ho nesmí přehlédnout.
+    await downloaded(yt, 'Song', 'ccccccccccc', { title: 'Song', categories: ['Music'] })
+    const second = lib.scan()
+    const third = lib.scan()
+    expect(third).toBe(second)
+    await first
+    expect(second).not.toBe(first)
+    expect(await second).toMatchObject({ videos: 1, errors: [] })
+    expect(summary().flatMap(([, names]) => names)).toEqual(['Song'])
+  })
+
   it('už zařazená videa nepřesouvá, podsložka uživatele je kategorie', async () => {
     await downloaded(join(yt, 'Oblíbené'), 'Paris', 'aaaaaaaaaaa', {
       title: 'Paris',

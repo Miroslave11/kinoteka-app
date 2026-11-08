@@ -209,11 +209,32 @@ describe('KidsDownloader', () => {
     expect(spawnImpl).not.toHaveBeenCalled()
   })
 
-  it('druhé stahování během prvního odmítne', async () => {
-    const kids = downloader(fakeYtDlp([], 0, { name: 'A [abcdefghijk].mp4' }))
-    const first = kids.download('https://youtu.be/abcdefghijk')
-    expect(await kids.download('https://youtu.be/abcdefghijk')).toMatchObject({ ok: false })
-    expect(await first).toMatchObject({ ok: true })
+  it('víc stahování souběžně, každé hlásí svůj průběh', async () => {
+    const kids = downloader(
+      fakeYtDlp(['[KTK] 50 100 NA NA NA avc1'], 0, { name: 'A [abcdefghijk].mp4' })
+    )
+    const first: string[] = []
+    const second: string[] = []
+    const both = Promise.all([
+      kids.download('https://youtu.be/abcdefghijk', { onProgress: (p) => first.push(p.phase) }),
+      kids.download('https://youtu.be/abcdefghijk', { onProgress: (p) => second.push(p.phase) })
+    ])
+    expect(kids.busy).toBe(true)
+    expect(await both).toMatchObject([{ ok: true }, { ok: true }])
+    expect(first).toEqual(['tool', 'starting', 'video'])
+    expect(second).toEqual(first)
+    expect(kids.busy).toBe(false)
+  })
+
+  it('zrušené (signal) před spuštěním yt-dlp → Zrušeno.', async () => {
+    const spawnImpl = fakeYtDlp([], 0)
+    const kids = downloader(spawnImpl)
+    const controller = new AbortController()
+    controller.abort()
+    expect(
+      await kids.download('https://youtu.be/abcdefghijk', { signal: controller.signal })
+    ).toEqual({ ok: false, message: 'Zrušeno.' })
+    expect(spawnImpl).not.toHaveBeenCalled()
   })
 })
 

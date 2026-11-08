@@ -112,6 +112,8 @@ const KEPT_INFO_FIELDS = [
  */
 export class YtLibrary extends EventEmitter<YtLibraryEvents> {
   private running: Promise<YtScanResult> | null = null
+  /** Procházení naplánované po tom běžícím (viz {@link YtLibrary.scan}). */
+  private followUp: Promise<YtScanResult> | null = null
   private lock: Promise<unknown> = Promise.resolve()
   private fetching: Promise<void> | null = null
   /** Kolik místa uvolnil poslední převod na online (výsledek `manage`). */
@@ -128,9 +130,21 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
     super()
   }
 
-  /** Projde složku; souběžná volání se spojí. */
+  /**
+   * Projde složku. Běží-li už procházení, proběhne po něm ještě jedno (to běžící mohlo
+   * přehlédnout právě dostažené video); další volání mezitím se k němu připojí.
+   */
   scan(): Promise<YtScanResult> {
-    this.running ??= this.exclusive(() => this.doScan()).finally(() => {
+    if (this.running) {
+      this.followUp ??= this.running
+        .catch(() => undefined)
+        .then(() => {
+          this.followUp = null
+          return this.scan()
+        })
+      return this.followUp
+    }
+    this.running = this.exclusive(() => this.doScan()).finally(() => {
       this.running = null
     })
     return this.running

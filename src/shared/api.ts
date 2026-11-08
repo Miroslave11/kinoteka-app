@@ -45,7 +45,14 @@ import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
 import type { ThemeInfo, ThemeResult, ThemeSettings, ThemeStatus } from './theme'
 import type { UpdateState } from './update'
-import type { YtCategory, YtManageAction, YtManageResult, YtScanResult, YtStatus } from './yt'
+import type {
+  YtCategory,
+  YtManageAction,
+  YtManageResult,
+  YtQueueAction,
+  YtScanResult,
+  YtStatus
+} from './yt'
 import type { OpenFileResult, PlayerClosedInfo, PlayerCommand, PlayerState } from './player'
 
 export interface AppInfo {
@@ -297,6 +304,10 @@ export interface KinotekaApi {
     queue(): Promise<KidsQueueItem[]>
     removeFromQueue(id: number): Promise<void>
     clearFinished(): Promise<void>
+    /** Pozastavit / pokračovat / zkusit znovu / zrušit vše. */
+    controlQueue(action: YtQueueAction): Promise<void>
+    /** Kolik videí stahovat najednou (1–3). */
+    setConcurrency(count: number): Promise<number>
     onQueueChanged(listener: (items: KidsQueueItem[]) => void): () => void
     /** Přidá video nebo playlist jako online (jen odkaz, nic se nestahuje). */
     addOnline(

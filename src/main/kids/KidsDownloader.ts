@@ -53,11 +53,23 @@ export const PREVIEW_CANCELED = 'Náhled byl zrušen.'
 
 const withoutExtension = (path: string): string => path.replace(/\.[^.\\/]+$/, '')
 
-/** Stáhne jedno video z YouTube do složky s dětskými videi (vždy jen jedno najednou). */
+/** Volby jednoho stahování. */
+export interface DownloadOptions {
+  folder?: string
+  quality?: KidsQuality
+  /** Průběh právě tohoto stahování (souběžná stahování se nepletou). */
+  onProgress?: (progress: KidsDownloadProgress) => void
+  /** Zrušení (nebo pozastavení) – yt-dlp se ukončí, výsledek je „Zrušeno.“ */
+  signal?: AbortSignal
+}
+
+/** Výsledek zrušeného stahování. */
+export const DOWNLOAD_CANCELED = 'Zrušeno.'
+
+/** Stahuje videa z YouTube přes yt-dlp; víc stahování může běžet souběžně. */
 export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
-  private running = false
-  private child: ChildProcess | null = null
-  private canceled = false
+  /** Kolik stahování právě běží. */
+  private active = 0
   private warm: Promise<void> | null = null
   /** Všechny běžící yt-dlp (náhledy, stahování) – při zavření aplikace se ukončí. */
   private readonly children = new Set<ChildProcess>()
@@ -67,7 +79,7 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
   }
 
   get busy(): boolean {
-    return this.running
+    return this.active > 0
   }
 
   private spawnYtDlp(exe: string, args: string[]): ChildProcess {
@@ -230,41 +242,35 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     return { code, json, output }
   }
 
-  /** Zruší právě běžící stahování (ve frontě). */
-  cancel(): void {
-    if (!this.child) return
-    this.canceled = true
-    killTree(this.child, this.options.spawn ?? nodeSpawn)
-  }
-
-  async download(
-    url: string,
-    options: { folder?: string; quality?: KidsQuality } = {}
-  ): Promise<KidsDownloadResult> {
-    if (this.running)
-      return { ok: false, message: 'Už se stahuje jiné video – počkej, až doběhne.' }
-    this.running = true
-    this.canceled = false
+  async download(url: string, options: DownloadOptions = {}): Promise<KidsDownloadResult> {
+    this.active++
+    const report = (progress: KidsDownloadProgress): void => {
+      this.emit('progress', progress)
+      options.onProgress?.(progress)
+    }
     try {
-      this.emit('progress', { phase: 'tool', percent: null, speed: null, eta: null })
+      report({ phase: 'tool', percent: null, speed: null, eta: null })
       let exe: string
       try {
         exe = await this.prepareTool()
       } catch (error) {
         return { ok: false, message: (error as Error).message }
       }
+      if (options.signal?.aborted) return { ok: false, message: DOWNLOAD_CANCELED }
       const folder = options.folder ?? this.options.folder()
       await mkdir(folder, { recursive: true })
       await mkdir(this.options.tempDir, { recursive: true })
-      const pathFile = join(this.options.tempDir, `yt-dlp-${Date.now()}.txt`)
+      const pathFile = join(
+        this.options.tempDir,
+        `yt-dlp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`
+      )
       try {
-        return await this.run(exe, url, folder, pathFile, options.quality)
+        return await this.run(exe, url, folder, pathFile, options, report)
       } finally {
         await rm(pathFile, { force: true })
       }
     } finally {
-      this.running = false
-      this.child = null
+      this.active--
     }
   }
 
@@ -273,25 +279,31 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     url: string,
     folder: string,
     pathFile: string,
-    quality: KidsQuality | undefined
+    options: DownloadOptions,
+    report: (progress: KidsDownloadProgress) => void
   ): Promise<KidsDownloadResult> {
-    this.emit('progress', { phase: 'starting', percent: null, speed: null, eta: null })
+    report({ phase: 'starting', percent: null, speed: null, eta: null })
     const args = buildDownloadArgs({
       url,
       folder,
       ffmpegDir: this.options.ffmpegDir,
       nodePath: this.options.nodePath,
       pathFile,
-      quality
+      quality: options.quality
     })
     const child = this.spawnYtDlp(exe, args)
-    this.child = child
+    let canceled = false
+    const onAbort = (): void => {
+      canceled = true
+      killTree(child, this.options.spawn ?? nodeSpawn)
+    }
+    options.signal?.addEventListener('abort', onAbort, { once: true })
     const output: string[] = []
     const onLine = (line: string): void => {
       const progress = parseProgressLine(line)
-      if (progress) this.emit('progress', progress)
+      if (progress) report(progress)
       else if (line.startsWith('[Merger]'))
-        this.emit('progress', { phase: 'merging', percent: null, speed: null, eta: null })
+        report({ phase: 'merging', percent: null, speed: null, eta: null })
       else output.push(line)
     }
     createInterface({ input: child.stdout! }).on('line', onLine)
@@ -301,7 +313,8 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
       child.on('error', () => resolve(-1))
       child.on('close', resolve)
     })
-    if (this.canceled) return { ok: false, message: 'Zrušeno.' }
+    options.signal?.removeEventListener('abort', onAbort)
+    if (canceled) return { ok: false, message: DOWNLOAD_CANCELED }
     if (code !== 0) return { ok: false, message: errorMessage(output) }
 
     let file: string
