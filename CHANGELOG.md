@@ -16,7 +16,6 @@
 - **Fronta:** pozastavit vše / pokračovat, zkusit znovu chybné, zrušit vše. Nedokončená stahování **pokračují i po restartu** aplikace; zbytky přerušených stahování se při startu smažou.
 - Video dostažené během procházení složky se zařadí do kategorie hned.
 
-
 ## 1.3.0 – 2026-11-07
 
 ### YT videa (nová část)
