@@ -6,6 +6,7 @@ import {
   parseStream,
   STREAM_REUSE_MARGIN_MS,
   YtStreamResolver,
+  type SavedStream,
   waitUntilPlayable
 } from './ytStream'
 
@@ -97,7 +98,7 @@ describe('YtStreamResolver', () => {
   it('použije zjištěné adresy znovu, dokud platí; souběžné dotazy spojí', async () => {
     let now = (EXPIRE - 3600) * 1000
     const lookup = vi.fn(async () => SPLIT)
-    const resolver = new YtStreamResolver(lookup, () => now)
+    const resolver = new YtStreamResolver(lookup, { now: () => now })
     const [a, b] = await Promise.all([
       resolver.resolve('abc', '1080'),
       resolver.resolve('abc', '1080')
@@ -186,13 +187,66 @@ describe('waitUntilPlayable', () => {
 
   it('resolver počká na platnost jen při novém zjištění, ne z mezipaměti', async () => {
     const ready = vi.fn(async () => undefined)
-    const resolver = new YtStreamResolver(
-      async () => SPLIT,
-      () => (EXPIRE - 3600) * 1000,
+    const resolver = new YtStreamResolver(async () => SPLIT, {
+      now: () => (EXPIRE - 3600) * 1000,
       ready
-    )
+    })
     await resolver.resolve('abc', '1080')
     await resolver.resolve('abc', '1080')
     expect(ready).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('YtStreamResolver – uložení a příprava předem', () => {
+  const NOW = (EXPIRE - 3600) * 1000
+
+  it('adresy uloží; po restartu je ověří a použije bez yt-dlp', async () => {
+    let saved: SavedStream[] = []
+    const store = { load: () => saved, save: (entries: SavedStream[]) => (saved = entries) }
+    const first = new YtStreamResolver(async () => SPLIT, { now: () => NOW, store })
+    await first.resolve('abc', '1080')
+    expect(saved.map((entry) => entry.key)).toEqual(['abc/1080'])
+
+    const lookup = vi.fn(async () => SPLIT)
+    const verify = vi.fn(async () => true)
+    const second = new YtStreamResolver(lookup, { now: () => NOW, store, verify })
+    expect(second.has('abc', '1080')).toBe(true)
+    await expect(second.resolve('abc', '1080')).resolves.toMatchObject({ audio: AUDIO_URL })
+    await second.resolve('abc', '1080')
+    expect(verify).toHaveBeenCalledTimes(1)
+    expect(lookup).not.toHaveBeenCalled()
+  })
+
+  it('uložené adresy, které už nefungují (jiná síť), zjistí znovu; prošlé nenačte', async () => {
+    const saved: SavedStream[] = [
+      { key: 'abc/1080', stream: parseStream(SPLIT)!, validUntil: NOW + 1000 },
+      { key: 'old/1080', stream: parseStream(SPLIT)!, validUntil: NOW - 1 }
+    ]
+    const lookup = vi.fn(async () => SPLIT)
+    const resolver = new YtStreamResolver(lookup, {
+      now: () => NOW,
+      store: { load: () => saved, save: () => undefined },
+      verify: async () => false
+    })
+    expect(resolver.has('old', '1080')).toBe(false)
+    await resolver.resolve('abc', '1080')
+    expect(lookup).toHaveBeenCalledTimes(1)
+  })
+
+  it('příprava předem: jen jedna najednou, kliknutí se připojí k běžící', async () => {
+    let finish: (value: unknown) => void = () => undefined
+    const lookup = vi.fn(() => new Promise((resolve) => (finish = resolve)))
+    const resolver = new YtStreamResolver(lookup, { now: () => NOW })
+    resolver.prefetch('abc', '1080')
+    resolver.prefetch('def', '1080')
+    const click = resolver.resolve('abc', '1080')
+    expect(lookup).toHaveBeenCalledTimes(1)
+    finish(SPLIT)
+    await expect(click).resolves.toMatchObject({ audio: AUDIO_URL })
+    expect(resolver.has('abc', '1080')).toBe(true)
+    await vi.waitFor(() => {
+      resolver.prefetch('def', '1080')
+      expect(lookup).toHaveBeenCalledTimes(2)
+    })
   })
 })

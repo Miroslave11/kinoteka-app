@@ -170,44 +170,131 @@ export const STREAM_REUSE_MARGIN_MS = 15 * 60 * 1000
 /** Bez údaje o platnosti se adresy drží nejvýš hodinu. */
 const DEFAULT_LIFETIME_MS = 60 * 60 * 1000
 
+/** Uložené adresy (soubor v datech aplikace) – po restartu se nemusí zjišťovat znovu. */
+export interface SavedStream {
+  key: string
+  stream: YtStream
+  validUntil: number
+}
+
+export interface ResolverOptions {
+  now?: () => number
+  /** Čekání, než čerstvé adresy začnou platit (viz {@link waitUntilPlayable}). */
+  ready?: (stream: YtStream) => Promise<void>
+  store?: { load: () => SavedStream[]; save: (entries: SavedStream[]) => void }
+  /**
+   * Fungují ještě adresy uložené před restartem? (Jsou vázané na IP adresu – po přesunu
+   * notebooku do jiné sítě přestanou platit.) Bez kontroly se použijí rovnou.
+   */
+  verify?: (stream: YtStream) => Promise<boolean>
+}
+
+/** Adresy ještě fungují: YouTube vydá první bajt obrazu (ne chyba). */
+export async function isPlayable(stream: YtStream): Promise<boolean> {
+  try {
+    return (await fetchProbe(stream.video, stream.headers)) < 400
+  } catch {
+    return false
+  }
+}
+
+interface Cached {
+  stream: YtStream
+  validUntil: number
+  /** Načteno ze souboru – před prvním použitím ověřit. */
+  unverified?: boolean
+}
+
 /**
  * Zjišťování adres s mezipamětí: opakované spuštění nebo pokračování videa nečeká znovu
- * na yt-dlp. Souběžné dotazy na stejné video se spojí.
+ * na yt-dlp (ani po restartu aplikace). Souběžné dotazy na stejné video se spojí.
  */
 export class YtStreamResolver {
-  private readonly cache = new Map<string, { stream: YtStream; validUntil: number }>()
+  private readonly cache = new Map<string, Cached>()
   private readonly pending = new Map<string, Promise<YtStream>>()
+  private readonly now: () => number
+  /** Běží příprava na pozadí (vždy jen jedna). */
+  private prefetching = false
 
   constructor(
     private readonly lookup: (youtubeId: string, quality: KidsQuality) => Promise<unknown>,
-    private readonly now: () => number = Date.now,
-    /** Čekání, než čerstvé adresy začnou platit (viz {@link waitUntilPlayable}). */
-    private readonly ready: (stream: YtStream) => Promise<void> = async () => undefined
-  ) {}
+    private readonly options: ResolverOptions = {}
+  ) {
+    this.now = options.now ?? Date.now
+    for (const entry of options.store?.load() ?? [])
+      if (entry.validUntil > this.now())
+        this.cache.set(entry.key, {
+          stream: entry.stream,
+          validUntil: entry.validUntil,
+          unverified: true
+        })
+  }
+
+  /** Adresy už jsou zjištěné a platí (spuštění bude okamžité). */
+  has(youtubeId: string, quality: KidsQuality): boolean {
+    const cached = this.cache.get(`${youtubeId}/${quality}`)
+    return cached !== undefined && cached.validUntil > this.now()
+  }
 
   resolve(youtubeId: string, quality: KidsQuality): Promise<YtStream> {
     const key = `${youtubeId}/${quality}`
-    const cached = this.cache.get(key)
-    if (cached && cached.validUntil > this.now()) return Promise.resolve(cached.stream)
     let running = this.pending.get(key)
-    if (!running) {
-      running = this.lookup(youtubeId, quality)
-        .then(async (json) => {
-          const stream = parseStream(json)
-          if (!stream) throw new Error('YouTube nevrátil adresu videa. Zkus to prosím znovu.')
-          await this.ready(stream)
-          const expires = stream.expiresAt ?? this.now() + DEFAULT_LIFETIME_MS
-          this.cache.set(key, { stream, validUntil: expires - STREAM_REUSE_MARGIN_MS })
-          return stream
-        })
-        .finally(() => this.pending.delete(key))
-      this.pending.set(key, running)
-    }
-    return running
+    if (running) return running
+    const cached = this.cache.get(key)
+    if (cached && cached.validUntil > this.now()) {
+      if (!cached.unverified || !this.options.verify) return Promise.resolve(cached.stream)
+      running = this.options.verify(cached.stream).then((ok) => {
+        if (ok) {
+          cached.unverified = false
+          return cached.stream
+        }
+        this.cache.delete(key)
+        return this.fetch(youtubeId, quality, key)
+      })
+    } else running = this.fetch(youtubeId, quality, key)
+    const shared = running.finally(() => this.pending.delete(key))
+    this.pending.set(key, shared)
+    return shared
+  }
+
+  /**
+   * Připraví adresy předem (najetí myší na video): spuštění pak nečeká. Vždy jen jedna
+   * příprava najednou – další se během ní přeskočí; chyby se ignorují.
+   */
+  prefetch(youtubeId: string, quality: KidsQuality): void {
+    const key = `${youtubeId}/${quality}`
+    if (this.prefetching || this.pending.has(key)) return
+    const cached = this.cache.get(key)
+    if (cached && !cached.unverified && cached.validUntil > this.now()) return
+    this.prefetching = true
+    void this.resolve(youtubeId, quality)
+      .catch(() => undefined)
+      .finally(() => (this.prefetching = false))
+  }
+
+  private async fetch(youtubeId: string, quality: KidsQuality, key: string): Promise<YtStream> {
+    const stream = parseStream(await this.lookup(youtubeId, quality))
+    if (!stream) throw new Error('YouTube nevrátil adresu videa. Zkus to prosím znovu.')
+    await this.options.ready?.(stream)
+    const expires = stream.expiresAt ?? this.now() + DEFAULT_LIFETIME_MS
+    this.cache.set(key, { stream, validUntil: expires - STREAM_REUSE_MARGIN_MS })
+    this.persist()
+    return stream
+  }
+
+  private persist(): void {
+    if (!this.options.store) return
+    const now = this.now()
+    this.options.store.save(
+      [...this.cache.entries()]
+        .filter(([, entry]) => entry.validUntil > now)
+        .map(([key, entry]) => ({ key, stream: entry.stream, validUntil: entry.validUntil }))
+    )
   }
 
   /** Adresy přestaly fungovat (mpv je neotevřel) – příště se zjistí znovu. */
   forget(youtubeId: string): void {
     for (const key of this.cache.keys()) if (key.startsWith(`${youtubeId}/`)) this.cache.delete(key)
+    this.persist()
   }
 }

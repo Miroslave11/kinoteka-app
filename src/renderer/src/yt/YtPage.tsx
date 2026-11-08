@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
   HardDrive,
+  Loader2,
   MoreHorizontal,
   Play,
   Plus
@@ -42,10 +43,23 @@ function VideoCard({
   onPlay: (id: number) => void
   onMenu: (video: YtVideoSummary, x: number, y: number) => void
 }): React.JSX.Element {
+  const hover = useRef<number | null>(null)
+  const stopHover = (): void => {
+    if (hover.current !== null) window.clearTimeout(hover.current)
+    hover.current = null
+  }
+  useEffect(() => stopHover, [])
   return (
     <button
       className="land yt-card"
       onClick={() => onPlay(video.id)}
+      // Online video: po chvilce nad kartou se adresy z YouTube zjistí předem.
+      onMouseEnter={() => {
+        if (!video.online || video.unavailable) return
+        stopHover()
+        hover.current = window.setTimeout(() => void window.kinoteka.yt.prefetch(video.id), 300)
+      }}
+      onMouseLeave={stopHover}
       onContextMenu={(event) => {
         event.preventDefault()
         onMenu(video, event.clientX, event.clientY)
@@ -153,10 +167,27 @@ export default function YtPage(): React.JSX.Element {
   const selected = visible.find((category) => filterKey(category) === params.get('kategorie'))
   const total = totalVideos(visible)
 
-  const play = (id: number): void =>
-    void yt.playVideo(id).then((result) => {
-      if (!result.ok && result.reason === 'error') setError(result.message)
-    })
+  /** Online video, které se právě načítá z YouTube (hláška se spinnerem). */
+  const [loading, setLoading] = useState<string | null>(null)
+  const play = (id: number): void => {
+    const video = (categories ?? []).flatMap((c) => c.videos).find((v) => v.id === id)
+    // Hláška až po chvilce – z mezipaměti se video spustí hned a jen by problikla.
+    const timer = video?.online ? window.setTimeout(() => setLoading(video.name), 250) : null
+    void yt
+      .playVideo(id)
+      .then((result) => {
+        if (!result.ok && result.reason === 'error') setError(result.message)
+      })
+      .finally(() => {
+        if (timer !== null) window.clearTimeout(timer)
+        setLoading(null)
+      })
+  }
+  // První online video v řadě Pokračovat se připraví hned po otevření stránky.
+  const firstOnline = continuing.find((v) => v.online && !v.unavailable)?.id ?? null
+  useEffect(() => {
+    if (firstOnline !== null) void yt.prefetch(firstOnline)
+  }, [yt, firstOnline])
   const manage = (action: Parameters<typeof yt.manage>[0]): void =>
     void yt.manage(action).then((result) => {
       if (!result.ok) setError(result.message)
@@ -283,7 +314,7 @@ export default function YtPage(): React.JSX.Element {
           {continuing.length > 0 && (
             <section className="yt-row">
               <h3>Pokračovat</h3>
-              <div className="strip">
+              <div className="yt-grid">
                 {continuing.map((video) => (
                   <VideoCard
                     key={video.id}
@@ -309,7 +340,7 @@ export default function YtPage(): React.JSX.Element {
                   onFree={(categoryId) => manage({ kind: 'keep-online-category', categoryId })}
                 />
               </h3>
-              <div className="strip">
+              <div className="yt-grid">
                 {category.videos.map((video) => (
                   <VideoCard
                     key={video.id}
@@ -325,6 +356,15 @@ export default function YtPage(): React.JSX.Element {
         </>
       )}
       {dialog}
+      {loading && (
+        <div className="yt-loading" role="status" aria-live="polite">
+          <div className="yt-loading-card">
+            <Loader2 size={36} className="spin" />
+            <b>Načítám video z YouTube…</b>
+            <span className="muted small">{loading}</span>
+          </div>
+        </div>
+      )}
       {menu && (
         <YtVideoMenu
           menu={menu}

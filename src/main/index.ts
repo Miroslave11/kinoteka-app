@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell } from 'electron'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { WindowState } from '../shared/api'
@@ -46,7 +46,14 @@ import { fetchOembed } from './kids/oembed'
 import { YtDlpTool } from './kids/YtDlpTool'
 import { YtLibrary } from './yt/YtLibrary'
 import { ytPlayItem, type YtPlayItem } from './yt/ytPlayback'
-import { mpvFileFor, mpvNetworkArgs, waitUntilPlayable, YtStreamResolver } from './yt/ytStream'
+import {
+  isPlayable,
+  mpvFileFor,
+  mpvNetworkArgs,
+  waitUntilPlayable,
+  YtStreamResolver,
+  type SavedStream
+} from './yt/ytStream'
 import { matchCategory, metaFromInfo } from './yt/ytClassify'
 import { QUEUE_SETTING, registerYtIpc, ytConcurrency, ytFolder } from './yt/ytIpc'
 import { YtRepository } from './yt/YtRepository'
@@ -920,12 +927,40 @@ void app.whenReady().then(() => {
     tempDir: join(app.getPath('temp'), 'kinoteka')
   })
   ytStreamStop = () => ytStreamDownloader.stopAll()
+  const streamsFile = join(app.getPath('userData'), 'cache', 'yt-streams.json')
   ytStreams = new YtStreamResolver(
     (youtubeId, quality) => ytStreamDownloader.streamInfo(youtubeId, quality),
-    Date.now,
-    // Čerstvé adresy YouTube první vteřiny odmítá – přehrávač by se otevřel a hned zavřel.
-    (stream) => waitUntilPlayable(stream)
+    {
+      // Čerstvé adresy YouTube první vteřiny odmítá – přehrávač by se otevřel a hned zavřel.
+      ready: (stream) => waitUntilPlayable(stream),
+      // Adresy platí ~6 h – uložené přežijí restart; před použitím se ověří (jiná síť).
+      store: {
+        load: () => {
+          try {
+            const saved: unknown = JSON.parse(readFileSync(streamsFile, 'utf8'))
+            return Array.isArray(saved) ? (saved as SavedStream[]) : []
+          } catch {
+            return []
+          }
+        },
+        save: (entries) => {
+          try {
+            mkdirSync(dirname(streamsFile), { recursive: true })
+            writeFileSync(streamsFile, JSON.stringify(entries))
+          } catch (error) {
+            console.warn(`YT adresy: ${(error as Error).message}`)
+          }
+        }
+      },
+      verify: isPlayable
+    }
   )
+  // Najetí myší na online video: adresy se zjistí předem, kliknutí pak nečeká.
+  ipcMain.handle(IpcChannel.YtPrefetch, (_event, id: unknown) => {
+    if (!Number.isInteger(id)) return
+    const item = ytPlayItem(ytRepository, id as number)
+    if (item?.online) ytStreams?.prefetch(item.online, ytQualitySetting())
+  })
   registerYtIpc({
     settings,
     library: ytLibrary,
