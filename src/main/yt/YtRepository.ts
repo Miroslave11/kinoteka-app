@@ -35,6 +35,7 @@ export interface StoredYtVideo {
   id: number
   path: string
   categoryId: number | null
+  youtubeId: string | null
   size: number
   mtimeMs: number
 }
@@ -43,6 +44,7 @@ const storedVideo = (row: Row): StoredYtVideo => ({
   id: Number(row['id']),
   path: String(row['path']),
   categoryId: row['category_id'] === null ? null : Number(row['category_id']),
+  youtubeId: (row['youtube_id'] as string | null) ?? null,
   size: Number(row['size']),
   mtimeMs: Number(row['mtime_ms'])
 })
@@ -112,14 +114,18 @@ export class YtRepository {
 
   categoryVideos(categoryId: number): StoredYtVideo[] {
     return this.db
-      .prepare('SELECT id, path, category_id, size, mtime_ms FROM yt_video WHERE category_id = ?')
+      .prepare(
+        'SELECT id, path, category_id, youtube_id, size, mtime_ms FROM yt_video WHERE category_id = ?'
+      )
       .all(categoryId)
       .map(storedVideo)
   }
 
   video(id: number): StoredYtVideo | null {
     const row = this.db
-      .prepare('SELECT id, path, category_id, size, mtime_ms FROM yt_video WHERE id = ?')
+      .prepare(
+        'SELECT id, path, category_id, youtube_id, size, mtime_ms FROM yt_video WHERE id = ?'
+      )
       .get(id)
     return row ? storedVideo(row) : null
   }
@@ -222,16 +228,24 @@ export class YtRepository {
     this.db.prepare('UPDATE yt_video SET duration = ? WHERE id = ?').run(duration, id)
   }
 
-  /** Kategorie, ve které už video z YouTube je; null = ještě není staženo. */
-  categoryOfYoutubeId(youtubeId: string): string | null {
+  /**
+   * Kategorie, ve které už video z YouTube je (stažené nebo online); null = ještě ho nemáš.
+   * `downloadedOnly` = jen stažená (online video jde ještě stáhnout).
+   */
+  categoryOfYoutubeId(youtubeId: string, downloadedOnly = false): string | null {
     const row = this.db
       .prepare(
         `SELECT c.folder FROM yt_video v LEFT JOIN yt_category c ON c.id = v.category_id
-         WHERE v.youtube_id = ? ORDER BY v.id DESC LIMIT 1`
+         WHERE v.youtube_id = ? ${downloadedOnly ? "AND v.path NOT LIKE '%.ytonline'" : ''}
+         ORDER BY v.id DESC LIMIT 1`
       )
       .get(youtubeId)
     if (!row) return null
     return (row['folder'] as string | null) ?? 'Čeká na zařazení'
+  }
+
+  setUnavailable(id: number, unavailable: boolean): void {
+    this.db.prepare('UPDATE yt_video SET unavailable = ? WHERE id = ?').run(unavailable ? 1 : 0, id)
   }
 
   thumbnailPath(id: number): string | null {
@@ -269,6 +283,8 @@ export class YtRepository {
         durationSec: typeof row['duration'] === 'number' ? Math.round(row['duration']) : null,
         youtubeId: (row['youtube_id'] as string | null) ?? null,
         online: isOnlineFile(String(row['path'])),
+        sizeBytes: isOnlineFile(String(row['path'])) ? 0 : Number(row['size']),
+        unavailable: Number(row['unavailable'] ?? 0) === 1,
         thumbnailUrl: row['thumbnail']
           ? `kinoteka-media://yt/video/${id}?v=${Number(row['mtime_ms'])}`
           : null,

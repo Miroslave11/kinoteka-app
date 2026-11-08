@@ -185,9 +185,16 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     signal?: AbortSignal
   ): Promise<Record<string, unknown>> {
     const url = `https://www.youtube.com/watch?v=${youtubeId}`
-    const { code, json, output } = await this.runInfo(url, false, undefined, signal, (node) =>
-      buildStreamArgs(url, node, quality)
-    )
+    let result: Awaited<ReturnType<KidsDownloader['runInfo']>>
+    try {
+      result = await this.runInfo(url, false, undefined, signal, (node) =>
+        buildStreamArgs(url, node, quality)
+      )
+    } catch (error) {
+      // Nástroj nejde připravit nebo YouTube neodpověděl – za video to nemůže.
+      throw Object.assign(error as Error, { retry: true })
+    }
+    const { code, json, output } = result
     if (code === 0 && typeof json === 'object' && json !== null)
       return json as Record<string, unknown>
     const message = errorMessage(output)

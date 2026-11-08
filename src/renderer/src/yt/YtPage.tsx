@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Cloud, HardDrive, MoreHorizontal, Play, Plus } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Cloud,
+  HardDrive,
+  MoreHorizontal,
+  Play,
+  Plus
+} from 'lucide-react'
+import { formatSize } from '../../../shared/library'
 import { Link, useSearchParams } from 'react-router'
 import { formatTime } from '../../../shared/player'
 import { countOf } from '../../../shared/plural'
@@ -11,12 +20,11 @@ import YtDownload from './YtDownload'
 import YtVideoMenu, { type YtMenuState } from './YtVideoMenu'
 import {
   continueRow,
+  diskBytes,
   filterKey,
-  filterStorage,
-  parseStorage,
+  freeableBytes,
   totalVideos,
-  visibleCategories,
-  type YtStorage
+  visibleCategories
 } from './ytData'
 
 /** Obrázek videa: uložený vedle videa (nebo snímek z něj), jinak náhled z YouTube. */
@@ -72,6 +80,11 @@ function VideoCard({
           {video.online ? <Cloud size={12} /> : <HardDrive size={12} />}
           {video.online ? 'Online' : 'V počítači'}
         </span>
+        {video.unavailable && (
+          <span className="badge glass yt-unavailable" title="YouTube video už nevydá">
+            <AlertTriangle size={12} /> Nedostupné
+          </span>
+        )}
         {video.watched && video.progress === null && (
           <span className="yt-watched" title="Zhlédnuto">
             <CheckCircle2 size={18} />
@@ -91,6 +104,32 @@ function VideoCard({
   )
 }
 
+/** „Ponechat jen online“ pro celou kategorii – na druhé kliknutí, ukáže uvolněné místo. */
+function FreeSpaceButton({
+  category,
+  onFree
+}: {
+  category: YtCategory
+  onFree: (categoryId: number) => void
+}): React.JSX.Element | null {
+  const [confirming, setConfirming] = useState(false)
+  const bytes = freeableBytes(category)
+  if (bytes === 0 || category.id === null) return null
+  return (
+    <button
+      className={`row-link yt-free ${confirming ? 'is-confirming' : ''}`}
+      title="Stažená videa půjdou do Koše, zůstanou jako online (přehrají se z YouTube)"
+      onBlur={() => setConfirming(false)}
+      onClick={() => (confirming ? onFree(category.id!) : setConfirming(true))}
+    >
+      <Cloud size={14} />{' '}
+      {confirming
+        ? `Opravdu? ${formatSize(bytes)} půjde do Koše`
+        : `Ponechat jen online (uvolní ${formatSize(bytes)})`}
+    </button>
+  )
+}
+
 /** Stránka YT videa: Pokračovat, filtr kategorií a řady videí po kategoriích. */
 export default function YtPage(): React.JSX.Element {
   const { setError } = useApp()
@@ -99,6 +138,7 @@ export default function YtPage(): React.JSX.Element {
   const [params, setParams] = useSearchParams()
   const [downloading, setDownloading] = useState(false)
   const [menu, setMenu] = useState<YtMenuState | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   useAmbientPalette(null)
 
   const reload = useCallback(async () => setCategories(await yt.listCategories()), [yt])
@@ -107,11 +147,7 @@ export default function YtPage(): React.JSX.Element {
     return yt.onChanged(() => void reload())
   }, [yt, reload])
 
-  const storage = parseStorage(params.get('uloziste'))
-  const visible = useMemo(
-    () => visibleCategories(filterStorage(categories ?? [], storage)),
-    [categories, storage]
-  )
+  const visible = useMemo(() => visibleCategories(categories ?? []), [categories])
   const everything = totalVideos(categories ?? [])
   const continuing = useMemo(() => continueRow(visible), [visible])
   const selected = visible.find((category) => filterKey(category) === params.get('kategorie'))
@@ -124,25 +160,35 @@ export default function YtPage(): React.JSX.Element {
   const manage = (action: Parameters<typeof yt.manage>[0]): void =>
     void yt.manage(action).then((result) => {
       if (!result.ok) setError(result.message)
+      else if (result.freedBytes)
+        setNotice(`Uvolněno ${formatSize(result.freedBytes)} – soubory jsou v Koši.`)
     })
+  /** Online video → stáhnout do počítače (do jeho kategorie). */
+  const download = async (video: YtVideoSummary): Promise<void> => {
+    if (!video.youtubeId) return
+    const owner = (categories ?? []).find((c) => c.videos.some((v) => v.id === video.id))
+    const { quality } = await yt.status()
+    const result = await yt.enqueue({
+      kind: 'video',
+      videoId: video.youtubeId,
+      playlistId: null,
+      title: owner?.id != null ? owner.name : '',
+      quality
+    })
+    if (!result.ok) return setError(result.message)
+    setNotice(
+      result.added > 0
+        ? `„${video.name}“ se stahuje do počítače – průběh je v okně Přidat z YouTube.`
+        : 'Video už je stažené.'
+    )
+  }
   const openMenu = (video: YtVideoSummary, x: number, y: number): void => {
     const owner = (categories ?? []).find((c) => c.videos.some((v) => v.id === video.id))
     setMenu({ video, categoryId: owner?.id ?? null, x, y })
   }
   const closeMenu = useCallback(() => setMenu(null), [])
-  const filterParams = (category: YtCategory | null, store: YtStorage): Record<string, string> => ({
-    ...(category ? { kategorie: filterKey(category) } : {}),
-    ...(store !== 'vse' ? { uloziste: store } : {})
-  })
   const select = (category: YtCategory | null): void =>
-    setParams(filterParams(category, storage), { replace: true })
-  const selectStorage = (store: YtStorage): void =>
-    setParams(filterParams(selected ?? null, store), { replace: true })
-  const counts = {
-    vse: everything,
-    pc: totalVideos(filterStorage(categories ?? [], 'pc')),
-    online: totalVideos(filterStorage(categories ?? [], 'online'))
-  }
+    setParams(category ? { kategorie: filterKey(category) } : {}, { replace: true })
 
   const dialog = downloading && (
     <YtDownload categories={categories ?? []} onClose={() => setDownloading(false)} />
@@ -185,28 +231,19 @@ export default function YtPage(): React.JSX.Element {
               'kategorie',
               'kategorií'
             )}
+            {diskBytes(categories ?? []) > 0 &&
+              ` · v počítači ${formatSize(diskBytes(categories ?? []))}`}
           </p>
         </div>
         {downloadButton}
       </div>
+      {notice && (
+        <p className="notice yt-notice" onClick={() => setNotice(null)}>
+          {notice}
+        </p>
+      )}
 
       <div className="toolbar yt-chips">
-        {(
-          [
-            ['vse', 'Vše', null],
-            ['pc', 'V počítači', <HardDrive key="pc" size={14} />],
-            ['online', 'Online', <Cloud key="online" size={14} />]
-          ] as const
-        ).map(([store, label, icon]) => (
-          <button
-            key={store}
-            className={`chip ${storage === store ? 'on' : ''}`}
-            onClick={() => selectStorage(store)}
-          >
-            {icon} {label} <span className="chip-count">{counts[store]}</span>
-          </button>
-        ))}
-        <span className="yt-chip-sep" />
         <button className={`chip ${selected ? '' : 'on'}`} onClick={() => select(null)}>
           Vše <span className="chip-count">{total}</span>
         </button>
@@ -222,17 +259,25 @@ export default function YtPage(): React.JSX.Element {
       </div>
 
       {selected ? (
-        <div className="yt-grid">
-          {selected.videos.map((video) => (
-            <VideoCard
-              key={video.id}
-              video={video}
-              detail={video.channel}
-              onPlay={play}
-              onMenu={openMenu}
+        <>
+          <div className="yt-grid-head">
+            <FreeSpaceButton
+              category={selected}
+              onFree={(categoryId) => manage({ kind: 'keep-online-category', categoryId })}
             />
-          ))}
-        </div>
+          </div>
+          <div className="yt-grid">
+            {selected.videos.map((video) => (
+              <VideoCard
+                key={video.id}
+                video={video}
+                detail={video.channel}
+                onPlay={play}
+                onMenu={openMenu}
+              />
+            ))}
+          </div>
+        </>
       ) : (
         <>
           {continuing.length > 0 && (
@@ -259,6 +304,10 @@ export default function YtPage(): React.JSX.Element {
                 <button className="row-link" onClick={() => select(category)}>
                   Zobrazit vše
                 </button>
+                <FreeSpaceButton
+                  category={category}
+                  onFree={(categoryId) => manage({ kind: 'keep-online-category', categoryId })}
+                />
               </h3>
               <div className="strip">
                 {category.videos.map((video) => (
@@ -283,6 +332,8 @@ export default function YtPage(): React.JSX.Element {
           onPlay={play}
           onMove={(videoId, categoryId) => manage({ kind: 'move-video', videoId, categoryId })}
           onTrash={(videoId) => manage({ kind: 'trash-video', videoId })}
+          onKeepOnline={(videoId) => manage({ kind: 'keep-online', videoId })}
+          onDownload={(video) => void download(video)}
           onClose={closeMenu}
         />
       )}

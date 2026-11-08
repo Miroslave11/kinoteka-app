@@ -11,6 +11,10 @@ export interface YtVideoSummary {
   youtubeId: string | null
   /** Online video (jen odkaz, přehrává se z YouTube); false = stažené v počítači. */
   online: boolean
+  /** Velikost staženého videa v bajtech (0 u online videa). */
+  sizeBytes: number
+  /** Online video, které YouTube už nevydá (smazané, soukromé) – zjistí se při přehrání. */
+  unavailable: boolean
   /** Obrázek videa (z YouTube, jinak snímek z videa); null = zástupné pozadí. */
   thumbnailUrl: string | null
   addedAt: string
@@ -60,8 +64,14 @@ export type YtManageAction =
   /** Přesune video i s obrázkem a údaji do jiné kategorie. */
   | { kind: 'move-video'; videoId: number; categoryId: number }
   | { kind: 'trash-video'; videoId: number }
+  /** Stažené video: soubor do Koše, zůstane odkaz (online). */
+  | { kind: 'keep-online'; videoId: number }
+  /** Totéž pro všechna stažená videa kategorie, která mají odkaz na YouTube. */
+  | { kind: 'keep-online-category'; categoryId: number }
 
-export type YtManageResult = { ok: true } | { ok: false; message: string }
+export type YtManageResult =
+  /** freedBytes = kolik místa se uvolnilo (u převodu na online). */
+  { ok: true; freedBytes?: number } | { ok: false; message: string }
 
 /** Klíčová slova bez prázdných a opakovaných (bez ohledu na velikost písmen). */
 export function cleanYtKeywords(values: readonly unknown[]): string[] {
@@ -102,6 +112,10 @@ export function parseYtManageAction(value: unknown): YtManageAction | null {
       return videoId && categoryId ? { kind: 'move-video', videoId, categoryId } : null
     case 'trash-video':
       return videoId ? { kind: 'trash-video', videoId } : null
+    case 'keep-online':
+      return videoId ? { kind: 'keep-online', videoId } : null
+    case 'keep-online-category':
+      return categoryId ? { kind: 'keep-online-category', categoryId } : null
     default:
       return null
   }

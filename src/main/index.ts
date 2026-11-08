@@ -412,8 +412,14 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
   try {
     source = await ytSource(item)
   } catch (error) {
+    // Video, které YouTube už nevydá (ne výpadek sítě), dostane štítek Nedostupné.
+    if (item.online && !(error as { retry?: boolean }).retry) {
+      ytRepository.setUnavailable(item.videoId, true)
+      broadcast(IpcChannel.YtChanged)
+    }
     return { ok: false, reason: 'error', message: ytStreamError(error) }
   }
+  if (item.online) ytRepository.setUnavailable(item.videoId, false)
   try {
     session?.close()
     let started: PlayerSession | undefined = undefined
@@ -886,7 +892,8 @@ void app.whenReady().then(() => {
       )
       return { name, existing: name !== null }
     },
-    alreadyIn: (videoId) => ytRepository.categoryOfYoutubeId(videoId),
+    // Online video jde ještě stáhnout do počítače – „už máš“ jen u staženého.
+    alreadyIn: (videoId) => ytRepository.categoryOfYoutubeId(videoId, true),
     scan: () => ytLibrary.scan(),
     quickInfo: (videoId) => fetchOembed(chromiumFetch, videoId)
   })

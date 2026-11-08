@@ -451,3 +451,103 @@ describe('YtLibrary – online videa', () => {
     ])
   })
 })
+
+describe('YtLibrary – převody (O3)', () => {
+  const videos = () => repository.list().flatMap((c) => c.videos)
+
+  it('Ponechat jen online: soubor do Koše, zůstane odkaz, pozice i obrázek; vrátí uvolněné místo', async () => {
+    const lib = library()
+    await lib.scan()
+    await downloaded(join(yt, 'Města'), 'Clip', 'aaaaaaaaaaa', { title: 'Clip', duration: 200 })
+    await lib.scan()
+    const before = videos()[0]!
+    repository.record(before.id, 80, 200)
+
+    const result = await lib.manage({ kind: 'keep-online', videoId: before.id })
+    expect(result).toEqual({ ok: true, freedBytes: 'video aaaaaaaaaaa'.length })
+    expect((await readdir(join(yt, 'Města'))).sort()).toEqual([
+      'Clip [aaaaaaaaaaa].info.json',
+      'Clip [aaaaaaaaaaa].jpg',
+      'Clip [aaaaaaaaaaa].ytonline'
+    ])
+    expect(await readdir(join(root, 'Koš'))).toEqual(['Clip [aaaaaaaaaaa].mp4'])
+    const after = videos()[0]!
+    expect(after).toMatchObject({ id: before.id, online: true, sizeBytes: 0, durationSec: 200 })
+    expect(repository.progress(before.id)?.position).toBe(80)
+    // Další sken nic nezdvojí.
+    await lib.scan()
+    expect(videos()).toHaveLength(1)
+  })
+
+  it('video bez ID z YouTube online ponechat nejde', async () => {
+    const lib = library()
+    await lib.scan()
+    await mkdir(join(yt, 'Města'), { recursive: true })
+    await writeFile(join(yt, 'Města', 'vlastni.mp4'), 'x')
+    await lib.scan()
+    expect(await lib.manage({ kind: 'keep-online', videoId: videos()[0]!.id })).toMatchObject({
+      ok: false
+    })
+    expect(existsSync(join(yt, 'Města', 'vlastni.mp4'))).toBe(true)
+  })
+
+  it('celá kategorie: převede jen stažená videa s odkazem, sečte uvolněné místo', async () => {
+    const lib = library()
+    await lib.scan()
+    await downloaded(join(yt, 'Města'), 'A', 'aaaaaaaaaaa', { title: 'A' })
+    await downloaded(join(yt, 'Města'), 'B', 'bbbbbbbbbbb', { title: 'B' })
+    await writeFile(join(yt, 'Města', 'vlastni.mp4'), 'x')
+    await lib.scan()
+    const id = repository.list().find((c) => c.name === 'Města')!.id!
+    const result = await lib.manage({ kind: 'keep-online-category', categoryId: id })
+    expect(result).toEqual({ ok: true, freedBytes: 2 * 'video aaaaaaaaaaa'.length })
+    expect(
+      videos()
+        .map((v) => [v.name, v.online])
+        .sort()
+    ).toEqual([
+      ['A', true],
+      ['B', true],
+      ['vlastni', false]
+    ])
+  })
+
+  it('Stáhnout do počítače: stažený soubor převezme záznam odkazu (pozice zůstane), odkaz zmizí', async () => {
+    const lib = library()
+    await lib.scan()
+    await lib.addOnline([{ youtubeId: 'ccccccccccc', title: 'Online klip' }], 'Příroda')
+    const online = videos()[0]!
+    repository.record(online.id, 90, 300)
+    expect(repository.categoryOfYoutubeId('ccccccccccc', true)).toBeNull()
+    expect(repository.categoryOfYoutubeId('ccccccccccc')).toBe('Příroda')
+
+    // yt-dlp stáhne video do stejné kategorie (pod svým názvem).
+    await downloaded(join(yt, 'Příroda'), 'Online klip (Official)', 'ccccccccccc', {
+      title: 'Online klip (Official)'
+    })
+    await lib.scan()
+
+    expect(videos()).toHaveLength(1)
+    expect(videos()[0]).toMatchObject({
+      id: online.id,
+      online: false,
+      name: 'Online klip (Official)'
+    })
+    expect(repository.progress(online.id)?.position).toBe(90)
+    expect((await readdir(join(yt, 'Příroda'))).sort()).toEqual([
+      'Online klip (Official) [ccccccccccc].info.json',
+      'Online klip (Official) [ccccccccccc].jpg',
+      'Online klip (Official) [ccccccccccc].mp4'
+    ])
+    expect(repository.categoryOfYoutubeId('ccccccccccc', true)).toBe('Příroda')
+  })
+
+  it('nedostupné video: štítek se uloží a přežije sken', async () => {
+    const lib = library()
+    await lib.scan()
+    await lib.addOnline([{ youtubeId: 'ddddddddddd', title: 'Smazané' }], 'Města')
+    repository.setUnavailable(videos()[0]!.id, true)
+    await lib.scan()
+    expect(videos()[0]!.unavailable).toBe(true)
+  })
+})

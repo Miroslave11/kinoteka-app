@@ -15,6 +15,14 @@ describe('parseYtManageAction', () => {
     expect(parseYtManageAction({ kind: 'delete-category', categoryId: '1' })).toBeNull()
     expect(parseYtManageAction({ kind: 'rename-category', categoryId: 2, name: '' })).toBeNull()
     expect(parseYtManageAction({ kind: 'neco' })).toBeNull()
+    expect(parseYtManageAction({ kind: 'keep-online', videoId: 4 })).toEqual({
+      kind: 'keep-online',
+      videoId: 4
+    })
+    expect(parseYtManageAction({ kind: 'keep-online-category', categoryId: 2 })).toEqual({
+      kind: 'keep-online-category',
+      categoryId: 2
+    })
   })
 
   it('klíčová slova bez prázdných a opakování', () => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ExternalLink, FolderInput, Play, Trash2 } from 'lucide-react'
+import { Cloud, Download, ExternalLink, FolderInput, Play, Trash2 } from 'lucide-react'
+import { formatSize } from '../../../shared/library'
 import type { YtCategory, YtVideoSummary } from '../../../shared/yt'
 
 export interface YtMenuState {
@@ -20,6 +21,8 @@ export default function YtVideoMenu({
   onPlay,
   onMove,
   onTrash,
+  onKeepOnline,
+  onDownload,
   onClose
 }: {
   menu: YtMenuState
@@ -27,10 +30,15 @@ export default function YtVideoMenu({
   onPlay: (id: number) => void
   onMove: (videoId: number, categoryId: number) => void
   onTrash: (videoId: number) => void
+  /** Stažené video: smazat soubor, ponechat odkaz (online). */
+  onKeepOnline: (videoId: number) => void
+  /** Online video: stáhnout do počítače. */
+  onDownload: (video: YtVideoSummary) => void
   onClose: () => void
 }): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   const [confirming, setConfirming] = useState(false)
+  const [confirmingOnline, setConfirmingOnline] = useState(false)
   const [position, setPosition] = useState({ left: menu.x, top: menu.y })
 
   // Nabídka nesmí přetéct okraj okna.
@@ -88,6 +96,25 @@ export default function YtVideoMenu({
             </button>
           ))}
         </>
+      )}
+      {menu.video.online && (
+        <button role="menuitem" onClick={() => act(() => onDownload(menu.video))}>
+          <Download size={15} /> Stáhnout do počítače
+        </button>
+      )}
+      {!menu.video.online && menu.video.youtubeId && (
+        <button
+          role="menuitem"
+          title="Soubor videa půjde do Koše, zůstane odkaz – přehraje se z YouTube"
+          onClick={() =>
+            confirmingOnline ? act(() => onKeepOnline(menu.video.id)) : setConfirmingOnline(true)
+          }
+        >
+          <Cloud size={15} />{' '}
+          {confirmingOnline
+            ? `Opravdu? Soubor (${formatSize(menu.video.sizeBytes)}) půjde do Koše`
+            : `Ponechat jen online (uvolní ${formatSize(menu.video.sizeBytes)})`}
+        </button>
       )}
       {menu.video.youtubeId && (
         <button

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { YtCategory, YtVideoSummary } from '../../../shared/yt'
 import {
   continueRow,
+  diskBytes,
   filterKey,
-  filterStorage,
-  parseStorage,
+  freeableBytes,
   totalVideos,
   visibleCategories
 } from './ytData'
@@ -16,6 +16,8 @@ const video = (id: number, patch: Partial<YtVideoSummary> = {}): YtVideoSummary 
   durationSec: 200,
   youtubeId: null,
   online: false,
+  sizeBytes: 1000,
+  unavailable: false,
   thumbnailUrl: null,
   addedAt: '2026-11-07T10:00:00.000Z',
   progress: null,
@@ -60,24 +62,20 @@ describe('ytData', () => {
   })
 })
 
-describe('filtr uložení', () => {
-  it('online / v počítači / vše', () => {
-    const mixed: YtCategory[] = [
-      {
-        id: 1,
-        name: 'Města',
-        keywords: [],
-        role: null,
-        videos: [video(1, { online: true }), video(2)]
-      }
-    ]
-    expect(totalVideos(filterStorage(mixed, 'online'))).toBe(1)
-    expect(filterStorage(mixed, 'pc')[0]!.videos.map((v) => v.id)).toEqual([2])
-    expect(totalVideos(filterStorage(mixed, 'vse'))).toBe(2)
-    expect([parseStorage('online'), parseStorage('x'), parseStorage(null)]).toEqual([
-      'online',
-      'vse',
-      'vse'
-    ])
+describe('místo na disku', () => {
+  it('obsazené a uvolnitelné místo', () => {
+    const category: YtCategory = {
+      id: 1,
+      name: 'Města',
+      keywords: [],
+      role: null,
+      videos: [
+        video(1, { sizeBytes: 500, youtubeId: 'aaaaaaaaaaa' }),
+        video(2, { sizeBytes: 300 }),
+        video(3, { online: true, sizeBytes: 0, youtubeId: 'bbbbbbbbbbb' })
+      ]
+    }
+    expect(diskBytes([category])).toBe(800)
+    expect(freeableBytes(category)).toBe(500)
   })
 })

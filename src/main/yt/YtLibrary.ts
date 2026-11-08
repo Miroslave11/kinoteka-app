@@ -114,6 +114,8 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
   private running: Promise<YtScanResult> | null = null
   private lock: Promise<unknown> = Promise.resolve()
   private fetching: Promise<void> | null = null
+  /** Kolik místa uvolnil poslední převod na online (výsledek `manage`). */
+  private freedBytes = 0
   /** Videa, ke kterým YouTube údaje nedá (smazaná, soukromá) – řadí se jen podle názvu. */
   private readonly withoutInfo = new Set<string>()
   /** Videa v kořeni složky, ke kterým se mají dotáhnout údaje (cesta → YouTube ID). */
@@ -156,9 +158,14 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
 
   async manage(action: YtManageAction): Promise<YtManageResult> {
     let result: YtManageResult
+    this.freedBytes = 0
     try {
       const message = await this.exclusive(() => this.apply(action))
-      result = message ? { ok: false, message } : { ok: true }
+      result = message
+        ? { ok: false, message }
+        : this.freedBytes > 0
+          ? { ok: true, freedBytes: this.freedBytes }
+          : { ok: true }
     } catch (error) {
       result = { ok: false, message: fileError(error) }
     }
@@ -229,6 +236,21 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
         await this.relocate(video, join(targetDir, basename(video.path)))
         return null
       }
+      case 'keep-online': {
+        const video = this.repository.video(action.videoId)
+        if (!video) return 'Video už ve složce není.'
+        if (isOnlineFile(video.path)) return null
+        if (!video.youtubeId)
+          return 'Video nemá odkaz na YouTube (v názvu souboru chybí ID) – online ho ponechat nejde.'
+        await this.toOnline(video)
+        return null
+      }
+      case 'keep-online-category': {
+        if (!this.repository.category(action.categoryId)) return 'Kategorie už neexistuje.'
+        for (const video of this.repository.categoryVideos(action.categoryId))
+          if (video.youtubeId && !isOnlineFile(video.path)) await this.toOnline(video)
+        return null
+      }
       case 'trash-video': {
         const video = this.repository.video(action.videoId)
         if (!video) return null
@@ -242,6 +264,86 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
         await rm(join(this.options.thumbnailDir, `${video.id}.jpg`), { force: true })
         return null
       }
+    }
+  }
+
+  /**
+   * Stažené video → online: vedle videa vznikne odkaz, video jde do Koše. Údaje, obrázek
+   * i pozice zůstanou (stejný záznam, jen jiný soubor).
+   */
+  private async toOnline(video: StoredYtVideo): Promise<void> {
+    const base = withoutExtension(video.path)
+    const onlinePath = base + ONLINE_EXTENSION
+    if (!existsSync(onlinePath)) {
+      const link = {
+        url: `https://www.youtube.com/watch?v=${video.youtubeId}`,
+        id: video.youtubeId,
+        addedAt: this.now().toISOString()
+      }
+      await writeFile(onlinePath, JSON.stringify(link, null, 1), 'utf8')
+    }
+    if (!findSidecarImage(video.path) && this.options.fetchThumbnail) {
+      const image = await this.options.fetchThumbnail(video.youtubeId!).catch(() => null)
+      if (image) await writeFile(`${base}.jpg`, image)
+    }
+    try {
+      await this.trash(video.path)
+    } catch (error) {
+      // Video zůstalo (je otevřené) – odkaz navíc by vedl na dva záznamy.
+      await rm(onlinePath, { force: true })
+      throw error
+    }
+    const file = await stat(onlinePath)
+    this.repository.updateVideo(
+      video.id,
+      await this.record(this.options.folder(), {
+        path: onlinePath,
+        size: file.size,
+        mtimeMs: Math.floor(file.mtimeMs)
+      })
+    )
+    await rm(join(this.options.thumbnailDir, `${video.id}.jpg`), { force: true })
+    this.freedBytes += video.size
+  }
+
+  /**
+   * Online video, které se mezitím stáhlo do počítače (Stáhnout do počítače): záznam
+   * odkazu převezme stažený soubor (pozice a zhlédnutí zůstanou) a odkaz se smaže.
+   */
+  private async mergeDownloaded(root: string): Promise<void> {
+    const online = (await listVideoFiles(root, undefined, isOnlineFile)).files
+    if (online.length === 0) return
+    const downloaded = new Map<string, string>()
+    for (const file of (await listVideoFiles(root)).files) {
+      if (PARTIAL_DOWNLOAD.test(file.path)) continue
+      const { youtubeId } = nameAndYoutubeId(file.path)
+      if (youtubeId) downloaded.set(youtubeId, file.path)
+    }
+    const stored = this.repository.storedFiles()
+    for (const file of online) {
+      const { youtubeId } = nameAndYoutubeId(file.path)
+      const videoPath = youtubeId ? downloaded.get(youtubeId) : undefined
+      if (!videoPath) continue
+      const record = stored.find((s) => s.path.toLowerCase() === file.path.toLowerCase())
+      const already = stored.some((s) => s.path.toLowerCase() === videoPath.toLowerCase())
+      if (record && !already) {
+        const info = await stat(videoPath)
+        this.repository.updateVideo(
+          record.id,
+          await this.record(root, {
+            path: videoPath,
+            size: info.size,
+            mtimeMs: Math.floor(info.mtimeMs)
+          })
+        )
+      }
+      // Odkaz a jeho obrázek s údaji pryč (stažené video má vlastní, když se jmenuje jinak).
+      const onlineBase = withoutExtension(file.path)
+      const videoBase = withoutExtension(videoPath)
+      await rm(file.path, { force: true })
+      if (onlineBase.toLowerCase() !== videoBase.toLowerCase())
+        for (const ext of ['.jpg', '.webp', '.png', '.info.json'])
+          await rm(onlineBase + ext, { force: true })
     }
   }
 
@@ -268,7 +370,9 @@ export class YtLibrary extends EventEmitter<YtLibraryEvents> {
     const errors: string[] = []
     await this.prepareCategories(root)
     // Během stahování se kořen netřídí – yt-dlp v něm dokončuje soubory (stažení pak skenuje znovu).
-    const sorted = this.options.busy?.() ? 0 : await this.sortLooseVideos(root, errors)
+    const busy = this.options.busy?.() ?? false
+    const sorted = busy ? 0 : await this.sortLooseVideos(root, errors)
+    if (!busy) await this.mergeDownloaded(root)
 
     const listing = await listVideoFiles(root, undefined, isMedia)
     listing.files = listing.files.filter((file) => !PARTIAL_DOWNLOAD.test(file.path))
