@@ -331,7 +331,9 @@ export default function YtPage(): React.JSX.Element {
             <section key={filterKey(category)} className="yt-row">
               <h3>
                 {category.name}
-                <span className="muted small">{category.videos.length}</span>
+                <span className="yt-count" title="Počet videí">
+                  {category.videos.length}
+                </span>
                 <button className="row-link" onClick={() => select(category)}>
                   Zobrazit vše
                 </button>
