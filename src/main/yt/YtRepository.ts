@@ -244,6 +244,22 @@ export class YtRepository {
     return (row['folder'] as string | null) ?? 'Čeká na zařazení'
   }
 
+  /** Videa s tímto YouTube ID (stažené i online). */
+  videosByYoutubeId(youtubeId: string): StoredYtVideo[] {
+    return this.db
+      .prepare('SELECT * FROM yt_video WHERE youtube_id = ? ORDER BY id')
+      .all(youtubeId)
+      .map(storedVideo)
+  }
+
+  /** Kategorie podle názvu složky bez ohledu na velikost písmen. */
+  categoryByName(name: string): StoredCategory | null {
+    const row = this.db
+      .prepare('SELECT * FROM yt_category WHERE folder = ? COLLATE NOCASE')
+      .get(name)
+    return row ? storedCategory(row) : null
+  }
+
   setUnavailable(id: number, unavailable: boolean): void {
     this.db.prepare('UPDATE yt_video SET unavailable = ? WHERE id = ?').run(unavailable ? 1 : 0, id)
   }

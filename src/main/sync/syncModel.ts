@@ -1,4 +1,4 @@
-import type { Database } from '../db/database'
+import { transaction, type Database } from '../db/database'
 
 /**
  * Model sdílení mezi počítači: každý sdílený záznam (záznam deníku, hodnocení, YT video…)
@@ -117,6 +117,11 @@ export class SyncRepository {
   clear(): void {
     this.db.exec('DELETE FROM sync_entity')
   }
+
+  /** Víc zápisů najednou (rychleji a bez napůl provedené změny). */
+  transaction<T>(work: () => T): T {
+    return transaction(this.db, work)
+  }
 }
 
 /**
@@ -129,7 +134,14 @@ export interface SyncAdapter {
   /** Místní stav: klíč → data. */
   snapshot(): Map<string, unknown>
   /** Promítne záznam z jiného počítače (deleted = smazat). */
-  apply(entity: SyncEntity): void
+  apply(entity: SyncEntity): void | Promise<void>
+  /**
+   * Pořadí promítání (menší dřív); výchozí: smazání před ostatními. YT videa: nejdřív
+   * nové kategorie, pak videa, nakonec smazání kategorií (už bez videí).
+   */
+  rank?(entity: SyncEntity): number
+  /** Po promítnutí všech změn (např. jeden sken složky místo jednoho na každé video). */
+  afterApply?(): Promise<void>
 }
 
 export interface MergeResult {
@@ -146,13 +158,13 @@ export interface MergeResult {
  * Jedna synchronizace: najde místní změny (proti stavu při poslední synchronizaci),
  * promítne novější změny z jiných počítačů a vrátí soubor tohoto počítače.
  */
-export function merge(
+export async function merge(
   repository: SyncRepository,
   adapters: readonly SyncAdapter[],
   remote: readonly DeviceFile[],
   device: string,
   now: string
-): MergeResult {
+): Promise<MergeResult> {
   const stored = new Map(repository.all().map((entity) => [entity.key, entity]))
   const snapshot = (): Map<string, string> => {
     const all = new Map<string, string>()
@@ -161,52 +173,75 @@ export function merge(
     return all
   }
 
-  // 1) Místní změny: nové, upravené a smazané záznamy.
-  let local = 0
-  const current = snapshot()
-  for (const [key, sig] of current) {
-    const known = stored.get(key)
-    if (known && known.localSig === sig) continue
-    const entity: StoredEntity = {
-      key,
-      data: JSON.parse(sig),
-      updatedAt: now,
-      device,
-      deleted: false,
-      localSig: sig
-    }
-    repository.put(entity)
-    stored.set(key, entity)
-    local++
-  }
-  for (const known of stored.values()) {
-    if (known.localSig === null || current.has(known.key)) continue
-    const entity: StoredEntity = { ...known, updatedAt: now, device, deleted: true, localSig: null }
-    repository.put(entity)
-    stored.set(known.key, entity)
-    local++
-  }
-
-  // 2) Změny z jiných počítačů – u každého klíče nejnovější; smazání před ostatními.
+  // Změny z jiných počítačů – u každého klíče nejnovější.
   const best = new Map<string, SyncEntity>()
   for (const file of remote)
     for (const entity of file.entities) {
       const seen = best.get(entity.key)
       if (!seen || isNewer(entity, seen)) best.set(entity.key, entity)
     }
+
+  // 1) Místní změny: nové, upravené a smazané záznamy.
+  let local = 0
+  const current = snapshot()
+  repository.transaction(() => {
+    for (const [key, sig] of current) {
+      const known = stored.get(key)
+      if (known && known.localSig === sig) continue
+      // Totéž už má jiný počítač (výchozí kategorie, první synchronizace) – převzít jeho
+      // záznam, ne ho poslat zpátky jako novou změnu.
+      const same = best.get(key)
+      if (same && !same.deleted && canonical(same.data) === sig) {
+        const adopted: StoredEntity = { ...same, localSig: sig }
+        repository.put(adopted)
+        stored.set(key, adopted)
+        continue
+      }
+      const entity: StoredEntity = {
+        key,
+        data: JSON.parse(sig),
+        updatedAt: now,
+        device,
+        deleted: false,
+        localSig: sig
+      }
+      repository.put(entity)
+      stored.set(key, entity)
+      local++
+    }
+    for (const known of stored.values()) {
+      if (known.localSig === null || current.has(known.key)) continue
+      const entity: StoredEntity = {
+        ...known,
+        updatedAt: now,
+        device,
+        deleted: true,
+        localSig: null
+      }
+      repository.put(entity)
+      stored.set(known.key, entity)
+      local++
+    }
+  })
+
+  // 2) Promítnout novější změny z jiných počítačů (v pořadí podle `rank`).
+  const adapterOf = (entity: SyncEntity): SyncAdapter | undefined =>
+    adapters.find((a) => entity.key.startsWith(a.prefix))
+  const rankOf = (entity: SyncEntity): number =>
+    adapterOf(entity)?.rank?.(entity) ?? (entity.deleted ? 0 : 1)
   const incoming = [...best.values()]
     .filter((entity) => {
       const known = stored.get(entity.key)
       return !known || isNewer(entity, known)
     })
-    .sort((a, b) => Number(b.deleted) - Number(a.deleted))
+    .sort((a, b) => rankOf(a) - rankOf(b))
   const errors: string[] = []
   const touched: string[] = []
   for (const entity of incoming) {
-    const adapter = adapters.find((a) => entity.key.startsWith(a.prefix))
+    const adapter = adapterOf(entity)
     if (!adapter) continue // Oblast, kterou tato verze ještě nezná – pošle se dál beze změny.
     try {
-      adapter.apply(entity)
+      await adapter.apply(entity)
     } catch (error) {
       errors.push(`${entity.key}: ${(error as Error).message}`)
       continue
@@ -227,6 +262,14 @@ export function merge(
   // 3) Podoba promítnutých záznamů v tomto počítači – další synchronizace je nevezme jako
   //    místní změnu (místní podoba se může lišit, např. název titulu podle místního TMDB).
   if (touched.length > 0) {
+    for (const adapter of adapters) {
+      if (!adapter.afterApply || !touched.some((key) => key.startsWith(adapter.prefix))) continue
+      try {
+        await adapter.afterApply()
+      } catch (error) {
+        errors.push(`${adapter.prefix} ${(error as Error).message}`)
+      }
+    }
     const after = snapshot()
     for (const key of touched) repository.setLocalSig(key, after.get(key) ?? null)
   }

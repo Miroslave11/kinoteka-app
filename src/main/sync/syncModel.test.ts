@@ -36,8 +36,8 @@ function computer(id: string, files: string[]) {
     titleId: (name: string): number =>
       Number(db.prepare('SELECT id FROM title WHERE name = ?').get(name)!['id']),
     /** Synchronizace proti souborům ostatních počítačů; vrátí výsledek a nový vlastní soubor. */
-    sync(others: DeviceFile[], at: string) {
-      const result = merge(repository, [adapters.diary, adapters.ratings], others, id, at)
+    async sync(others: DeviceFile[], at: string) {
+      const result = await merge(repository, [adapters.diary, adapters.ratings], others, id, at)
       file = { ...file, updatedAt: at, entities: result.own }
       return result
     },
@@ -49,7 +49,7 @@ function computer(id: string, files: string[]) {
 }
 
 describe('canonical', () => {
-  it('stejná data = stejný zápis bez ohledu na pořadí klíčů', () => {
+  it('stejná data = stejný zápis bez ohledu na pořadí klíčů', async () => {
     expect(canonical({ b: 1, a: [{ d: null, c: 'x' }] })).toBe(
       canonical({ a: [{ c: 'x', d: null }], b: 1 })
     )
@@ -57,7 +57,7 @@ describe('canonical', () => {
 })
 
 describe('sdílení deníku mezi dvěma počítači', () => {
-  it('záznam a hodnocení se přenesou; titul, který druhé PC nemá, se založí', () => {
+  it('záznam a hodnocení se přenesou; titul, který druhé PC nemá, se založí', async () => {
     const doma = computer('A-doma', ['Prázdnota (2020).mkv', 'Duna (2021).mkv'])
     const notebook = computer('B-notebook', ['Duna (2021).mkv'])
     const prazdnota = doma.titleId('Prázdnota')
@@ -75,8 +75,8 @@ describe('sdílení deníku mezi dvěma počítači', () => {
     })
     doma.journal.setRating(prazdnota, 5)
 
-    expect(doma.sync([], '2026-11-08T10:00:00.000Z')).toMatchObject({ local: 3, applied: 0 })
-    expect(notebook.sync([doma.file], '2026-11-08T10:01:00.000Z')).toMatchObject({
+    expect(await doma.sync([], '2026-11-08T10:00:00.000Z')).toMatchObject({ local: 3, applied: 0 })
+    expect(await notebook.sync([doma.file], '2026-11-08T10:01:00.000Z')).toMatchObject({
       applied: 3,
       local: 0,
       errors: []
@@ -93,17 +93,17 @@ describe('sdílení deníku mezi dvěma počítači', () => {
     ).toBe(1)
 
     // Promítnuté změny nejsou místní změny – další synchronizace nic nového nenajde.
-    expect(notebook.sync([doma.file], '2026-11-08T10:02:00.000Z')).toMatchObject({
+    expect(await notebook.sync([doma.file], '2026-11-08T10:02:00.000Z')).toMatchObject({
       local: 0,
       applied: 0
     })
-    expect(doma.sync([notebook.file], '2026-11-08T10:03:00.000Z')).toMatchObject({
+    expect(await doma.sync([notebook.file], '2026-11-08T10:03:00.000Z')).toMatchObject({
       local: 0,
       applied: 0
     })
   })
 
-  it('úprava a smazání se přenesou zpět; novější změna vyhraje', () => {
+  it('úprava a smazání se přenesou zpět; novější změna vyhraje', async () => {
     const doma = computer('A-doma', ['Duna (2021).mkv'])
     const notebook = computer('B-notebook', ['Duna (2021).mkv'])
     doma.journal.addManual({
@@ -112,29 +112,31 @@ describe('sdílení deníku mezi dvěma počítači', () => {
       watchedAt: '2026-11-02T20:00:00.000Z',
       note: null
     })
-    doma.sync([], '2026-11-08T10:00:00.000Z')
-    notebook.sync([doma.file], '2026-11-08T10:01:00.000Z')
+    await doma.sync([], '2026-11-08T10:00:00.000Z')
+    await notebook.sync([doma.file], '2026-11-08T10:01:00.000Z')
 
     // Obě PC upraví poznámku; notebook později → vyhraje notebook.
     const [onDoma] = doma.journal.list()
     const [onNotebook] = notebook.journal.list()
     doma.journal.update(onDoma!.id, { note: 'doma' })
-    doma.sync([notebook.file], '2026-11-08T11:00:00.000Z')
+    await doma.sync([notebook.file], '2026-11-08T11:00:00.000Z')
     notebook.journal.update(onNotebook!.id, { note: 'notebook' })
-    notebook.sync([doma.file], '2026-11-08T11:05:00.000Z')
-    doma.sync([notebook.file], '2026-11-08T11:06:00.000Z')
+    await notebook.sync([doma.file], '2026-11-08T11:05:00.000Z')
+    await doma.sync([notebook.file], '2026-11-08T11:06:00.000Z')
     expect(doma.journal.list()[0]!.note).toBe('notebook')
 
     // Smazání na notebooku smaže i doma a záznam se už nevrátí.
     notebook.journal.remove(onNotebook!.id)
-    notebook.sync([doma.file], '2026-11-08T12:00:00.000Z')
-    expect(doma.sync([notebook.file], '2026-11-08T12:01:00.000Z')).toMatchObject({ applied: 1 })
+    await notebook.sync([doma.file], '2026-11-08T12:00:00.000Z')
+    expect(await doma.sync([notebook.file], '2026-11-08T12:01:00.000Z')).toMatchObject({
+      applied: 1
+    })
     expect(doma.journal.list()).toEqual([])
-    notebook.sync([doma.file], '2026-11-08T12:02:00.000Z')
+    await notebook.sync([doma.file], '2026-11-08T12:02:00.000Z')
     expect(notebook.journal.list()).toEqual([])
   })
 
-  it('poškozený soubor z Disku se přeskočí; neznámá oblast se zachová a pošle dál', () => {
+  it('poškozený soubor z Disku se přeskočí; neznámá oblast se zachová a pošle dál', async () => {
     expect(parseDeviceFile('nesmysl')).toBeNull()
     expect(parseDeviceFile('{"format":2,"device":{"id":"x"}}')).toBeNull()
     const doma = computer('A-doma', [])
@@ -145,7 +147,7 @@ describe('sdílení deníku mezi dvěma počítači', () => {
       device: 'C',
       deleted: false
     }
-    doma.sync(
+    await doma.sync(
       [{ format: 1, device: { id: 'C', name: 'C' }, updatedAt: '', entities: [future] }],
       '2026-11-08T10:01:00.000Z'
     )
