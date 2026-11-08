@@ -46,6 +46,12 @@ export interface YtIpcDeps {
   repository: YtRepository
   /** Přehraje video v běžném přehrávači (rozkoukané od uložené pozice). */
   play: (host: BrowserWindow | null, videoId: number) => Promise<unknown>
+  /** Přehraje video z YouTube bez stažení (test O1). */
+  playOnline: (
+    host: BrowserWindow | null,
+    youtubeId: string,
+    quality: KidsQuality
+  ) => Promise<unknown>
   downloader: KidsDownloader
   queue: KidsDownloadQueue
 }
@@ -55,6 +61,7 @@ export function registerYtIpc({
   library,
   repository,
   play,
+  playOnline,
   downloader,
   queue
 }: YtIpcDeps): void {
@@ -97,6 +104,17 @@ export function registerYtIpc({
 
   ipcMain.handle(IpcChannel.YtOpenFolder, async () => {
     await shell.openPath(ytFolder(settings))
+  })
+
+  ipcMain.handle(IpcChannel.YtPlayOnline, (event, value: unknown) => {
+    const link = typeof value === 'string' ? parseYoutubeLink(value) : null
+    if (!link?.videoId)
+      return { ok: false, reason: 'error', message: 'Tohle není odkaz na video z YouTube.' }
+    return playOnline(
+      BrowserWindow.fromWebContents(event.sender),
+      link.videoId,
+      ytQuality(settings)
+    )
   })
 
   // ---------- stahování z YouTube ----------

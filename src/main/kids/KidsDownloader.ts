@@ -17,6 +17,7 @@ import {
   parseProgressLine,
   type VideoInfo
 } from './ytdlp'
+import { buildStreamArgs } from '../yt/ytStream'
 
 interface KidsDownloaderEvents {
   progress: [KidsDownloadProgress]
@@ -174,17 +175,37 @@ export class KidsDownloader extends EventEmitter<KidsDownloaderEvents> {
     throw Object.assign(new Error(message), { retry: /připojení/.test(message) })
   }
 
+  /**
+   * Adresy obrazu a zvuku videa na YouTube pro přehrávání bez stažení (`yt-dlp -J -f …`).
+   * Chyba spojení má `retry: true`.
+   */
+  async streamInfo(
+    youtubeId: string,
+    quality: KidsQuality,
+    signal?: AbortSignal
+  ): Promise<Record<string, unknown>> {
+    const url = `https://www.youtube.com/watch?v=${youtubeId}`
+    const { code, json, output } = await this.runInfo(url, false, undefined, signal, (node) =>
+      buildStreamArgs(url, node, quality)
+    )
+    if (code === 0 && typeof json === 'object' && json !== null)
+      return json as Record<string, unknown>
+    const message = errorMessage(output)
+    throw Object.assign(new Error(message), { retry: /připojení/.test(message) })
+  }
+
   private async runInfo(
     url: string,
     playlist: boolean,
     onStage?: (stage: KidsPreviewStage) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    args: (nodePath: string) => string[] = (node) => buildInfoArgs(url, node, playlist)
   ): Promise<{ code: number | null; json: unknown; output: string[] }> {
     onStage?.('tool')
     const exe = await this.prepareTool()
     if (signal?.aborted) throw new Error(PREVIEW_CANCELED)
     onStage?.('info')
-    const child = this.spawnYtDlp(exe, buildInfoArgs(url, this.options.nodePath, playlist))
+    const child = this.spawnYtDlp(exe, args(this.options.nodePath))
     const stdout: Buffer[] = []
     const output: string[] = []
     child.stdout!.on('data', (chunk: Buffer) => stdout.push(chunk))

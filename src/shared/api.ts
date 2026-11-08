@@ -298,6 +298,8 @@ export interface KinotekaApi {
     removeFromQueue(id: number): Promise<void>
     clearFinished(): Promise<void>
     onQueueChanged(listener: (items: KidsQueueItem[]) => void): () => void
+    /** Přehraje odkaz z YouTube bez stažení (test přehrávání online). */
+    playOnline(url: string): Promise<OpenFileResult>
   }
   library: {
     listFolders(): Promise<LibraryFolder[]>

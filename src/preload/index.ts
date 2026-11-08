@@ -156,7 +156,8 @@ const api: KinotekaApi = {
     queue: () => ipcRenderer.invoke(IpcChannel.YtQueue),
     removeFromQueue: (id) => ipcRenderer.invoke(IpcChannel.YtQueueRemove, id),
     clearFinished: () => ipcRenderer.invoke(IpcChannel.YtQueueClear),
-    onQueueChanged: (listener) => subscribe(IpcChannel.YtQueueChanged, listener)
+    onQueueChanged: (listener) => subscribe(IpcChannel.YtQueueChanged, listener),
+    playOnline: (url) => ipcRenderer.invoke(IpcChannel.YtPlayOnline, url)
   },
   library: {
     listFolders: () => ipcRenderer.invoke(IpcChannel.LibraryListFolders),
