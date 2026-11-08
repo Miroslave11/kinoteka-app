@@ -133,5 +133,11 @@ export const IpcChannel = {
   YtPrefetch: 'yt:prefetch',
   YtSetConcurrency: 'yt:set-concurrency',
   YtQueueChanged: 'yt:queue-changed',
-  YtAddOnline: 'yt:add-online'
+  YtAddOnline: 'yt:add-online',
+  SyncStatus: 'sync:status',
+  SyncSignIn: 'sync:sign-in',
+  SyncSignOut: 'sync:sign-out',
+  SyncNow: 'sync:now',
+  SyncSetDeviceName: 'sync:set-device-name',
+  SyncChanged: 'sync:changed'
 } as const

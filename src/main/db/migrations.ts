@@ -342,5 +342,26 @@ export const MIGRATIONS: readonly string[] = [
   // 21 – YT videa: online video, které YouTube už nevydá (zjištěno při přehrání)
   `
   ALTER TABLE yt_video ADD COLUMN unavailable INTEGER NOT NULL DEFAULT 0;
+  `,
+  // 22 – sdílení mezi počítači: stálé ID záznamu deníku a stav sdílených záznamů
+  `
+  ALTER TABLE watch_event ADD COLUMN sync_id TEXT;
+  UPDATE watch_event SET sync_id = lower(hex(randomblob(16))) WHERE sync_id IS NULL;
+  CREATE UNIQUE INDEX watch_event_sync ON watch_event (sync_id);
+  CREATE TRIGGER watch_event_sync_id AFTER INSERT ON watch_event WHEN NEW.sync_id IS NULL
+  BEGIN
+    UPDATE watch_event SET sync_id = lower(hex(randomblob(16))) WHERE id = NEW.id;
+  END;
+
+  -- Sdílený záznam (klíč → data). local_sig = podoba záznamu v tomto počítači při poslední
+  -- synchronizaci; podle ní se poznají místní změny.
+  CREATE TABLE sync_entity (
+    key TEXT PRIMARY KEY,
+    data TEXT,
+    updated_at TEXT NOT NULL,
+    device TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    local_sig TEXT
+  );
   `
 ]

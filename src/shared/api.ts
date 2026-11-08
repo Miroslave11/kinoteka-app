@@ -45,6 +45,7 @@ import type { PlayRequest } from './playback'
 import type { SubtitleSettings } from './subtitles'
 import type { ThemeInfo, ThemeResult, ThemeSettings, ThemeStatus } from './theme'
 import type { UpdateState } from './update'
+import type { SyncStatus } from './sync'
 import type {
   YtCategory,
   YtManageAction,
@@ -278,6 +279,16 @@ export interface KinotekaApi {
     chooseTmdb(titleId: number, choice: KidsTmdbChoice): Promise<KidsManageResult>
     /** Vlastní obrázek titulu vybraný v dialogu; null = výběr zrušen. */
     pickCover(titleId: number): Promise<KidsManageResult | null>
+  }
+  /** Sdílení mezi počítači přes Google Disk. */
+  sync: {
+    status(): Promise<SyncStatus>
+    /** Přihlášení ke Google v prohlížeči (čeká, až ho uživatel dokončí). */
+    signIn(): Promise<{ ok: boolean; message?: string }>
+    signOut(): Promise<void>
+    syncNow(): Promise<void>
+    setDeviceName(name: string): Promise<void>
+    onChanged(listener: () => void): () => void
   }
   yt: {
     status(): Promise<YtStatus>

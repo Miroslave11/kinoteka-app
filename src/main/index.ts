@@ -28,6 +28,11 @@ import { CatalogRepository } from './catalog/CatalogRepository'
 import { registerImdbIpc } from './imdb/imdbIpc'
 import { DeletionService } from './deletion/DeletionService'
 import { registerJournalIpc } from './journal/journalIpc'
+import { DRIVE_ENDPOINTS, driveEndpointsAt } from './sync/driveClient'
+import { endpointsAt, GOOGLE_ENDPOINTS } from './sync/googleAuth'
+import { JournalSync } from './sync/journalSync'
+import { registerSyncIpc } from './sync/syncIpc'
+import { SyncService } from './sync/SyncService'
 import { JournalRepository } from './journal/JournalRepository'
 import { ImdbService } from './imdb/ImdbService'
 import { KidsArtwork } from './kids/KidsArtwork'
@@ -410,6 +415,10 @@ let ytTracker: KidsTracker
 let ytRepository: YtRepository
 let ytDownloaderRef: KidsDownloader | null = null
 let ytQueueRef: KidsDownloadQueue | null = null
+let syncRef: SyncService | null = null
+/** Klíč aplikace u Googlu (sdílení přes Google Disk) – vkládá ho workflow Vydání. */
+const GOOGLE_CLIENT_ID = __KINOTEKA_GOOGLE_CLIENT_ID__
+const GOOGLE_CLIENT_SECRET = __KINOTEKA_GOOGLE_CLIENT_SECRET__
 
 /**
  * Video z části YT videa: běžný přehrávač s plným ovládáním, pozice se ukládá do vlastní
@@ -758,7 +767,36 @@ void app.whenReady().then(() => {
   setInterval(() => void metadata.run(), 60 * 60 * 1000).unref()
   registerMetadataIpc(metadata)
   registerImdbIpc(imdb)
-  registerJournalIpc(new JournalRepository(db), () => broadcast(IpcChannel.LibraryChanged))
+  // Sdílení mezi počítači přes Google Disk (SCOPE-SYNC.md). Ve vývoji jde Google nahradit
+  // falešným serverem (KINOTEKA_DEV_GOOGLE_URL, scripts/fake-google.mjs) – bez prohlížeče.
+  const devGoogle = app.isPackaged ? undefined : process.env['KINOTEKA_DEV_GOOGLE_URL']
+  const googleClient =
+    GOOGLE_CLIENT_ID !== ''
+      ? { id: GOOGLE_CLIENT_ID, secret: GOOGLE_CLIENT_SECRET }
+      : devGoogle
+        ? { id: 'kinoteka-dev', secret: 'dev' }
+        : null
+  const journalSync = new JournalSync(db)
+  const sync = new SyncService({
+    db,
+    settings,
+    adapters: [journalSync.diary, journalSync.ratings],
+    client: googleClient,
+    endpoints: devGoogle ? endpointsAt(devGoogle) : GOOGLE_ENDPOINTS,
+    drive: devGoogle ? driveEndpointsAt(devGoogle) : DRIVE_ENDPOINTS,
+    fetch: chromiumFetch,
+    openUrl: devGoogle
+      ? async (url) => void (await chromiumFetch(url))
+      : (url) => shell.openExternal(url),
+    onApplied: () => broadcast(IpcChannel.LibraryChanged)
+  })
+  syncRef = sync
+  registerSyncIpc(sync)
+  registerJournalIpc(new JournalRepository(db), () => {
+    broadcast(IpcChannel.LibraryChanged)
+    sync.soon()
+  })
+  sync.start()
   const deletion = new DeletionService(repository, {
     trash: (path) => shell.trashItem(path),
     remove: (path) => rm(path),
@@ -1050,6 +1088,7 @@ void app.whenReady().then(() => {
     ytDownloaderRef?.stopAll()
     ytStreamStop?.()
     themeDownloader.stopAll()
+    syncRef?.stop()
     db.close()
   })
 })
