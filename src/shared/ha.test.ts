@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DEFAULT_HA_AUTOMATION,
   DEFAULT_HA_SETTINGS,
   haBulbState,
   haLabel,
   isToggleEntityId,
   normalizeHaUrl,
+  parseHaAutomation,
   parseHaSettings,
   type HaStatus
 } from './ha'
 
 const status = (patch: Partial<HaStatus> = {}): HaStatus => ({
   settings: { ...DEFAULT_HA_SETTINGS, enabled: true, entityId: 'switch.vypinac_linka' },
+  automation: DEFAULT_HA_AUTOMATION,
   hasToken: true,
   connection: 'connected',
   error: null,
@@ -67,5 +70,36 @@ describe('žárovka', () => {
   it('název: vlastní, jinak z Home Assistant', () => {
     expect(haLabel(status())).toBe('vypinac_linka')
     expect(haLabel(status({ settings: { ...status().settings, label: 'Linka' } }))).toBe('Linka')
+  })
+})
+
+describe('parseHaAutomation', () => {
+  it('výchozí pravidla podle návrhu', () => {
+    expect(parseHaAutomation(undefined)).toEqual(DEFAULT_HA_AUTOMATION)
+    expect(DEFAULT_HA_AUTOMATION).toMatchObject({
+      start: 'off',
+      pause: 'on',
+      resume: 'off',
+      end: 'restore'
+    })
+  })
+
+  it('přijme platné a zahodí neplatné hodnoty', () => {
+    expect(
+      parseHaAutomation({
+        enabled: false,
+        sections: { yt: false, movie: 'x' },
+        start: 'restore',
+        pause: 'none',
+        end: 'off'
+      })
+    ).toEqual({
+      enabled: false,
+      sections: { movie: true, series: true, yt: false },
+      start: 'off',
+      pause: 'none',
+      resume: 'off',
+      end: 'off'
+    })
   })
 })

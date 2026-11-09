@@ -4,7 +4,9 @@ import {
   DEFAULT_HA_SETTINGS,
   isToggleEntityId,
   normalizeHaUrl,
+  parseHaAutomation,
   parseHaSettings,
+  type HaAutomationSettings,
   HA_TOGGLE_DOMAINS,
   type HaActionResult,
   type HaConnectionState,
@@ -20,6 +22,7 @@ import { HaConnection, HaError, type HaEntitySnapshot } from './HaConnection'
 
 export const HA_SETTINGS_KEY = 'ha.settings'
 export const HA_TOKEN_KEY = 'ha.token'
+export const HA_AUTOMATION_KEY = 'ha.automation'
 
 /** Prodlevy mezi pokusy o nové spojení (poslední se opakuje). */
 const RETRY_MS = [2_000, 5_000, 15_000, 30_000, 60_000]
@@ -70,6 +73,10 @@ export class HaService extends EventEmitter {
     return parseHaSettings(this.options.settings.get(HA_SETTINGS_KEY) ?? DEFAULT_HA_SETTINGS)
   }
 
+  automation(): HaAutomationSettings {
+    return parseHaAutomation(this.options.settings.get(HA_AUTOMATION_KEY))
+  }
+
   private token(): string | undefined {
     return this.options.settings.getSecret(HA_TOKEN_KEY) || undefined
   }
@@ -77,6 +84,7 @@ export class HaService extends EventEmitter {
   status(): HaStatus {
     return {
       settings: this.settings(),
+      automation: this.automation(),
       hasToken: !!this.token(),
       connection: this.state,
       error: this.error,
@@ -111,6 +119,8 @@ export class HaService extends EventEmitter {
       next.entityId = isToggleEntityId(patch.entityId) ? patch.entityId : null
     if (patch.label !== undefined) next.label = cleanHaLabel(patch.label)
     this.options.settings.set(HA_SETTINGS_KEY, next)
+    if (patch.automation !== undefined)
+      this.options.settings.set(HA_AUTOMATION_KEY, parseHaAutomation(patch.automation))
     if (typeof patch.token === 'string') {
       const token = patch.token.trim()
       if (token) this.options.settings.setSecret(HA_TOKEN_KEY, token)
@@ -167,6 +177,17 @@ export class HaService extends EventEmitter {
             HA_TOGGLE_DOMAINS.indexOf(domainOf(b.entityId)) ||
           a.friendlyName.localeCompare(b.friendlyName, 'cs')
       )
+  }
+
+  /** Je funkce zapnutá a entita vybraná (pro automatiku). */
+  configured(): boolean {
+    const { enabled, entityId } = this.settings()
+    return enabled && entityId !== null && !!this.token()
+  }
+
+  /** Poslední známý stav vybrané entity; null = nepřipojeno. */
+  entityState(): string | null {
+    return this.state === 'connected' ? (this.entity?.state ?? null) : null
   }
 
   /** Přepne vybranou entitu (žárovka, klávesa L). */

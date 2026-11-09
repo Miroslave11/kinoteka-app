@@ -35,6 +35,8 @@ import { registerSyncIpc } from './sync/syncIpc'
 import { SyncService } from './sync/SyncService'
 import { registerHaIpc } from './ha/haIpc'
 import { HaService } from './ha/HaService'
+import { HaAutomation, type HaPlaybackRun } from './ha/HaAutomation'
+import type { HaStatus } from '../shared/ha'
 import type { SyncAdapter } from './sync/syncModel'
 import { ytCategoryAdapter, ytVideoAdapter } from './sync/ytSync'
 import { JournalRepository } from './journal/JournalRepository'
@@ -214,9 +216,11 @@ async function startPlayback(
   session?.close()
   // mpv hlásí pozici už během spouštění – do přiřazení se jeho události ignorují.
   let started: PlayerSession | undefined = undefined
+  let haRun: HaPlaybackRun | null = null
   started = await PlayerSession.start({
     mainWindow: host,
     file,
+    onPlaybackFlags: (flags) => haRun?.flags(flags),
     title: item?.label,
     startSec,
     next: item ? nextLabel(item) : null,
@@ -263,6 +267,7 @@ async function startPlayback(
       if (session === started && current) playback.saveSubDelay(current.fileId, seconds)
     },
     onEnd: (info) => {
+      haRun?.end()
       if (session === started) {
         session = null
         tracker.finish()
@@ -273,6 +278,12 @@ async function startPlayback(
   session = started
   if (item) tracker.start(item)
   else tracker.finish()
+  // Home Assistant jen u filmů a seriálů z knihovny (ne u „Otevřít soubor…“).
+  if (item)
+    haRun =
+      haAutomation?.begin(item.episodeId !== null ? 'series' : 'movie', (message) =>
+        started?.notify(message)
+      ) ?? null
 }
 
 /** „Další / předchozí díl“ – načte se do běžícího přehrávače, okno se nezavře. */
@@ -421,6 +432,7 @@ let ytDownloaderRef: KidsDownloader | null = null
 let ytQueueRef: KidsDownloadQueue | null = null
 let syncRef: SyncService | null = null
 let haRef: HaService | null = null
+let haAutomation: HaAutomation | null = null
 /** Klíč aplikace u Googlu (sdílení přes Google Disk) – vkládá ho workflow Vydání. */
 const GOOGLE_CLIENT_ID = __KINOTEKA_GOOGLE_CLIENT_ID__
 const GOOGLE_CLIENT_SECRET = __KINOTEKA_GOOGLE_CLIENT_SECRET__
@@ -448,6 +460,7 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
   try {
     session?.close()
     let started: PlayerSession | undefined = undefined
+    let ytHaRun: HaPlaybackRun | null = null
     started = await PlayerSession.start({
       mainWindow: host,
       file: source.file,
@@ -457,6 +470,7 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
       previous: item.previous?.name ?? null,
       // Vždy s volbami pro síť – v jedné kategorii se můžou střídat stažená a online videa.
       networkArgs: mpvNetworkArgs({ headers: source.headers ?? {} }),
+      onPlaybackFlags: (flags) => ytHaRun?.flags(flags),
       loadingText: ytLoadingText(item),
       audio: audioLaunchOptions(loadAudioSettings(settings)),
       tracks: trackChoicesFor(item.online ? '' : item.path),
@@ -484,6 +498,7 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
         return 'Video z YouTube se nepodařilo otevřít. Zkontroluj připojení a zkus ho pustit znovu.'
       },
       onEnd: (info) => {
+        ytHaRun?.end()
         if (session === started) {
           session = null
           ytCurrent = null
@@ -497,6 +512,7 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
     tracker.finish()
     ytTracker.start(item.videoId)
     ytCurrent = item
+    ytHaRun = haAutomation?.begin('yt', (message) => started?.notify(message)) ?? null
     return { ok: true }
   } catch (error) {
     return { ok: false, reason: 'error', message: (error as Error).message }
@@ -806,6 +822,8 @@ void app.whenReady().then(() => {
   const ha = new HaService({ settings })
   haRef = ha
   registerHaIpc(ha)
+  haAutomation = new HaAutomation(ha)
+  ha.on('changed', (status: HaStatus) => haAutomation?.entityChanged(status.entity?.state ?? null))
   ha.start()
   registerJournalIpc(new JournalRepository(db), () => {
     broadcast(IpcChannel.LibraryChanged)

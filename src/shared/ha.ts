@@ -35,6 +35,7 @@ export interface HaEntityState {
 
 export interface HaStatus {
   settings: HaSettings
+  automation: HaAutomationSettings
   /** Token je uložený (samotný token do okna nikdy nejde). */
   hasToken: boolean
   connection: HaConnectionState
@@ -88,6 +89,7 @@ export interface HaActionResult {
 
 /** Změny nastavení z okna; token jen při zadání nového (prázdný řetězec = smazat). */
 export interface HaSettingsPatch {
+  automation?: HaAutomationSettings
   enabled?: boolean
   url?: string
   entityId?: string | null
@@ -140,5 +142,61 @@ export function parseHaSettings(value: unknown): HaSettings {
     url: normalizeHaUrl(raw['url']) ?? HA_DEFAULT_URL,
     entityId: isToggleEntityId(raw['entityId']) ? raw['entityId'] : null,
     label: cleanHaLabel(raw['label'])
+  }
+}
+
+/** Co udělat s entitou při události přehrávání. */
+export type HaRuleAction = 'none' | 'on' | 'off' | 'restore'
+
+/** Části Kinotéky, kde automatika platí (Děti nikdy). */
+export type HaPlaybackKind = 'movie' | 'series' | 'yt'
+
+export interface HaAutomationSettings {
+  enabled: boolean
+  sections: Record<HaPlaybackKind, boolean>
+  /** Spuštění přehrávání. */
+  start: Exclude<HaRuleAction, 'restore'>
+  /** Pauza delší než {@link HA_PAUSE_DELAY_MS}. */
+  pause: Exclude<HaRuleAction, 'restore'>
+  /** Pokračování po pauze (jen když se pauza projevila). */
+  resume: Exclude<HaRuleAction, 'restore'>
+  /** Konec filmu / zavření přehrávače / Zastavit. */
+  end: HaRuleAction
+}
+
+export const DEFAULT_HA_AUTOMATION: HaAutomationSettings = {
+  enabled: true,
+  sections: { movie: true, series: true, yt: true },
+  start: 'off',
+  pause: 'on',
+  resume: 'off',
+  end: 'restore'
+}
+
+/** Kratší pauza (přetáčení, omylem mezerník) se nepočítá. */
+export const HA_PAUSE_DELAY_MS = 2000
+
+const SIMPLE_ACTIONS = ['none', 'on', 'off'] as const
+
+export function parseHaAutomation(value: unknown): HaAutomationSettings {
+  const raw = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
+  const sections = (
+    raw['sections'] && typeof raw['sections'] === 'object' ? raw['sections'] : {}
+  ) as Record<string, unknown>
+  const simple = (key: 'start' | 'pause' | 'resume'): Exclude<HaRuleAction, 'restore'> =>
+    (SIMPLE_ACTIONS as readonly unknown[]).includes(raw[key])
+      ? (raw[key] as Exclude<HaRuleAction, 'restore'>)
+      : DEFAULT_HA_AUTOMATION[key]
+  const section = (key: HaPlaybackKind): boolean =>
+    typeof sections[key] === 'boolean' ? sections[key] : DEFAULT_HA_AUTOMATION.sections[key]
+  return {
+    enabled: typeof raw['enabled'] === 'boolean' ? raw['enabled'] : DEFAULT_HA_AUTOMATION.enabled,
+    sections: { movie: section('movie'), series: section('series'), yt: section('yt') },
+    start: simple('start'),
+    pause: simple('pause'),
+    resume: simple('resume'),
+    end: ([...SIMPLE_ACTIONS, 'restore'] as readonly unknown[]).includes(raw['end'])
+      ? (raw['end'] as HaRuleAction)
+      : DEFAULT_HA_AUTOMATION.end
   }
 }

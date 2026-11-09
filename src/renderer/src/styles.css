@@ -2898,3 +2898,59 @@ p.info-chip {
   color: var(--muted);
   font-size: 12px;
 }
+
+.ha-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  margin: 6px 0 10px;
+}
+
+.ha-rules {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ha-rules.is-disabled {
+  opacity: 0.5;
+}
+
+.ha-rules th,
+.ha-rules td {
+  text-align: left;
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ha-rules th {
+  color: var(--dim);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.ha-rules .seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.ha-rules .seg button {
+  padding: 6px 11px;
+  font-size: 13px;
+  color: var(--muted);
+  border-right: 1px solid var(--line);
+}
+
+.ha-rules .seg button:last-child {
+  border-right: 0;
+}
+
+.ha-rules .seg button.on {
+  background: var(--text);
+  color: #000;
+  font-weight: 600;
+}

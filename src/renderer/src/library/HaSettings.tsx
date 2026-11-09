@@ -3,6 +3,11 @@ import { Lightbulb, PlugZap, RefreshCw } from 'lucide-react'
 import {
   HA_DEFAULT_URL,
   MAX_HA_LABEL,
+  haLabel,
+  type HaAutomationSettings,
+  type HaPlaybackKind,
+  type HaRuleAction,
+  type HaStatus,
   type HaEntityOption,
   type HaTestResult
 } from '../../../shared/ha'
@@ -236,6 +241,109 @@ export default function HaSettings(): React.JSX.Element {
           )}
         </section>
       )}
+
+      {status.hasToken && settings.enabled && settings.entityId && (
+        <HaAutomationCard status={status} />
+      )}
     </>
+  )
+}
+
+const KIND_LABELS: [HaPlaybackKind, string][] = [
+  ['movie', 'Filmy'],
+  ['series', 'Seriály'],
+  ['yt', 'YT videa']
+]
+
+const RULES: [Exclude<keyof HaAutomationSettings, 'enabled' | 'sections'>, string][] = [
+  ['start', 'spustím přehrávání'],
+  ['pause', 'dám pauzu'],
+  ['resume', 'pokračuji po pauze'],
+  ['end', 'film skončí / zavřu přehrávač']
+]
+
+const ACTION_LABELS: Record<HaRuleAction, string> = {
+  none: 'nic',
+  on: 'zapnout',
+  off: 'vypnout',
+  restore: 'vrátit původní'
+}
+
+/** Automatika podle přehrávání: pravidla a části Kinotéky, kde platí. */
+function HaAutomationCard({ status }: { status: HaStatus }): React.JSX.Element {
+  const { ha } = window.kinoteka
+  const { automation } = status
+  const name = haLabel(status)
+  const save = (patch: Partial<HaAutomationSettings>): void =>
+    void ha.save({ automation: { ...automation, ...patch } })
+
+  return (
+    <section className="card">
+      <h2>Automatika podle přehrávání</h2>
+      <label className="toggle-row">
+        <input
+          type="checkbox"
+          checked={automation.enabled}
+          onChange={() => save({ enabled: !automation.enabled })}
+        />
+        <span>Přepínat „{name}“ podle přehrávání</span>
+      </label>
+      <div className="ha-kinds">
+        {KIND_LABELS.map(([kind, label]) => (
+          <label key={kind} className="toggle-row">
+            <input
+              type="checkbox"
+              disabled={!automation.enabled}
+              checked={automation.sections[kind]}
+              onChange={() =>
+                save({ sections: { ...automation.sections, [kind]: !automation.sections[kind] } })
+              }
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+        <span className="muted small">Děti – nikdy</span>
+      </div>
+      <table className={`ha-rules ${automation.enabled ? '' : 'is-disabled'}`}>
+        <thead>
+          <tr>
+            <th>Když…</th>
+            <th>{name}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {RULES.map(([rule, label]) => {
+            const actions: HaRuleAction[] =
+              rule === 'end' ? ['none', 'on', 'off', 'restore'] : ['none', 'on', 'off']
+            return (
+              <tr key={rule}>
+                <td>{label}</td>
+                <td>
+                  <div className="seg" role="radiogroup" aria-label={label}>
+                    {actions.map((action) => (
+                      <button
+                        key={action}
+                        role="radio"
+                        aria-checked={automation[rule] === action}
+                        disabled={!automation.enabled}
+                        className={automation[rule] === action ? 'on' : ''}
+                        onClick={() => save({ [rule]: action })}
+                      >
+                        {ACTION_LABELS[action]}
+                      </button>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <p className="muted small">
+        Pauza kratší než 2 s se nepočítá. Mezi díly seriálu se nic nepřepíná. „Vrátit původní“ =
+        stav před spuštěním; když „{name}“ mezitím přepneš ručně (vypínač, klávesa L), Kinotéka už
+        ji nechá být. Když Home Assistant neodpovídá, film hraje normálně.
+      </p>
+    </section>
   )
 }
