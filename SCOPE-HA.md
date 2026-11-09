@@ -21,22 +21,22 @@ Platí pro **Filmy, Seriály a YT videa**, **ne pro Děti**.
 
 ## Nastavení → Home Assistant (nová karta)
 
-| Položka               | Popis                                                                                          |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| Zapnuto               | hlavní vypínač celé funkce                                                                     |
-| Adresa, Token         | + tlačítko **Ověřit spojení** (ukáže verzi HA a název domova, nebo srozumitelnou chybu)        |
-| Ovládaná entita       | výběr ze seznamu entit z HA s hledáním (switch, light, scene, script…); výchozí `vypinac_linka` |
-| Zobrazovaný název     | např. „Linka“ – v bublině u žárovky a v hláškách (výchozí = friendly_name z HA)                  |
-| Automatika            | zapnout/vypnout + pravidla níže + zaškrtnutí Filmy / Seriály / YT videa                         |
+| Položka           | Popis                                                                                           |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
+| Zapnuto           | hlavní vypínač celé funkce                                                                      |
+| Adresa, Token     | + tlačítko **Ověřit spojení** (ukáže verzi HA a název domova, nebo srozumitelnou chybu)         |
+| Ovládaná entita   | výběr ze seznamu entit z HA s hledáním (switch, light, scene, script…); výchozí `vypinac_linka` |
+| Zobrazovaný název | např. „Linka“ – v bublině u žárovky a v hláškách (výchozí = friendly_name z HA)                 |
+| Automatika        | zapnout/vypnout + pravidla níže + zaškrtnutí Filmy / Seriály / YT videa                         |
 
 ### Pravidla automatiky (výchozí hodnoty)
 
-| Událost                                   | Akce (nic / zapnout / vypnout / vrátit původní) | Výchozí            |
-| ----------------------------------------- | ----------------------------------------------- | ------------------ |
-| Spuštění přehrávání                       |                                                 | **vypnout**        |
-| Pauza                                     |                                                 | **zapnout**        |
-| Pokračování po pauze                      |                                                 | **vypnout**        |
-| Konec / zavření přehrávače / ■ Zastavit   |                                                 | **vrátit původní** |
+| Událost                                 | Akce (nic / zapnout / vypnout / vrátit původní) | Výchozí            |
+| --------------------------------------- | ----------------------------------------------- | ------------------ |
+| Spuštění přehrávání                     |                                                 | **vypnout**        |
+| Pauza                                   |                                                 | **zapnout**        |
+| Pokračování po pauze                    |                                                 | **vypnout**        |
+| Konec / zavření přehrávače / ■ Zastavit |                                                 | **vrátit původní** |
 
 - „Vrátit původní“ = stav entity před spuštěním filmu (když byla linka zhasnutá už předtím,
   po filmu se nerozsvítí).
@@ -58,12 +58,12 @@ Platí pro **Filmy, Seriály a YT videa**, **ne pro Děti**.
 
 ## Postup (přírůstky, po každém ruční test)
 
-| Krok | Obsah                                                                                                                                                                       |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| H0   | Ty: vytvořit token v HA. Já: falešný HA server pro testy (`scripts/fake-ha.mjs`, REST + WebSocket), aby se při vývoji neblikalo skutečnou linkou.                             |
-| H1   | Připojení (`src/main/ha/`), Nastavení → Home Assistant (adresa, token, ověření, výběr entity, název), **ruční ovládání** (žárovka) v horní liště a v přehrávači + klávesa L, živý stav.|
-| H2   | **Automatika** podle přehrávání – pravidla, výběr částí, „vrátit původní“, ignorování krátkých pauz a přechodů mezi díly, hláška při nedostupnosti.                            |
-| H3   | Odolnost (výpadek HA/sítě, neplatný token, smazaná entita, opětovné připojení WebSocketu), `docs/rucni-test-ha.md`, souhrnný ruční test, vydání **1.6.0** jen se souhlasem.    |
+| Krok | Obsah                                                                                                                                                                                   |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H0   | Ty: vytvořit token v HA. Já: falešný HA server pro testy (`scripts/fake-ha.mjs`, REST + WebSocket), aby se při vývoji neblikalo skutečnou linkou.                                       |
+| H1   | Připojení (`src/main/ha/`), Nastavení → Home Assistant (adresa, token, ověření, výběr entity, název), **ruční ovládání** (žárovka) v horní liště a v přehrávači + klávesa L, živý stav. |
+| H2   | **Automatika** podle přehrávání – pravidla, výběr částí, „vrátit původní“, ignorování krátkých pauz a přechodů mezi díly, hláška při nedostupnosti.                                     |
+| H3   | Odolnost (výpadek HA/sítě, neplatný token, smazaná entita, opětovné připojení WebSocketu), `docs/rucni-test-ha.md`, souhrnný ruční test, vydání **1.6.0** jen se souhlasem.             |
 
 ## Mimo rozsah (případně později)
 
