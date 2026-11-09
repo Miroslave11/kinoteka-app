@@ -24,6 +24,9 @@ export const HA_SETTINGS_KEY = 'ha.settings'
 export const HA_TOKEN_KEY = 'ha.token'
 export const HA_AUTOMATION_KEY = 'ha.automation'
 
+/** Jak často ověřit, že spojení žije (po uspání PC může „viset“). */
+const PING_MS = 30_000
+
 /** Prodlevy mezi pokusy o nové spojení (poslední se opakuje). */
 const RETRY_MS = [2_000, 5_000, 15_000, 30_000, 60_000]
 
@@ -33,6 +36,9 @@ export interface HaServiceOptions {
   settings: SettingsRepository
   connect?: HaConnect
   retryMs?: number[]
+  pingMs?: number
+  /** Časový limit odpovědi Home Assistant (výchozí 5 s). */
+  timeoutMs?: number
 }
 
 const friendlyName = (entityId: string, attributes?: Record<string, unknown>): string => {
@@ -52,6 +58,7 @@ export class HaService extends EventEmitter {
   private location: string | null = null
   private entity: HaEntityState | null = null
   private retryTimer: ReturnType<typeof setTimeout> | null = null
+  private pingTimer: ReturnType<typeof setInterval> | null = null
   private attempt = 0
   /** Zvyšuje se při každém novém připojení – starší pokusy se pak zahodí. */
   private generation = 0
@@ -66,7 +73,8 @@ export class HaService extends EventEmitter {
   }
 
   private connectWith(url: string, token: string): Promise<HaConnection> {
-    return (this.options.connect ?? ((u, t) => HaConnection.open(u, t)))(url, token)
+    const timeoutMs = this.options.timeoutMs
+    return (this.options.connect ?? ((u, t) => HaConnection.open(u, t, { timeoutMs })))(url, token)
   }
 
   settings(): HaSettings {
@@ -103,9 +111,17 @@ export class HaService extends EventEmitter {
     void this.reconnect()
   }
 
+  /** Počítač se probudil ze spánku: spojení je nejspíš mrtvé – hned nové. */
+  wake(): void {
+    if (!this.settings().enabled) return
+    this.attempt = 0
+    void this.reconnect()
+  }
+
   stop(): void {
     this.generation++
     this.clearRetry()
+    this.clearPing()
     this.connection?.close()
     this.connection = null
   }
@@ -203,6 +219,8 @@ export class HaService extends EventEmitter {
   private async call(service: 'toggle' | 'turn_on' | 'turn_off'): Promise<HaActionResult> {
     const { enabled, entityId } = this.settings()
     if (!enabled || !entityId) return { ok: false, message: 'Home Assistant není nastavený.' }
+    if (this.state === 'connected' && this.entity?.missing)
+      return { ok: false, message: missingText(entityId) }
     try {
       const connection = await this.ensureConnection()
       await connection.callService(domainOf(entityId), service, entityId)
@@ -220,6 +238,22 @@ export class HaService extends EventEmitter {
     throw new HaError('network', this.error ?? 'Home Assistant není připojený.')
   }
 
+  private clearPing(): void {
+    if (this.pingTimer) clearInterval(this.pingTimer)
+    this.pingTimer = null
+  }
+
+  /** Pravidelný ping; bez odpovědi se spojení zavře a naváže znovu. */
+  private startPing(connection: HaConnection, generation: number): void {
+    this.clearPing()
+    this.pingTimer = setInterval(() => {
+      if (generation !== this.generation || !connection.isOpen) return
+      connection.ping().catch(() => {
+        if (generation === this.generation) connection.close()
+      })
+    }, this.options.pingMs ?? PING_MS)
+  }
+
   private clearRetry(): void {
     if (this.retryTimer) clearTimeout(this.retryTimer)
     this.retryTimer = null
@@ -229,6 +263,7 @@ export class HaService extends EventEmitter {
   private reconnect(): Promise<void> {
     const generation = ++this.generation
     this.clearRetry()
+    this.clearPing()
     this.connection?.close()
     this.connection = null
     this.entity = null
@@ -250,6 +285,7 @@ export class HaService extends EventEmitter {
         this.connection = connection
         connection.onClose(() => {
           if (generation !== this.generation) return
+          this.clearPing()
           this.connection = null
           this.entity = null
           this.state = 'error'
@@ -272,6 +308,7 @@ export class HaService extends EventEmitter {
         this.state = 'connected'
         this.error = null
         this.entity ??= entityId ? entityState(entityId, undefined) : null
+        this.startPing(connection, generation)
         this.changed()
       } catch (error) {
         if (generation !== this.generation) return
@@ -302,13 +339,18 @@ function domainOf(entityId: string): (typeof HA_TOGGLE_DOMAINS)[number] {
   return entityId.split('.')[0] as (typeof HA_TOGGLE_DOMAINS)[number]
 }
 
-/** Entita, kterou Home Assistant nezná, se hlásí jako nedostupná. */
+/** Entita, kterou Home Assistant nezná (smazaná, přejmenovaná): nedostupná a „missing“. */
 function entityState(entityId: string, snapshot: HaEntitySnapshot | undefined): HaEntityState {
   return {
     entityId,
     state: snapshot?.state ?? 'unavailable',
-    friendlyName: friendlyName(entityId, snapshot?.attributes)
+    friendlyName: friendlyName(entityId, snapshot?.attributes),
+    ...(snapshot ? {} : { missing: true })
   }
+}
+
+export function missingText(entityId: string): string {
+  return `Entita ${entityId} v Home Assistant není (smazaná nebo přejmenovaná) – vyber ji znovu v Nastavení → Home Assistant.`
 }
 
 function describe(error: unknown, url: string): string {

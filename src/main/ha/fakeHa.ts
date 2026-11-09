@@ -31,6 +31,14 @@ export interface FakeHa {
   calls: string[]
   /** Odpojí všechny klienty (výpadek Home Assistant). */
   dropClients(): void
+  /** Přestane odpovídat, ale spojení nezavře (jako po uspání počítače). */
+  freeze(frozen: boolean): void
+  /** Smaže entitu (odběratelé dostanou „r“). */
+  removeEntity(entityId: string): void
+  /** Zneplatní token (nová přihlášení selžou). */
+  revokeToken(): void
+  /** Počet přihlášení (kolikrát se klient připojil). */
+  logins(): number
   close(): Promise<void>
 }
 
@@ -102,6 +110,9 @@ export function startFakeHa(
   const states = new Map<string, FakeEntity>(Object.entries(entities))
   const clients = new Set<Client>()
   const calls: string[] = []
+  let validToken: string | null = token
+  let frozen = false
+  let loginCount = 0
 
   const send = (client: Client, message: unknown): void => {
     if (!client.socket.destroyed) client.socket.write(frame(JSON.stringify(message)))
@@ -137,10 +148,12 @@ export function startFakeHa(
   }
 
   const handle = (client: Client, text: string): void => {
+    if (frozen) return
     const message = JSON.parse(text) as Record<string, unknown>
     if (!client.authed) {
-      if (message['type'] === 'auth' && message['access_token'] === token) {
+      if (message['type'] === 'auth' && message['access_token'] === validToken) {
         client.authed = true
+        loginCount++
         send(client, { type: 'auth_ok', ha_version: FAKE_HA_VERSION })
       } else {
         send(client, { type: 'auth_invalid', message: 'Invalid access token or password' })
@@ -246,6 +259,20 @@ export function startFakeHa(
         state: (entityId) => states.get(entityId)?.state,
         calls,
         dropClients,
+        freeze: (value) => {
+          frozen = value
+        },
+        removeEntity: (entityId) => {
+          states.delete(entityId)
+          for (const client of clients)
+            for (const [id] of client.subscriptions)
+              send(client, { id, type: 'event', event: { r: [entityId] } })
+        },
+        revokeToken: () => {
+          validToken = null
+          dropClients()
+        },
+        logins: () => loginCount,
         close: () =>
           new Promise<void>((done) => {
             dropClients()

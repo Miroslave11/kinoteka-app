@@ -47,9 +47,11 @@ export default function HaBulb({
   if (bulb === 'hidden') return null
   const label = haLabel(status)
   const title =
-    bulb === 'unavailable'
-      ? `${label} – Home Assistant nedostupný${status?.error ? `: ${status.error}` : ''}`
-      : `${label} – ${bulb === 'on' ? 'vypnout' : 'zapnout'} (L)`
+    status?.connection === 'connected' && status.entity?.missing
+      ? `${label} – entita v Home Assistant není, vyber ji znovu v Nastavení`
+      : bulb === 'unavailable'
+        ? `${label} – Home Assistant nedostupný${status?.error ? `: ${status.error}` : ''}`
+        : `${label} – ${bulb === 'on' ? 'vypnout' : 'zapnout'} (L)`
   return (
     <button
       className={`${className} ha-bulb is-${bulb}`}

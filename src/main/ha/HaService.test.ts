@@ -21,9 +21,12 @@ afterEach(async () => {
   await ha.close()
 })
 
-function service(): { service: HaService; settings: SettingsRepository } {
+function service(options: { pingMs?: number; timeoutMs?: number } = {}): {
+  service: HaService
+  settings: SettingsRepository
+} {
   const settings = new SettingsRepository(openDatabase(':memory:'))
-  const created = new HaService({ settings, retryMs: [50] })
+  const created = new HaService({ settings, retryMs: [50], ...options })
   services.push(created)
   return { service: created, settings }
 }
@@ -143,6 +146,47 @@ describe('HaService', () => {
     await until(created, (s) => s.connection === 'error')
     expect(haBulbState(created.status())).toBe('unavailable')
     await until(created, (s) => s.connection === 'connected' && s.entity?.state === 'on')
+  })
+
+  it('mrtvé spojení (uspání PC) pozná pingem a naváže nové', async () => {
+    const { service: created } = service({ pingMs: 100, timeoutMs: 300 })
+    await created.save({ enabled: true, url: ha.url, token: FAKE_HA_TOKEN, entityId: ENTITY })
+    await until(created, (s) => s.connection === 'connected')
+    ha.freeze(true)
+    await until(created, (s) => s.connection === 'error')
+    ha.freeze(false)
+    await until(created, (s) => s.connection === 'connected' && s.entity?.state === 'on')
+    expect(ha.logins()).toBeGreaterThanOrEqual(2)
+  }, 15_000)
+
+  it('probuzení ze spánku hned naváže nové spojení', async () => {
+    const created = await connected()
+    created.wake()
+    await until(created, (s) => s.connection === 'connected' && s.entity?.state === 'on')
+    expect(ha.logins()).toBe(2)
+  })
+
+  it('zneplatněný token: srozumitelná chyba a žádné další pokusy', async () => {
+    const created = await connected()
+    ha.revokeToken()
+    const status = await until(
+      created,
+      (s) => s.connection === 'error' && !!s.error?.includes('token')
+    )
+    expect(haBulbState(status)).toBe('unavailable')
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(created.status().error).toContain('token nepřijal')
+  })
+
+  it('entita smazaná v Home Assistant: hláška, přepnutí se nezkouší', async () => {
+    const created = await connected()
+    ha.removeEntity(ENTITY)
+    const status = await until(created, (s) => s.entity?.missing === true)
+    expect(haBulbState(status)).toBe('unavailable')
+    const calls = ha.calls.length
+    const result = await created.toggle()
+    expect(result.message).toContain('vyber ji znovu')
+    expect(ha.calls.length).toBe(calls)
   })
 
   it('neexistující entita je nedostupná', async () => {

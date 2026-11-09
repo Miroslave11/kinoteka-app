@@ -196,6 +196,12 @@ export default function HaSettings(): React.JSX.Element {
             </button>
           </div>
           {entityError && <p className="notice is-error">{entityError}</p>}
+          {connected && status.entity?.missing && (
+            <p className="notice is-error">
+              Entita {settings.entityId} v Home Assistant není (smazaná nebo přejmenovaná) – vyber
+              ji znovu.
+            </p>
+          )}
           <div className="ha-entities" role="listbox" aria-label="Entity Home Assistant">
             {shown.map((entity) => (
               <button

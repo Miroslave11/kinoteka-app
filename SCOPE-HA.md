@@ -1,4 +1,4 @@
-# Ovládání Home Assistant z Kinotéky (návrh, čeká na schválení)
+# Ovládání Home Assistant z Kinotéky (schváleno 2026-11-09)
 
 ## Cíl
 

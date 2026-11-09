@@ -31,6 +31,8 @@ export interface HaEntityState {
   /** Stav z Home Assistant: on, off, unavailable, unknown… */
   state: string
   friendlyName: string
+  /** Home Assistant entitu nezná (smazaná nebo přejmenovaná). */
+  missing?: boolean
 }
 
 export interface HaStatus {
