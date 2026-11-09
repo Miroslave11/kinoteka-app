@@ -2,7 +2,8 @@ import { X } from 'lucide-react'
 
 const SHORTCUTS: [string, string][] = [
   ['Mezerník, K', 'Přehrát / pauza'],
-  ['← → , J L', 'Zpět / vpřed o 10 s'],
+  ['← →, J', 'Zpět / vpřed o 10 s (J = zpět)'],
+  ['L', 'Přepnout žárovku (Home Assistant)'],
   ['0 – 9', 'Skok na 0–90 % filmu'],
   ['Home', 'Na začátek'],
   ['↑ ↓', 'Hlasitost'],

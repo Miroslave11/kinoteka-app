@@ -2834,3 +2834,67 @@ p.info-chip {
   cursor: pointer;
   margin-bottom: 8px;
 }
+
+/* ---------- Home Assistant (žárovka, Nastavení) ---------- */
+.icon-btn.ha-bulb.is-on {
+  color: #ffc857;
+  background: rgb(255 200 87 / 0.14);
+  box-shadow: inset 0 0 0 1px rgb(255 200 87 / 0.45);
+}
+
+.icon-btn.ha-bulb.is-on svg {
+  filter: drop-shadow(0 0 6px rgb(255 200 87 / 0.8));
+}
+
+.icon-btn.ha-bulb.is-unavailable {
+  opacity: 0.55;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.35);
+  outline: 1px dashed rgb(255 255 255 / 0.35);
+  outline-offset: -4px;
+}
+
+.ha-entities {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow: auto;
+  margin-top: 10px;
+}
+
+.ha-entity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  color: var(--text);
+}
+
+.ha-entity:hover {
+  background: rgb(255 255 255 / 0.05);
+}
+
+.ha-entity.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ha-entity .ha-lit {
+  color: #ffc857;
+}
+
+.ha-entity-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ha-entity code {
+  color: var(--muted);
+  font-size: 12px;
+}

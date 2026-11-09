@@ -940,3 +940,23 @@ button {
     transform: rotate(360deg);
   }
 }
+
+/* Žárovka Home Assistant v ovládací liště. */
+.icon-btn.ha-bulb.is-on {
+  color: #ffc857;
+  background: rgb(255 200 87 / 0.16);
+  border-color: rgb(255 200 87 / 0.5);
+}
+
+.icon-btn.ha-bulb.is-on svg {
+  filter: drop-shadow(0 0 6px rgb(255 200 87 / 0.8));
+}
+
+.icon-btn.ha-bulb.is-unavailable {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.notice-toast.ha-toast {
+  border-color: rgb(255 200 87 / 0.6);
+}

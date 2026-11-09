@@ -6,6 +6,8 @@ import { useApp } from '../app/AppContext'
 import { useFullscreen } from '../app/fullscreen'
 import { filesOf } from '../app/catalogData'
 import { countOf } from '../../../shared/plural'
+import { haBulbState } from '../../../shared/ha'
+import HaBulb, { isHaToggleKey, toggleHa, useHaStatus } from './HaBulb'
 
 export default function TopBar(): React.JSX.Element {
   const { titles, folders } = useApp()
@@ -15,18 +17,23 @@ export default function TopBar(): React.JSX.Element {
   const input = useRef<HTMLInputElement>(null)
   const [fullscreen, setFullscreen] = useFullscreen()
   const query = location.pathname === '/hledat' ? (params.get('q') ?? '') : ''
+  const ha = useHaStatus()
+  const haActive = haBulbState(ha) !== 'hidden'
 
-  // Ctrl+K přesune kurzor do vyhledávání.
+  // Ctrl+K přesune kurzor do vyhledávání, L přepne žárovku (Home Assistant).
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.ctrlKey && event.key.toLowerCase() === 'k') {
         event.preventDefault()
         input.current?.focus()
+      } else if (haActive && isHaToggleKey(event)) {
+        event.preventDefault()
+        toggleHa()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [haActive])
 
   const onSearch = (value: string): void => {
     if (value)
@@ -59,6 +66,7 @@ export default function TopBar(): React.JSX.Element {
         {offline ? `${offline} knihovna offline · ` : 'Knihovna aktuální · '}
         {countOf(files.length, 'soubor', 'soubory', 'souborů')} · {formatSize(totalSize)}
       </div>
+      <HaBulb status={ha} className="icon-btn topbar-btn" />
       <button
         className="icon-btn topbar-btn"
         onClick={() => setFullscreen(!fullscreen)}

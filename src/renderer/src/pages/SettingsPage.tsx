@@ -3,6 +3,7 @@ import { useAmbientPalette } from '../app/palette'
 import AboutApp from '../library/AboutApp'
 import AppearanceSettings from '../library/AppearanceSettings'
 import LibrarySettings from '../library/LibrarySettings'
+import HaSettings from '../library/HaSettings'
 import ImdbSettings from '../library/ImdbSettings'
 import KidsSettings from '../library/KidsSettings'
 import MetadataSettings from '../library/MetadataSettings'
@@ -22,6 +23,7 @@ type Section =
   | 'deti'
   | 'yt'
   | 'sdileni'
+  | 'home-assistant'
   | 'o-aplikaci'
 
 const SECTIONS: [Section, string][] = [
@@ -34,6 +36,7 @@ const SECTIONS: [Section, string][] = [
   ['deti', 'Děti'],
   ['yt', 'YT videa'],
   ['sdileni', 'Sdílení'],
+  ['home-assistant', 'Home Assistant'],
   ['o-aplikaci', 'O aplikaci']
 ]
 
@@ -73,6 +76,7 @@ export default function SettingsPage(): React.JSX.Element {
           {section === 'deti' && <KidsSettings />}
           {section === 'yt' && <YtSettings />}
           {section === 'sdileni' && <SyncSettings />}
+          {section === 'home-assistant' && <HaSettings />}
           {section === 'o-aplikaci' && <AboutApp />}
         </div>
       </div>
