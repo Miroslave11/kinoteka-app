@@ -161,6 +161,11 @@ export class HaConnection {
     })
   }
 
+  /** Kontrola, že spojení žije (po uspání PC může zůstat „viset“ bez události close). */
+  ping(): Promise<unknown> {
+    return this.request({ type: 'ping' })
+  }
+
   getConfig(): Promise<{ location_name?: string; version?: string }> {
     return this.request({ type: 'get_config' })
   }
@@ -215,6 +220,9 @@ export class HaConnection {
 
   private handleMessage(message: Record<string, unknown>): void {
     const id = message['id'] as number
+    if (message['type'] === 'pong') {
+      message = { id, type: 'result', success: true, result: null }
+    }
     if (message['type'] === 'result') {
       const pending = this.pending.get(id)
       if (!pending) return

@@ -1,4 +1,13 @@
-import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  net,
+  powerMonitor,
+  safeStorage,
+  shell
+} from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -822,6 +831,8 @@ void app.whenReady().then(() => {
   const ha = new HaService({ settings })
   haRef = ha
   registerHaIpc(ha)
+  // Po probuzení ze spánku je spojení s Home Assistant nejspíš mrtvé – hned nové.
+  powerMonitor.on('resume', () => ha.wake())
   haAutomation = new HaAutomation(ha)
   ha.on('changed', (status: HaStatus) => haAutomation?.entityChanged(status.entity?.state ?? null))
   ha.start()
