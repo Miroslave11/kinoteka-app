@@ -113,6 +113,8 @@ export interface PlayerSessionOptions {
    * ukončí s chybou; false = nic nedělat (výchozí chování).
    */
   onOpenFailed?: () => string | false
+  /** Změna pauzy nebo konce souboru (automatika Home Assistant). */
+  onPlaybackFlags?: (flags: { paused: boolean; ended: boolean; hasNext: boolean }) => void
   onEnd: (info: PlayerClosedInfo) => void
 }
 
@@ -603,7 +605,15 @@ export class PlayerSession {
   }
 
   private update(patch: Partial<PlayerState>, positionOnly = false): void {
+    const before = this.state
     this.state = { ...this.state, ...patch }
+    if (before.paused !== this.state.paused || before.ended !== this.state.ended) {
+      this.options.onPlaybackFlags?.({
+        paused: this.state.paused,
+        ended: this.state.ended,
+        hasNext: this.state.next !== null
+      })
+    }
     if (!positionOnly) return this.sendState()
     const wait = POSITION_UPDATE_MS - (Date.now() - this.lastSentAt)
     if (wait <= 0) this.sendState()

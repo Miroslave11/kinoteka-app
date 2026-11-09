@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import type { HaSettingsPatch } from '../../shared/ha'
+import { parseHaAutomation, type HaSettingsPatch } from '../../shared/ha'
 import { IpcChannel } from '../../shared/ipc'
 import { broadcast } from '../broadcast'
 import type { HaService } from './HaService'
@@ -14,6 +14,8 @@ function cleanPatch(value: unknown): HaSettingsPatch {
     patch.entityId = raw['entityId'] as string | null
   if (typeof raw['label'] === 'string') patch.label = raw['label']
   if (typeof raw['token'] === 'string') patch.token = raw['token']
+  if (raw['automation'] && typeof raw['automation'] === 'object')
+    patch.automation = parseHaAutomation(raw['automation'])
   return patch
 }
 
