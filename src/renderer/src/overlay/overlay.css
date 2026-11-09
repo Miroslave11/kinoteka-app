@@ -956,7 +956,3 @@ button {
   opacity: 0.55;
   border-style: dashed;
 }
-
-.notice-toast.ha-toast {
-  border-color: rgb(255 200 87 / 0.6);
-}

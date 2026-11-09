@@ -1,5 +1,12 @@
 # Změny
 
+## Nevydáno
+
+### Ovládání Home Assistant
+
+- Po spuštění videa se světlo vypne až **2 s po rozehrání** (ne už při načítání); film zavřený do 2 s světlo nepřepne.
+- Přepnutí žárovky v přehrávači už neukazuje hlášku „… zapnuto / vypnuto“ – stav ukazuje jen barva žárovky.
+
 ## 1.6.0 – 2026-11-09
 
 ### Ovládání Home Assistant

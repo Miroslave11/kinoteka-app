@@ -21,7 +21,7 @@ import {
   type PlayerCommand,
   type PlayerState
 } from '../../../shared/player'
-import { haBulbState, haLabel } from '../../../shared/ha'
+import { haBulbState } from '../../../shared/ha'
 import HaBulb, { isHaToggleKey, toggleHa, useHaStatus } from '../components/HaBulb'
 import BusyIndicator from './BusyIndicator'
 import KidsOverlay from './KidsOverlay'
@@ -35,8 +35,6 @@ const HIDE_CONTROLS_AFTER_MS = 2500
 /** Po konci dílu se další díl spustí sám po tolika sekundách. */
 const NEXT_COUNTDOWN_SECONDS = 10
 const NOTICE_MS = 10_000
-/** Hláška po přepnutí žárovky (Home Assistant). */
-const HA_NOTICE_MS = 2500
 /** Odstup, podle kterého se rozliší jedno kliknutí (pauza) od dvojkliku (celá obrazovka). */
 const DOUBLE_CLICK_MS = 250
 
@@ -63,22 +61,9 @@ export default function PlayerOverlay(): React.JSX.Element {
 
   useEffect(() => window.kinoteka.player.onState(setState), [])
 
-  // Home Assistant: žárovka a krátká hláška, když se entita přepne (L, klik, vypínač na zdi).
+  // Home Assistant: žárovka v liště a klávesa L (stav ukazuje jen barva žárovky, bez hlášky).
   const ha = useHaStatus()
   const haActive = haBulbState(ha) !== 'hidden'
-  const haState = haActive ? (ha?.entity?.state ?? null) : null
-  const haName = haLabel(ha)
-  const previousHaState = useRef<string | null>(null)
-  const [haNotice, setHaNotice] = useState<string | null>(null)
-  useEffect(() => {
-    const previous = previousHaState.current
-    previousHaState.current = haState
-    if (previous === null || haState === null || previous === haState) return
-    if (haState !== 'on' && haState !== 'off') return
-    setHaNotice(`${haName}: ${haState === 'on' ? 'zapnuto' : 'vypnuto'}`)
-    const timer = window.setTimeout(() => setHaNotice(null), HA_NOTICE_MS)
-    return () => window.clearTimeout(timer)
-  }, [haState, haName])
 
   // Upozornění z přehrávače (např. přechod na PCM) se na chvíli ukáže nahoře.
   const [notice, setNotice] = useState<string | null>(null)
@@ -193,12 +178,6 @@ export default function PlayerOverlay(): React.JSX.Element {
       {onlineOpen && <OnlineSubtitlesPanel onClose={() => setOnlineOpen(false)} />}
 
       <BusyIndicator text={state.ended ? null : state.busy} />
-
-      {haNotice && !notice && (
-        <div className="notice-toast ha-toast" {...controlsProps}>
-          {haNotice}
-        </div>
-      )}
 
       {notice && (
         <div className="notice-toast" {...controlsProps}>

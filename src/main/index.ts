@@ -242,6 +242,7 @@ async function startPlayback(
     logFile: join(app.getPath('logs'), 'mpv.log'),
     onProgress: (position, duration) => {
       if (session === started) tracker.update(position, duration)
+      haRun?.progress()
     },
     onNext: () => {
       if (session === started) playSibling(started, 'next')
@@ -488,6 +489,7 @@ async function playYt(host: BrowserWindow | null, videoId: number): Promise<Open
       logFile: join(app.getPath('logs'), 'mpv.log'),
       onProgress: (position, duration) => {
         if (session === started) ytTracker.update(position, duration)
+        ytHaRun?.progress()
       },
       onNext: () => {
         if (session === started && ytCurrent?.next) void loadYt(started, ytCurrent.next.id)

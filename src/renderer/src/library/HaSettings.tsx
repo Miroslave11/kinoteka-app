@@ -346,9 +346,10 @@ function HaAutomationCard({ status }: { status: HaStatus }): React.JSX.Element {
         </tbody>
       </table>
       <p className="muted small">
-        Pauza kratší než 2 s se nepočítá. Mezi díly seriálu se nic nepřepíná. „Vrátit původní“ =
-        stav před spuštěním; když „{name}“ mezitím přepneš ručně (vypínač, klávesa L), Kinotéka už
-        ji nechá být. Když Home Assistant neodpovídá, film hraje normálně.
+        Akce při spuštění proběhne 2 s po rozehrání videa. Pauza kratší než 2 s se nepočítá. Mezi
+        díly seriálu se nic nepřepíná. „Vrátit původní“ = stav před spuštěním; když „{name}“ mezitím
+        přepneš ručně (vypínač, klávesa L), Kinotéka už ji nechá být. Když Home Assistant
+        neodpovídá, film hraje normálně.
       </p>
     </section>
   )
