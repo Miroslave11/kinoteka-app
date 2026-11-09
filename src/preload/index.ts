@@ -148,6 +148,14 @@ const api: KinotekaApi = {
     setDeviceName: (name) => ipcRenderer.invoke(IpcChannel.SyncSetDeviceName, name),
     onChanged: (listener) => subscribe(IpcChannel.SyncChanged, () => listener())
   },
+  ha: {
+    status: () => ipcRenderer.invoke(IpcChannel.HaStatus),
+    save: (patch) => ipcRenderer.invoke(IpcChannel.HaSave, patch),
+    test: (url, token) => ipcRenderer.invoke(IpcChannel.HaTest, url, token),
+    entities: () => ipcRenderer.invoke(IpcChannel.HaEntities),
+    toggle: () => ipcRenderer.invoke(IpcChannel.HaToggle),
+    onChanged: (listener) => subscribe(IpcChannel.HaChanged, listener)
+  },
   yt: {
     status: () => ipcRenderer.invoke(IpcChannel.YtStatus),
     listCategories: () => ipcRenderer.invoke(IpcChannel.YtListCategories),

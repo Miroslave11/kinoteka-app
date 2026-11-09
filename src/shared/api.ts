@@ -46,6 +46,7 @@ import type { SubtitleSettings } from './subtitles'
 import type { ThemeInfo, ThemeResult, ThemeSettings, ThemeStatus } from './theme'
 import type { UpdateState } from './update'
 import type { SyncStatus } from './sync'
+import type { HaActionResult, HaEntityOption, HaSettingsPatch, HaStatus, HaTestResult } from './ha'
 import type {
   YtCategory,
   YtManageAction,
@@ -289,6 +290,16 @@ export interface KinotekaApi {
     syncNow(): Promise<void>
     setDeviceName(name: string): Promise<void>
     onChanged(listener: () => void): () => void
+  }
+  /** Ovládání entity v Home Assistant (žárovka v liště a v přehrávači). */
+  ha: {
+    status(): Promise<HaStatus>
+    save(patch: HaSettingsPatch): Promise<HaStatus>
+    /** Ověří adresu a token bez uložení (token prázdný = uložený). */
+    test(url: string, token?: string): Promise<HaTestResult>
+    entities(): Promise<{ ok: boolean; entities: HaEntityOption[]; message?: string }>
+    toggle(): Promise<HaActionResult>
+    onChanged(listener: (status: HaStatus) => void): () => void
   }
   yt: {
     status(): Promise<YtStatus>

@@ -33,6 +33,8 @@ import { endpointsAt, GOOGLE_ENDPOINTS } from './sync/googleAuth'
 import { JournalSync } from './sync/journalSync'
 import { registerSyncIpc } from './sync/syncIpc'
 import { SyncService } from './sync/SyncService'
+import { registerHaIpc } from './ha/haIpc'
+import { HaService } from './ha/HaService'
 import type { SyncAdapter } from './sync/syncModel'
 import { ytCategoryAdapter, ytVideoAdapter } from './sync/ytSync'
 import { JournalRepository } from './journal/JournalRepository'
@@ -418,6 +420,7 @@ let ytRepository: YtRepository
 let ytDownloaderRef: KidsDownloader | null = null
 let ytQueueRef: KidsDownloadQueue | null = null
 let syncRef: SyncService | null = null
+let haRef: HaService | null = null
 /** Klíč aplikace u Googlu (sdílení přes Google Disk) – vkládá ho workflow Vydání. */
 const GOOGLE_CLIENT_ID = __KINOTEKA_GOOGLE_CLIENT_ID__
 const GOOGLE_CLIENT_SECRET = __KINOTEKA_GOOGLE_CLIENT_SECRET__
@@ -799,6 +802,11 @@ void app.whenReady().then(() => {
   })
   syncRef = sync
   registerSyncIpc(sync)
+  // Ovládání entity v Home Assistant (SCOPE-HA.md); ve vývoji scripts/fake-ha.mjs.
+  const ha = new HaService({ settings })
+  haRef = ha
+  registerHaIpc(ha)
+  ha.start()
   registerJournalIpc(new JournalRepository(db), () => {
     broadcast(IpcChannel.LibraryChanged)
     sync.soon()
@@ -1100,6 +1108,7 @@ void app.whenReady().then(() => {
     ytStreamStop?.()
     themeDownloader.stopAll()
     syncRef?.stop()
+    haRef?.stop()
     db.close()
   })
 })

@@ -139,5 +139,11 @@ export const IpcChannel = {
   SyncSignOut: 'sync:sign-out',
   SyncNow: 'sync:now',
   SyncSetDeviceName: 'sync:set-device-name',
-  SyncChanged: 'sync:changed'
+  SyncChanged: 'sync:changed',
+  HaStatus: 'ha:status',
+  HaSave: 'ha:save',
+  HaTest: 'ha:test',
+  HaEntities: 'ha:entities',
+  HaToggle: 'ha:toggle',
+  HaChanged: 'ha:changed'
 } as const

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kinotéka – mockup Home Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #07080c; --glass: rgba(255,255,255,.055); --glass-2: rgba(255,255,255,.09);
+  --line: rgba(255,255,255,.09); --text: #f4f5f7; --muted: #9aa0ab; --dim: #6b717c;
+  --ok: #45d483; --danger: #ff5a5f; --accent: #ff4d4d; --lamp: #ffc857;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #020203; color: var(--text); font-family: Inter, system-ui, sans-serif; padding: 16px; font-size: 14px; }
+button, input, select { font: inherit; color: inherit; border: 0; background: none; }
+button { cursor: pointer; }
+.mock-nav { max-width: 1440px; margin: 0 auto 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mock-nav h1 { font-size: 13px; font-weight: 600; color: var(--muted); margin-right: 10px; }
+.mock-nav button { padding: 7px 12px; border-radius: 8px; background: #111318; border: 1px solid #1e2129; color: #c9ccd3; font-size: 13px; }
+.mock-nav button.on { background: #f4f5f7; color: #000; }
+.mock-note { max-width: 1440px; margin: 10px auto 0; color: var(--dim); font-size: 12px; line-height: 1.5; }
+
+.app { position: relative; max-width: 1440px; height: 820px; margin: 0 auto; display: flex; overflow: hidden;
+  border-radius: 14px; border: 1px solid #16181f; box-shadow: 0 30px 80px rgba(0,0,0,.6);
+  background: radial-gradient(1000px 600px at 85% -10%, rgba(160,20,30,.55), transparent 62%),
+              radial-gradient(800px 600px at -5% 105%, rgba(40,10,40,.9), transparent 65%), var(--bg); }
+.sidebar { width: 228px; flex: none; padding: 22px 14px; display: flex; flex-direction: column; gap: 4px;
+  background: rgba(6,7,10,.55); border-right: 1px solid var(--line); }
+.brand { font-weight: 800; font-size: 19px; padding: 0 10px 22px; }
+.sidebar a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; color: #c9ccd3; }
+.sidebar a.on { background: var(--glass-2); color: #fff; }
+.ico { width: 18px; text-align: center; opacity: .85; }
+.wrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { display: flex; align-items: center; gap: 10px; padding: 14px 34px 0; }
+.search { flex: 1; max-width: 420px; padding: 9px 13px; border-radius: 10px; background: var(--glass); border: 1px solid var(--line); color: var(--dim); }
+.spacer { flex: 1; }
+.tb { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--line); }
+.ha { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--line); color: #8a8f99; }
+.ha.is-on { color: var(--lamp); border-color: rgba(255,200,87,.5); background: rgba(255,200,87,.12); }
+.ha.is-on svg { filter: drop-shadow(0 0 6px var(--lamp)); fill: rgba(255,200,87,.35); }
+.ha.is-na { color: var(--dim); border-style: dashed; opacity: .7; }.new { outline: 2px dashed rgba(255,77,77,.7); outline-offset: 3px; }
+.main { flex: 1; overflow: auto; padding: 22px 34px; }
+.screen { display: none; } .screen.on { display: block; }
+h1.h { font-size: 28px; font-weight: 800; margin-bottom: 18px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+.tab { padding: 7px 13px; border-radius: 99px; background: var(--glass); border: 1px solid var(--line); color: #c9ccd3; font-size: 13px; }
+.tab.on { background: #fff; color: #000; }
+.panel { background: var(--glass); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+.panel h2 { font-size: 16px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+label { display: block; color: var(--muted); font-size: 12px; margin: 14px 0 6px; }
+.input { width: 100%; padding: 10px 13px; border-radius: 10px; background: rgba(0,0,0,.35); border: 1px solid var(--line); }
+.btn { padding: 9px 15px; border-radius: 10px; background: var(--glass-2); border: 1px solid var(--line); font-weight: 600; }
+.row { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.ok { color: var(--ok); } .muted { color: var(--muted); } .hint { color: var(--dim); font-size: 12px; margin-top: 6px; line-height: 1.5; }
+.toggle { margin-left: auto; width: 42px; height: 24px; border-radius: 99px; background: var(--ok); position: relative; flex: none; }
+.toggle::after { content: ""; position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+.toggle.off { background: #333; } .toggle.off::after { right: auto; left: 3px; }
+.ent { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); margin-top: 6px; }
+.ent.sel { border-color: var(--accent); background: rgba(255,77,77,.08); }
+.ent code { color: var(--dim); font-size: 12px; margin-left: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+td, th { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--dim); font-weight: 500; font-size: 12px; }
+.seg { display: inline-flex; border-radius: 9px; overflow: hidden; border: 1px solid var(--line); }
+.seg span { padding: 5px 10px; font-size: 12px; color: var(--muted); border-right: 1px solid var(--line); }
+.seg span:last-child { border: 0; }
+.seg span.on { background: #fff; color: #000; font-weight: 600; }
+.chk { display: inline-flex; gap: 6px; align-items: center; margin-right: 16px; }
+.box { width: 16px; height: 16px; border-radius: 4px; background: var(--accent); display: grid; place-items: center; font-size: 11px; }
+.box.no { background: transparent; border: 1px solid var(--dim); }
+
+.home-hero { height: 340px; border-radius: 16px; background: linear-gradient(120deg, #1b2a4a, #602030 60%, #c86b2c); padding: 34px; display: flex; flex-direction: column; justify-content: flex-end; }
+.home-hero h2 { font-size: 34px; font-weight: 800; }
+
+.player { position: absolute; inset: 0; background: linear-gradient(160deg, #0b1220, #24304a 50%, #5b4a3a); display: none; }
+.player.on { display: block; }
+.ov-top { position: absolute; top: 0; left: 0; right: 0; padding: 20px 28px; display: flex; gap: 12px; align-items: center; background: linear-gradient(rgba(0,0,0,.7), transparent); }
+.ov-top b { font-size: 18px; }
+.ov-bot { position: absolute; left: 0; right: 0; bottom: 0; padding: 24px 28px; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
+.seek { height: 5px; border-radius: 9px; background: rgba(255,255,255,.2); margin-bottom: 14px; }
+.seek i { display: block; width: 38%; height: 100%; background: var(--accent); border-radius: 9px; }
+.ctrls { display: flex; gap: 10px; align-items: center; }
+.cb { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); }
+.cb.big { width: 54px; height: 54px; background: #fff; color: #000; font-size: 20px; }
+.toast { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); padding: 10px 18px; border-radius: 99px; background: rgba(0,0,0,.75); border: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+.toast .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--lamp); box-shadow: 0 0 10px var(--lamp); }
+.toast.warn { top: auto; bottom: 130px; color: var(--muted); }
+.paused { position: absolute; inset: 0; display: grid; place-items: center; font-size: 80px; color: rgba(255,255,255,.75); }
+</style>
+</head>
+<body>
+<div class="mock-nav">
+  <h1>Mockup Home Assistant</h1>
+  <button data-s="nastaveni" class="on">1 · Nastavení → Home Assistant</button>
+  <button data-s="lista">2 · Horní lišta</button>
+  <button data-s="prehravac">3 · Přehrávač – pauza</button>
+  <button data-s="nedostupne">4 · HA nedostupný</button>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">Kinotéka</div>
+    <a><span class="ico">⌂</span> Domů</a>
+    <a><span class="ico">🎬</span> Filmy</a>
+    <a><span class="ico">📺</span> Seriály</a>
+    <a><span class="ico">☺</span> Děti</a>
+    <a><span class="ico">▶</span> YT videa</a>
+    <a id="nav-set" class="on" style="margin-top:auto"><span class="ico">⚙</span> Nastavení</a>
+  </aside>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="search">Hledat…</div>
+      <div class="spacer"></div>
+      <div class="ha is-on new" id="tb-ha" title="Linka – L"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></div>
+      <div class="tb">⛶</div>
+    </div>
+    <div class="main">
+      <!-- 1 Nastavení -->
+      <section class="screen on" id="s-nastaveni">
+        <h1 class="h">Nastavení</h1>
+        <div class="tabs"><span class="tab">Knihovny</span><span class="tab">Přehrávání</span><span class="tab">Zvuk</span><span class="tab">YT videa</span><span class="tab">Děti</span><span class="tab">Sdílení</span><span class="tab on new">Home Assistant</span><span class="tab">O aplikaci</span></div>
+        <div class="two">
+          <div>
+            <div class="panel">
+              <h2>Připojení <span class="toggle"></span></h2>
+              <label>Adresa</label><input class="input" value="http://homeassistant.local:8123">
+              <label>Dlouhodobý přístupový token</label><input class="input" value="••••••••••••••••••••••••••••">
+              <div class="hint">V Home Assistant: Profil → Zabezpečení → Dlouhodobé přístupové tokeny → Vytvořit („Kinotéka“). Uloží se zašifrovaně jen v tomto počítači, přes Google Disk se nesdílí.</div>
+              <div class="row"><button class="btn">Ověřit spojení</button><span class="ok">✓ Připojeno – Domov, Home Assistant 2026.11.0</span></div>
+            </div>
+            <div class="panel">
+              <h2>Ovládaná entita</h2>
+              <input class="input" value="linka" style="margin-top:10px">
+              <div class="ent sel">⏻ vypinac_linka <span class="ok" style="font-size:12px">zapnuto</span><code>switch.vypinac_linka</code></div>
+              <div class="ent muted">⏻ vypinac_loznice Left <code>switch.…</code></div>
+              <label>Zobrazovaný název</label><input class="input" value="Linka">
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Automatika podle přehrávání <span class="toggle"></span></h2>
+            <div class="row"><span class="chk"><span class="box">✓</span>Filmy</span><span class="chk"><span class="box">✓</span>Seriály</span><span class="chk"><span class="box">✓</span>YT videa</span><span class="chk muted"><span class="box no"></span>Děti – nikdy</span></div>
+            <table>
+              <tr><th>Když…</th><th>Linka</th></tr>
+              <tr><td>spustím přehrávání</td><td><span class="seg"><span>nic</span><span>zapnout</span><span class="on">vypnout</span></span></td></tr>
+              <tr><td>dám pauzu</td><td><span class="seg"><span>nic</span><span class="on">zapnout</span><span>vypnout</span></span></td></tr>
+              <tr><td>pokračuji po pauze</td><td><span class="seg"><span>nic</span><span>zapnout</span><span class="on">vypnout</span></span></td></tr>
+              <tr><td>film skončí / zavřu přehrávač</td><td><span class="seg"><span>nic</span><span>zapnout</span><span>vypnout</span><span class="on">vrátit původní</span></span></td></tr>
+            </table>
+            <div class="hint">Pauza kratší než 2 s se nepočítá. Mezi díly seriálu se nic nepřepíná. „Vrátit původní“ = stav před spuštěním; když linku mezitím přepneš ručně, Kinotéka ji už nechá být.</div>
+          </div>
+        </div>
+      </section>
+      <!-- 2 Lišta -->
+      <section class="screen" id="s-lista">
+        <div class="home-hero"><div class="muted">Pokračovat ve sledování</div><h2>Duna: Část druhá</h2></div>
+        <div class="hint" style="margin-top:14px">Žárovka vpravo nahoře (bez textu, název jen v bublině po najetí myší): žlutě = zapnuto, šedě = vypnuto, čárkovaně = Home Assistant nedostupný. Klik nebo klávesa L = přepnout. Stav je živý (změna vypínačem na zdi se hned projeví).</div>
+        <div class="row">
+          <div class="ha is-on" title="Linka – L"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></div>
+          <div class="ha" title="Linka – L"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></div>
+          <div class="ha is-na" title="Linka – nedostupné"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- 3/4 Přehrávač -->
+  <div class="player" id="player">
+    <div class="ov-top"><span class="cb">←</span><b>Duna: Část druhá (2024)</b></div>
+    <div class="paused" id="pz">❚❚</div>
+    <div class="toast" id="toast-ok"><span class="dot"></span> Linka: zapnuto (pauza)</div>
+    <div class="toast warn" id="toast-warn">⚠ Home Assistant je nedostupný – film hraje normálně</div>
+    <div class="ov-bot">
+      <div class="seek"><i></i></div>
+      <div class="ctrls">
+        <span class="cb">⏮</span><span class="cb big">▶</span><span class="cb">⏭</span><span class="cb">■</span>
+        <span class="muted" style="margin-left:8px">1:02:14 / 2:46:00</span>
+        <div class="spacer"></div>
+        <div class="ha is-on new" id="pl-ha" title="Linka – L"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></div>
+        <span class="cb">CC</span><span class="cb">🔊</span><span class="cb">⛶</span>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="mock-note">Čárkovaně orámované = nové prvky. Mockup je statický – ukazuje rozložení, ne skutečné chování.</p>
+
+<script>
+const btns = document.querySelectorAll('.mock-nav button');
+function show(s) {
+  btns.forEach(b => b.classList.toggle('on', b.dataset.s === s));
+  document.querySelectorAll('.screen').forEach(el => el.classList.toggle('on', el.id === 's-' + s));
+  const pl = s === 'prehravac' || s === 'nedostupne';
+  document.getElementById('player').classList.toggle('on', pl);
+  document.getElementById('toast-ok').style.display = s === 'prehravac' ? 'flex' : 'none';
+  document.getElementById('toast-warn').style.display = s === 'nedostupne' ? 'flex' : 'none';
+  document.getElementById('pz').style.display = s === 'prehravac' ? 'grid' : 'none';
+  document.getElementById('pl-ha').className = 'ha new ' + (s === 'nedostupne' ? 'is-na' : 'is-on');
+  document.getElementById('nav-set').classList.toggle('on', s === 'nastaveni');
+  try { location.hash = s; } catch (e) {}
+}
+btns.forEach(b => b.addEventListener('click', () => show(b.dataset.s)));
+show((location.hash || '#nastaveni').slice(1));
+</script>
+</body>
+</html>
