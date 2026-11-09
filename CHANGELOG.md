@@ -1,5 +1,15 @@
 # Změny
 
+## 1.6.0 – 2026-11-09
+
+### Ovládání Home Assistant
+
+- Nová sekce **Nastavení → Home Assistant**: adresa (výchozí `http://homeassistant.local:8123`), dlouhodobý přístupový token (uložený zašifrovaně jen v tomto počítači, přes Google Disk se nesdílí), Ověřit spojení a výběr ovládané entity (vypínač, světlo, pomocník typu přepínač) s vlastním názvem.
+- **Žárovka** vpravo nahoře a v ovládací liště přehrávače: žlutá = zapnuto, šedá = vypnuto, čárkovaná = Home Assistant nedostupný. Klik entitu přepne; stav je živý (změna vypínačem na zdi se hned projeví).
+- **Klávesa L** přepne žárovku v hlavním okně i v přehrávači. V přehrávači se tím mění zkratka: posun o +10 s je teď jen na šipce →.
+- **Automatika podle přehrávání** (Filmy, Seriály, YT videa; Děti nikdy): spuštění = vypnout, pauza delší než 2 s = zapnout, pokračování = vypnout, konec / zavření přehrávače = vrátit stav před spuštěním. Pravidla jdou změnit (nic / zapnout / vypnout / vrátit původní). Mezi díly seriálu se nic nepřepíná; když entitu během filmu přepneš ručně, Kinotéka ji na konci nechá být.
+- **Odolnost:** výpadek Home Assistant nikdy nezastaví přehrávání (jen jedna hláška); spojení se po výpadku sítě i po probuzení počítače ze spánku obnoví samo. Neplatný token a smazaná entita mají srozumitelnou hlášku.
+
 ## 1.5.0 – 2026-11-08
 
 ### Sdílení mezi počítači přes Google Disk
