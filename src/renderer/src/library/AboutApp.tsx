@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Download, FolderOpen, RefreshCw } from 'lucide-react'
 import type { AppInfo } from '../../../shared/api'
-import { keyWarning, type UpdateState } from '../../../shared/update'
+import type { UpdateState } from '../../../shared/update'
 import { useUpdateState } from '../components/UpdateBanner'
 import { IMDB_ATTRIBUTION } from '../../../shared/metadata'
 
@@ -111,22 +111,7 @@ function describe(state: UpdateState): string {
   }
 }
 
-/** Klíč, kterým Kinotéka čte soukromý repozitář s vydáními: platnost a upozornění. */
-function KeyInfo({ state }: { state: UpdateState }): React.JSX.Element | null {
-  const { key } = state
-  const warning = keyWarning(key)
-  if (warning) return <p className="notice is-error">{warning}</p>
-  if (key.status !== 'ok') return null
-  return (
-    <p className="muted small">
-      {key.expiresAt
-        ? `Klíč pro aktualizace platí do ${new Date(key.expiresAt).toLocaleDateString('cs-CZ')}.`
-        : 'Klíč pro aktualizace platí bez omezení.'}
-    </p>
-  )
-}
-
-/** Nastavení → O aplikaci: automatické aktualizace ze soukromého repozitáře s vydáními. */
+/** Nastavení → O aplikaci: automatické aktualizace z veřejného repozitáře kinoteka-app. */
 function UpdateCard({ state }: { state: UpdateState }): React.JSX.Element {
   const { update } = window.kinoteka
   const unsupported = state.status === 'unsupported'
@@ -135,7 +120,6 @@ function UpdateCard({ state }: { state: UpdateState }): React.JSX.Element {
     <section className="card">
       <h2>Aktualizace</h2>
       <p className={`notice ${state.status === 'error' ? 'is-error' : ''}`}>{describe(state)}</p>
-      <KeyInfo state={state} />
       <label className="toggle-row">
         <input
           type="checkbox"

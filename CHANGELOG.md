@@ -1,5 +1,12 @@
 # Změny
 
+## Nevydáno
+
+### Veřejný repozitář
+
+- Kinotéka je nově ve veřejném repozitáři [kinoteka-app](https://github.com/Miroslave11/kinoteka-app) – zdrojový kód i instalátory ke stažení.
+- Automatické aktualizace se hledají tam, bez klíče. Zmizel údaj o platnosti klíče v Nastavení → O aplikaci a upozornění na jeho vypršení.
+
 ## 1.6.0 – 2026-11-09
 
 ### Ovládání Home Assistant

@@ -9,15 +9,15 @@ Windows 10/11 · Electron + React + TypeScript · přehrávání přes mpv.
 
 ## Instalace
 
-Instalátor `Kinoteka-Setup-<verze>.exe` vzniká v CI (artefakt „Kinoteka-Setup“ u každého běhu
-GitHub Actions) nebo lokálně příkazem `npm run dist` do složky `dist/`. Obsahuje mpv i ffmpeg.
+Instalátor `Kinoteka-Setup-<verze>.exe` je ke stažení ve
+[vydáních](https://github.com/Miroslave11/kinoteka-app/releases/latest). Vzniká v CI (artefakt
+„Kinoteka-Setup“ u každého běhu GitHub Actions) nebo lokálně příkazem `npm run dist` do `dist/`. Obsahuje mpv i ffmpeg.
 Instalátor není podepsaný, Windows SmartScreen proto při prvním spuštění zobrazí varování
 („Další informace“ → „Přesto spustit“). Knihovna, deník a nastavení jsou v `%APPDATA%\kinoteka`
 (stejná složka jako při vývoji, takže se po instalaci zachovají) a odinstalace je nemaže.
 
-Nainstalovaná Kinotéka se sama aktualizuje ze soukromého repozitáře
-[kinoteka-vydani](https://github.com/Miroslave11/kinoteka-vydani), kde jsou jen instalátory.
-Čte ho klíčem jen pro čtení, který je vložený v aplikaci (viz níže).
+Nainstalovaná Kinotéka se sama aktualizuje z vydání v tomto veřejném repozitáři – bez
+přihlášení a bez klíče.
 
 ## Spuštění bez instalace
 
@@ -54,20 +54,21 @@ a sestaví instalátor.
 1. Zvýšit verzi v `package.json` a doplnit `CHANGELOG.md`, začlenit do `main`.
 2. Tag `v<verze>` (např. `git tag v1.2.0 && git push origin v1.2.0`) spustí workflow
    „Vydání“: sestaví instalátor a nahraje ho s `latest.yml` jako **koncept** vydání do
-   [kinoteka-vydani](https://github.com/Miroslave11/kinoteka-vydani).
+   [vydání tohoto repozitáře](https://github.com/Miroslave11/kinoteka-app/releases). Stačí mu
+   vestavěný `GITHUB_TOKEN`.
 3. Koncept zkontrolovat a zveřejnit – teprve potom si ho nainstalované Kinotéky stáhnou
    (po spuštění a každých 6 hodin) a nainstalují při zavření.
 
-Workflow potřebuje dvě tajné proměnné (Settings → Secrets and variables → Actions), obě jako
-osobní klíč GitHubu (fine-grained) jen pro repozitář `kinoteka-vydani`:
+Workflow potřebuje tajné proměnné (Settings → Secrets and variables → Actions)
+`KINOTEKA_GOOGLE_CLIENT_ID` a `KINOTEKA_GOOGLE_CLIENT_SECRET` (klient Google typu „Aplikace pro
+počítač“ pro sdílení přes Google Disk).
 
-- `KINOTEKA_VYDANI_TOKEN` – _Contents: Read and write_, nahrává vydání. Když vyprší, stačí ho
-  vyměnit – nainstalovaných aplikací se to netýká.
-- `KINOTEKA_UPDATE_TOKEN` – jen _Contents: Read-only_, vloží se do aplikace a ta jím čte
-  vydání. Bez něj workflow skončí chybou. Platnost ukazuje Nastavení → O aplikaci a 30 dní
-  před vypršením i pruh nahoře. **Výměna:** nový klíč do secretu, vydat novou verzi a
-  nainstalovat ji, dokud starý klíč platí. Po vypršení už Kinotéka novou verzi sama
-  nenajde – instalátor je pak potřeba stáhnout z GitHubu ručně.
+**Přechod ze soukromého repozitáře:** Kinotéky do verze 1.6.0 hledají aktualizace jen v
+soukromém `kinoteka-vydani` (klíčem vloženým v aplikaci). Dokud existuje secret
+`KINOTEKA_VYDANI_TOKEN`, workflow nahraje stejný koncept i tam – zveřejnit je potřeba oba.
+Až budou všechny počítače na novější verzi, smazat přechodový krok ve workflow, secrety
+`KINOTEKA_VYDANI_TOKEN` a `KINOTEKA_UPDATE_TOKEN`, oba klíče na GitHubu a repozitář
+`kinoteka-vydani`.
 
 Aktualizace jdou vyzkoušet i ve vývoji proti vlastnímu serveru se souborem `latest.yml`:
 `KINOTEKA_DEV_UPDATE_URL=http://127.0.0.1:8767/ npm run dev`.
