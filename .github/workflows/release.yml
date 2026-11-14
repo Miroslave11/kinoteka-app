@@ -1,14 +1,18 @@
 name: Vydání
 
-# Tag v1.2.3 → instalátor a latest.yml jako KONCEPT vydání v Miroslave11/kinoteka-vydani.
+# Tag v1.2.3 → instalátor a latest.yml jako KONCEPT vydání ve veřejném Miroslave11/kinoteka-app.
 # Aplikace si aktualizaci stáhne až po ručním zveřejnění konceptu.
 on:
   push:
     tags: ['v*']
 
+# Vestavěný GITHUB_TOKEN smí zakládat vydání v tomto repozitáři.
+permissions:
+  contents: write
+
 jobs:
   release:
-    name: Instalátor do kinoteka-vydani
+    name: Instalátor do vydání
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -23,14 +27,6 @@ jobs:
 
       - name: Testy
         run: npm test
-
-      # Vydání jsou v soukromém repozitáři – verze bez klíče pro čtení by se už nikdy
-      # neaktualizovala, proto bez něj vydání nevznikne.
-      - name: Klíč pro aktualizace je nastavený
-        shell: bash
-        env:
-          KINOTEKA_UPDATE_TOKEN: ${{ secrets.KINOTEKA_UPDATE_TOKEN }}
-        run: test -n "$KINOTEKA_UPDATE_TOKEN" || { echo "Chybí secret KINOTEKA_UPDATE_TOKEN"; exit 1; }
 
       # Sdílení přes Google Disk: klíč aplikace u Googlu (Google Cloud → Clients, typ Desktop app).
       - name: Klíč Google pro sdílení je platný
@@ -56,23 +52,36 @@ jobs:
 
       # Koncept založit předem: electron-builder nahrává instalátor a latest.yml souběžně
       # a bez existujícího konceptu si každé nahrávání založí vlastní (stalo se u 1.1.0).
-      - name: Koncept vydání v kinoteka-vydani
+      - name: Koncept vydání
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.KINOTEKA_VYDANI_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" --repo Miroslave11/kinoteka-vydani >/dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" --repo Miroslave11/kinoteka-vydani --draft               --title "Kinotéka ${GITHUB_REF_NAME#v}"               --notes "$(awk -v v="## ${GITHUB_REF_NAME#v}" 'index($0, v) == 1 {f = 1; next} /^## / {if (f) exit} f' CHANGELOG.md)"
+          awk -v v="## ${GITHUB_REF_NAME#v}" 'index($0, v) == 1 {f = 1; next} /^## / {if (f) exit} f' CHANGELOG.md > notes.md
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag               --title "Kinotéka ${GITHUB_REF_NAME#v}" --notes-file notes.md
 
       - name: Sestavení a nahrání konceptu vydání
         env:
-          # Klíč s právem zápisu jen do repozitáře kinoteka-vydani (Settings → Secrets → Actions).
-          GH_TOKEN: ${{ secrets.KINOTEKA_VYDANI_TOKEN }}
-          # Klíč jen pro čtení kinoteka-vydani – vloží se do aplikace (aktualizace ze soukromého repa).
-          KINOTEKA_UPDATE_TOKEN: ${{ secrets.KINOTEKA_UPDATE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           # Klíč aplikace u Googlu pro sdílení přes Google Disk (bez něj se sdílení nedá zapnout).
           KINOTEKA_GOOGLE_CLIENT_ID: ${{ secrets.KINOTEKA_GOOGLE_CLIENT_ID }}
           KINOTEKA_GOOGLE_CLIENT_SECRET: ${{ secrets.KINOTEKA_GOOGLE_CLIENT_SECRET }}
           # Electron a nástroje electron-builderu přes místní zrcadlo (scripts/eb-mirror.mjs).
           EB_MIRROR_TOKEN: ${{ github.token }}
         run: npm run fetch:bin && npm run build && node scripts/eb-mirror.mjs npx electron-builder --win --publish always
+
+      # PŘECHOD ze soukromého repozitáře kinoteka-vydani: Kinotéky do verze 1.6.0 hledají
+      # aktualizace jen tam (klíčem vloženým v aplikaci). Stejné soubory proto jdou i tam jako
+      # koncept; po instalaci se Kinotéka přepne na kinoteka-app. Až budou všechny počítače
+      # aktualizované, smazat tento krok, secret KINOTEKA_VYDANI_TOKEN i repozitář kinoteka-vydani.
+      - name: Přechod – kopie konceptu do kinoteka-vydani
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.KINOTEKA_VYDANI_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "Secret KINOTEKA_VYDANI_TOKEN chybí – přechodová kopie se přeskakuje."; exit 0; fi
+          repo=Miroslave11/kinoteka-vydani
+          gh release view "$GITHUB_REF_NAME" --repo $repo >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --repo $repo --draft --target main               --title "Kinotéka ${GITHUB_REF_NAME#v}" --notes-file notes.md
+          gh release upload "$GITHUB_REF_NAME" --repo $repo --clobber             "dist/Kinoteka-Setup-${GITHUB_REF_NAME#v}.exe"             "dist/Kinoteka-Setup-${GITHUB_REF_NAME#v}.exe.blockmap"             dist/latest.yml

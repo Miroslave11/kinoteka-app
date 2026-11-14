@@ -2,6 +2,11 @@
 
 ## Nevydáno
 
+### Veřejný repozitář
+
+- Kinotéka je nově ve veřejném repozitáři [kinoteka-app](https://github.com/Miroslave11/kinoteka-app) – zdrojový kód i instalátory ke stažení.
+- Automatické aktualizace se hledají tam, bez klíče. Zmizel údaj o platnosti klíče v Nastavení → O aplikaci a upozornění na jeho vypršení.
+
 ### Ovládání Home Assistant
 
 - Po spuštění videa se světlo vypne až **2 s po rozehrání** (ne už při načítání); film zavřený do 2 s světlo nepřepne.

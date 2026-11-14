@@ -1,4 +1,4 @@
-import { app, ipcMain, net } from 'electron'
+import { app, ipcMain } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -6,10 +6,10 @@ import { IpcChannel } from '../../shared/ipc'
 import { broadcast } from '../broadcast'
 import type { SettingsRepository } from '../settings/SettingsRepository'
 import { AppUpdater } from './AppUpdater'
-import { RELEASES_OWNER, RELEASES_REPO, checkUpdateKey } from './updateKey'
 
-/** Klíč pro aktualizace vložený při sestavení (prázdný ve vývoji). */
-const UPDATE_TOKEN = __KINOTEKA_UPDATE_TOKEN__
+/** Veřejný repozitář Kinotéky – zdrojový kód i vydání (instalátor + latest.yml). */
+const RELEASES_OWNER = 'Miroslave11'
+const RELEASES_REPO = 'kinoteka-app'
 
 /**
  * Automatické aktualizace jen v nainstalované aplikaci. Ve vývoji jdou vyzkoušet proti
@@ -32,23 +32,11 @@ updaterCacheDirName: kinoteka-dev-updater
   }
   // Instalátor je vždy celý (offline), webový instalátor Kinotéka nepoužívá.
   autoUpdater.disableWebInstaller = true
-  const token = app.isPackaged && !devUrl ? UPDATE_TOKEN : ''
-  if (token) {
-    // Vydání jsou v soukromém repozitáři – electron-updater je čte přes API GitHubu s klíčem.
-    autoUpdater.setFeedURL({
-      provider: 'github',
-      owner: RELEASES_OWNER,
-      repo: RELEASES_REPO,
-      private: true,
-      token
-    })
+  if (app.isPackaged && !devUrl) {
+    // Vydání jsou ve veřejném repozitáři – čtou se bez klíče (nezávisle na app-update.yml).
+    autoUpdater.setFeedURL({ provider: 'github', owner: RELEASES_OWNER, repo: RELEASES_REPO })
   }
-  const updater = new AppUpdater(
-    settings,
-    app.isPackaged || devUrl ? autoUpdater : null,
-    undefined,
-    token ? () => checkUpdateKey((input, init) => net.fetch(String(input), init), token) : undefined
-  )
+  const updater = new AppUpdater(settings, app.isPackaged || devUrl ? autoUpdater : null)
   updater.on('changed', (state) => broadcast(IpcChannel.UpdateChanged, state))
   ipcMain.handle(IpcChannel.UpdateState, () => updater.state())
   ipcMain.handle(IpcChannel.UpdateCheck, () => updater.check())
