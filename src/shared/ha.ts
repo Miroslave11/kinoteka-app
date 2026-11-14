@@ -178,6 +178,9 @@ export const DEFAULT_HA_AUTOMATION: HaAutomationSettings = {
 /** Kratší pauza (přetáčení, omylem mezerník) se nepočítá. */
 export const HA_PAUSE_DELAY_MS = 2000
 
+/** Akce „spuštění“ až chvíli po rozehrání videa (ne hned při otevírání). */
+export const HA_START_DELAY_MS = 2000
+
 const SIMPLE_ACTIONS = ['none', 'on', 'off'] as const
 
 export function parseHaAutomation(value: unknown): HaAutomationSettings {

@@ -1,5 +1,6 @@
 import {
   HA_PAUSE_DELAY_MS,
+  HA_START_DELAY_MS,
   type HaActionResult,
   type HaAutomationSettings,
   type HaPlaybackKind,
@@ -36,7 +37,8 @@ export class HaAutomation {
 
   constructor(
     private readonly target: HaAutomationTarget,
-    private readonly pauseDelayMs = HA_PAUSE_DELAY_MS
+    private readonly pauseDelayMs = HA_PAUSE_DELAY_MS,
+    private readonly startDelayMs = HA_START_DELAY_MS
   ) {}
 
   /**
@@ -48,6 +50,7 @@ export class HaAutomation {
     const run = new HaPlaybackRun(
       this.target,
       this.pauseDelayMs,
+      this.startDelayMs,
       previous?.isOpen ? previous.handOver() : null,
       onFailure
     )
@@ -72,6 +75,8 @@ export class HaAutomation {
 interface Inherited {
   original: string | null
   override: boolean
+  /** Předchozí přehrávání už entitu přepnulo (na konci je co vracet). */
+  touched: boolean
 }
 
 export class HaPlaybackRun {
@@ -82,11 +87,18 @@ export class HaPlaybackRun {
   /** Stav, který automatika naposledy nastavila (změna na jiný = ruční zásah). */
   private expected: string | null = null
   private pauseTimer: ReturnType<typeof setTimeout> | null = null
+  /** Akce „spuštění“ čeká, až video chvíli hraje. */
+  private startTimer: ReturnType<typeof setTimeout> | null = null
+  private startDone = false
+  /** Automatika už v tomto (nebo předchozím) přehrávání něco přepnula. */
+  private touched = false
+  private paused = false
   private failed = false
 
   constructor(
     private readonly target: HaAutomationTarget,
     private readonly pauseDelayMs: number,
+    private readonly startDelayMs: number,
     private readonly inherited: Inherited | null,
     private readonly onFailure?: (message: string) => void
   ) {}
@@ -100,29 +112,51 @@ export class HaPlaybackRun {
     this.active = this.target.configured() && rules.enabled && rules.sections[kind]
     this.original = this.inherited ? this.inherited.original : this.target.entityState()
     this.override = this.inherited?.override ?? false
+    this.touched = this.inherited?.touched ?? false
     this.expected = this.target.entityState()
-    if (this.active) this.apply(rules.start)
+  }
+
+  /**
+   * Video se rozehrálo (mpv hlásí pozici). Akce „spuštění“ proběhne po {@link HA_START_DELAY_MS},
+   * pokud video mezitím nikdo nepozastavil ani nezavřel.
+   */
+  progress(): void {
+    if (!this.active || this.startDone || this.startTimer || this.paused) return
+    if (this.phase !== 'playing') return
+    this.startTimer = setTimeout(() => {
+      this.startTimer = null
+      if (this.phase !== 'playing' || this.paused) return
+      this.startDone = true
+      this.apply(this.target.automation().start)
+    }, this.startDelayMs)
   }
 
   /** Předá původní stav novému přehrávání a samo skončí bez akce. */
   handOver(): Inherited {
     this.clearPause()
+    this.clearStart()
     this.phase = 'closed'
-    return { original: this.original, override: this.override }
+    return { original: this.original, override: this.override, touched: this.touched }
   }
 
   flags({ paused, ended, hasNext }: HaPlaybackFlags): void {
     if (!this.active || this.phase === 'closed') return
+    this.paused = paused
     const rules = (): HaAutomationSettings => this.target.automation()
     if (ended) {
       this.clearPause()
       // Konec dílu s dalším dílem = přechod, ne konec sledování.
       if (hasNext || this.phase === 'ended') return
+      this.clearStart()
       this.phase = 'ended'
-      this.apply(rules().end)
+      // Před spuštěním se nic nepřepnulo – není co vracet.
+      if (this.touched) this.apply(rules().end)
       return
     }
     if (paused) {
+      // Pauza dřív, než akce „spuštění“ proběhla: počká se na nové rozehrání.
+      this.clearStart()
+      if (!this.touched) return
       if (this.phase !== 'playing' || this.pauseTimer) return
       this.pauseTimer = setTimeout(() => {
         this.pauseTimer = null
@@ -135,23 +169,32 @@ export class HaPlaybackRun {
     // Hraje.
     this.clearPause()
     if (this.phase === 'paused') this.apply(rules().resume)
-    else if (this.phase === 'ended') this.apply(rules().start) // Přehrát znovu
+    // Přehrát znovu po konci: „spuštění“ znovu se zpožděním.
+    else if (this.phase === 'ended') this.startDone = false
     this.phase = 'playing'
+    this.progress()
   }
 
   /** Přehrávač se zavřel (konec, Zpět, Zastavit, křížek). */
   end(): void {
     if (this.phase === 'closed') return
     this.clearPause()
+    this.clearStart()
     const wasEnded = this.phase === 'ended'
     this.phase = 'closed'
-    if (this.active && !wasEnded) this.apply(this.target.automation().end)
+    // Zavřeno dřív, než se cokoli přepnulo: entita zůstane, jak byla.
+    if (this.active && !wasEnded && this.touched) this.apply(this.target.automation().end)
   }
 
   entityChanged(state: string | null): void {
     if (this.phase === 'closed' || (state !== 'on' && state !== 'off')) return
     if (state !== this.expected) this.override = true
     this.expected = state
+  }
+
+  private clearStart(): void {
+    if (this.startTimer) clearTimeout(this.startTimer)
+    this.startTimer = null
   }
 
   private clearPause(): void {
@@ -161,6 +204,7 @@ export class HaPlaybackRun {
 
   private apply(action: HaRuleAction): void {
     if (action === 'none') return
+    if (action !== 'restore') this.touched = true
     if (action === 'restore') {
       if (this.override || (this.original !== 'on' && this.original !== 'off')) return
       return this.set(this.original === 'on')

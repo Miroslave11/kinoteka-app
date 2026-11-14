@@ -17,14 +17,15 @@ Kinotéka 1.6.0, Home Assistant v domácí síti (`http://homeassistant.local:81
 5. Žárovka v horní liště: žlutá = svítí, šedá = zhasnuto. Klik přepne linku.
 6. Klávesa **L** (mimo textové pole) přepne linku. V poli Hledat se píše „l“ normálně.
 7. Linku přepnout vypínačem na zdi / v aplikaci HA → žárovka se do pár sekund změní sama.
-8. V přehrávači (film, seriál, YT video): žárovka vpravo dole, **L** přepne linku a nahoře
-   se ukáže „Linka: zapnuto/vypnuto“; video se neposune (+10 s je jen šipka →).
+8. V přehrávači (film, seriál, YT video): žárovka vpravo dole, **L** přepne linku (změní se
+   jen barva žárovky, žádná hláška); video se neposune (+10 s je jen šipka →).
 9. Klávesové zkratky v přehrávači (?) uvádějí L = žárovka.
 10. V Dětech žárovka není a L nic nedělá.
 
 ## Automatika (výchozí pravidla)
 
-11. Linka svítí → pustit film: linka zhasne.
+11. Linka svítí → pustit film: linka zhasne **2 s po rozehrání** videa (ne během načítání).
+    Zavřít film do 2 s od spuštění → linka se vůbec nepřepne.
 12. Pauza a počkat > 2 s → rozsvítí se; pokračovat → zhasne. Pauza a hned pokračovat → nic.
 13. Zavřít přehrávač (Zpět, Esc, ■ Zastavit, křížek) → linka se rozsvítí (svítila před filmem).
 14. Linka zhasnutá → pustit film a zavřít → zůstane zhasnutá.
