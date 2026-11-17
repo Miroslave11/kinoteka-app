@@ -63,12 +63,5 @@ Workflow potřebuje tajné proměnné (Settings → Secrets and variables → Ac
 `KINOTEKA_GOOGLE_CLIENT_ID` a `KINOTEKA_GOOGLE_CLIENT_SECRET` (klient Google typu „Aplikace pro
 počítač“ pro sdílení přes Google Disk).
 
-**Přechod ze soukromého repozitáře:** Kinotéky do verze 1.6.0 hledají aktualizace jen v
-soukromém `kinoteka-vydani` (klíčem vloženým v aplikaci). Dokud existuje secret
-`KINOTEKA_VYDANI_TOKEN`, workflow nahraje stejný koncept i tam – zveřejnit je potřeba oba.
-Až budou všechny počítače na novější verzi, smazat přechodový krok ve workflow, secrety
-`KINOTEKA_VYDANI_TOKEN` a `KINOTEKA_UPDATE_TOKEN`, oba klíče na GitHubu a repozitář
-`kinoteka-vydani`.
-
 Aktualizace jdou vyzkoušet i ve vývoji proti vlastnímu serveru se souborem `latest.yml`:
 `KINOTEKA_DEV_UPDATE_URL=http://127.0.0.1:8767/ npm run dev`.
