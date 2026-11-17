@@ -70,18 +70,3 @@ jobs:
           # Electron a nástroje electron-builderu přes místní zrcadlo (scripts/eb-mirror.mjs).
           EB_MIRROR_TOKEN: ${{ github.token }}
         run: npm run fetch:bin && npm run build && node scripts/eb-mirror.mjs npx electron-builder --win --publish always
-
-      # PŘECHOD ze soukromého repozitáře kinoteka-vydani: Kinotéky do verze 1.6.0 hledají
-      # aktualizace jen tam (klíčem vloženým v aplikaci). Stejné soubory proto jdou i tam jako
-      # koncept; po instalaci se Kinotéka přepne na kinoteka-app. Až budou všechny počítače
-      # aktualizované, smazat tento krok, secret KINOTEKA_VYDANI_TOKEN i repozitář kinoteka-vydani.
-      - name: Přechod – kopie konceptu do kinoteka-vydani
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.KINOTEKA_VYDANI_TOKEN }}
-        run: |
-          if [ -z "$GH_TOKEN" ]; then echo "Secret KINOTEKA_VYDANI_TOKEN chybí – přechodová kopie se přeskakuje."; exit 0; fi
-          repo=Miroslave11/kinoteka-vydani
-          gh release view "$GITHUB_REF_NAME" --repo $repo >/dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" --repo $repo --draft --target main               --title "Kinotéka ${GITHUB_REF_NAME#v}" --notes-file notes.md
-          gh release upload "$GITHUB_REF_NAME" --repo $repo --clobber             "dist/Kinoteka-Setup-${GITHUB_REF_NAME#v}.exe"             "dist/Kinoteka-Setup-${GITHUB_REF_NAME#v}.exe.blockmap"             dist/latest.yml
