@@ -34,11 +34,21 @@ function useYtVideoCount(): number | null {
   return count
 }
 
+/** Verze nainstalované Kinotéky (z hlavního procesu). */
+function useAppVersion(): string | null {
+  const [version, setVersion] = useState<string | null>(null)
+  useEffect(() => {
+    void window.kinoteka.app.info().then((info) => setVersion(info.version))
+  }, [])
+  return version
+}
+
 export default function Sidebar(): React.JSX.Element {
   const { movies, shows, folders } = useApp()
   const link = ({ isActive }: { isActive: boolean }): string => (isActive ? 'on' : '')
   const kids = useKidsVideoCount()
   const ytCount = useYtVideoCount()
+  const version = useAppVersion()
   const [scanning, setScanning] = useState<ReadonlySet<number>>(new Set())
 
   /** Klik na knihovnu ji znovu proskenuje (hlavně aby se vrátil odpojený a znovu připojený disk). */
@@ -114,6 +124,12 @@ export default function Sidebar(): React.JSX.Element {
         <NavLink to="/denik" className={link}>
           <BookOpen size={18} /> Deník
         </NavLink>
+        {version && (
+          <div className="side-version" title={`Kinotéka ${version}`}>
+            <span className="side-version-label">Verze </span>
+            {version}
+          </div>
+        )}
       </div>
     </aside>
   )

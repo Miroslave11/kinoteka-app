@@ -261,6 +261,14 @@ option {
   gap: 4px;
 }
 
+.side-version {
+  padding: 6px 12px 0;
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+  user-select: text;
+}
+
 .dot {
   flex: none;
   width: 8px;
@@ -1295,8 +1303,14 @@ option {
   .sidebar a .count,
   .nav-disabled .count,
   .side-sep,
+  .side-version-label,
   .lib {
     display: none;
+  }
+
+  .side-version {
+    padding: 6px 0 0;
+    text-align: center;
   }
 
   .search {

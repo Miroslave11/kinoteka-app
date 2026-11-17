@@ -1,5 +1,9 @@
 # Změny
 
+## 1.6.2 – 2026-11-17
+
+- V levém menu pod Deníkem je malým písmem verze Kinotéky (na úzkém okně jen číslo).
+
 ## 1.6.1 – 2026-11-14
 
 ### Veřejný repozitář
